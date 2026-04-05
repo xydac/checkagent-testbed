@@ -564,3 +564,60 @@ Works. Deselects all 475 tests because none have `@pytest.mark.agent_test(layer=
 - Investigate whether `ProbeSet.__add__` preserves ordering
 - Check if there's a `checkagent.ci` pytest fixture (like `ap_quality_gates`)
 - Test what happens with `@pytest.mark.agent_test(layer='judge')` — can we write a judge test?
+
+---
+
+## Session 014 — 2026-04-05
+
+**Upgraded from:** 735700f → 90ab3c5 (still 0.0.1a1)
+**New commit message:** (no new features detected — same top-level exports as session-013)
+
+**What I tried:**
+- Upgraded checkagent from git main (90ab3c5)
+- Re-ran all 549 existing tests — all pass, no regressions
+- Explored CI pipeline end-to-end: runs → metrics → aggregate → evaluate_gates → generate_pr_comment
+- Investigated `generate_pr_comment` signature for eval/regression support
+- Tested `ProbeSet + operator` for ordering guarantees and duplicate handling
+- Wrote judge-layer marker tests — confirmed `@pytest.mark.agent_test(layer='judge')` works
+- Investigated `checkagent run` default `-m agent_test` filter behavior
+- Tested `RunSummary.save()` / `RunSummary.load()` round-trip with regressions
+- Tested CI quality gates pytest plugin integration (or lack thereof)
+- Tested `QualityGateEntry` missing-metric behavior
+- Filed F-033 through F-035
+
+**What I found:**
+
+**Full CI pipeline works end-to-end (with correct dict API):**
+`aggregate_scores()` takes `list[tuple[str, float, bool | None]]` — 3-tuple, not 2-tuple. `evaluate_gates()` takes `dict[str, QualityGateEntry]` — dict keyed by metric name, not a list. Once you get the API right the pipeline is clean: compute metric scores → aggregate → evaluate_gates → generate_pr_comment produces a valid GitHub-flavored Markdown comment.
+
+**F-033: generate_pr_comment has no eval_summary or regressions param:**
+The eval and CI modules are completely disconnected. `generate_pr_comment` signature is `(test_summary, gate_report, cost_report, title)`. No `eval_summary`, no `regressions`, no way to surface `detect_regressions()` output in PR comments. The workaround is to translate regressions into gate failures manually. This is a significant gap for the "CI/CD-first" claim.
+
+**F-034: checkagent run silently runs only marked tests:**
+`checkagent run tests/` runs 221 tests (only `@pytest.mark.agent_test`), while `pytest tests/` runs 549. The `build_pytest_args()` function injects `-m agent_test` by default. There's no warning about this deselection. Users following the README quickstart with `checkagent run` will silently miss 328 tests. This is a significant DX trap.
+
+**F-035: RunSummary.load() drops regressions:**
+`RunSummary.save()` calls `to_dict()` which includes regressions. The JSON file contains the regressions array. But `RunSummary.load()` never reads it back — `loaded.regressions` is always `[]`. The round-trip is asymmetric: save more than you load. Must recompute regressions after loading if you need them for `detect_regressions()`.
+
+**ProbeSet + operator — ordering confirmed:**
+`left + right` preserves insertion order: all left items first, then all right items. Works cross-category (injection + jailbreak). Duplicates ARE allowed (same probe can appear twice after `ps + ps`). Empty ProbeSet is identity for both `ps + empty` and `empty + ps`. `len(a + b) == len(a) + len(b)`. Clean implementation.
+
+**Judge layer — empty module:**
+`checkagent.judge` is an empty module. The layer is recognized by the plugin (`VALID_LAYERS = frozenset({'eval', 'judge', 'replay', 'mock'})`), filtering works correctly. But the judge module has zero functionality — no `ap_judge_llm` fixture, no `JudgeLLM` class, no statistical assertion helpers, nothing. Judge-layer tests can use any other fixture, but the framework provides no judge-specific primitives. This matches the earlier finding that `@pytest.mark.safety` and `@pytest.mark.cassette` exist as markers with no backing implementation.
+
+**CI gates have no pytest exit code integration:**
+The plugin has no `pytest_sessionfinish` or `pytest_terminal_summary` hooks. Quality gates defined in `checkagent.yml` are loaded into `ap_config.quality_gates` but never auto-evaluated. To make gate failures affect the build, users must write a session-scoped fixture in their conftest that calls `evaluate_gates()` and raises if not passed. This is significant friction for the "CI/CD-first" claim.
+
+**Missing metric gate → SKIPPED (silent no-op):**
+If a quality gate is configured for `task_completion` but the user accidentally passes `task_rate` as the score name, the gate is SKIPPED with `message="Metric 'task_completion' not found in scores"`. The report still passes. There's no validation that gate metric names match any known score name. Typos in gate config fail silently.
+
+**Wrote 41 new tests; total now 590, all pass.**
+
+**Next time I want to try:**
+- Write a conftest.py that wires evaluate_gates() into pytest sessionfinish for real CI gate enforcement
+- Test `checkagent run --layer judge` with actual judge-marked tests (just did this today, could expand)
+- Test what `RunSummary.step_stats` does — can ComputeStepStats feed into it?
+- Check if `checkagent.yml` quality_gates field is actually used anywhere in the CLI
+- Investigate whether `checkagent run` with existing -m still merges with agent_test somehow
+- Check `CostReport.budget_utilization()` with None total_cost edge case
+- Test `FaultInjector.check_tool_async()` for real latency simulation (F-016 workaround)

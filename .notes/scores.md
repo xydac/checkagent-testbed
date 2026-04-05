@@ -100,3 +100,11 @@ Rate each feature on:
 | injection.direct.all() vs all_probes | 3 | 2 | .all() returns list; .all_probes is ProbeSet; inconsistent — mixing them breaks + composition (F-032) | 2026-04-05 |
 | task_completion expected_output_equals | 4 | 3 | Exact match works; case-sensitive (expected); None treated as '' — None == '' → True (F-031); can combine with expected_output_contains | 2026-04-05 |
 | checkagent run --layer judge | 5 | 4 | Correctly deselects all non-judge tests; needs @pytest.mark.agent_test(layer='judge') to select tests | 2026-04-05 |
+| checkagent run default filter | 3 | 2 | Runs only -m agent_test tests by default — silent deselection of 328/549 tests (F-034) | 2026-04-05 |
+| ProbeSet + operator | 5 | 5 | Order preserved (left then right); cross-category works; duplicates allowed; empty ProbeSet is identity | 2026-04-05 |
+| detect_regressions | 5 | 4 | Correct delta/threshold logic; improvement not flagged; missing-baseline skipped; not at top-level | 2026-04-05 |
+| RunSummary.save() / load() | 3 | 2 | save() serializes regressions to JSON; load() drops them silently (F-035). Aggregates round-trip correctly | 2026-04-05 |
+| generate_pr_comment (eval integration) | 1 | 1 | No eval_summary param, no regressions param — CI and eval modules completely disconnected (F-033) | 2026-04-05 |
+| judge layer marker | 4 | 3 | @pytest.mark.agent_test(layer='judge') filters correctly; checkagent run --layer judge works; but judge module is empty — no judge fixtures, no JudgeLLM, nothing | 2026-04-05 |
+| CI quality gates pytest integration | 1 | 1 | No pytest_sessionfinish/terminal_summary hooks; no ap_quality_gates fixture; gates defined in config are not auto-evaluated; users must wire everything manually (F-034) | 2026-04-05 |
+| QualityGateEntry missing metric typo | 2 | 2 | Misconfigured gate metric name → SKIPPED (not an error); silently passes — no validation that gate names match computed score names | 2026-04-05 |

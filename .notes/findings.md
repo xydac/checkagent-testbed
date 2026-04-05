@@ -373,3 +373,39 @@ Format:
 **Actual:** `type(injection.direct.all())` → `list`. `type(injection.direct.all_probes)` → N/A (`.all()` is the method; attribute access differs by module). Use `injection.all_probes` (module attribute, not method) for ProbeSet operations.
 **Workaround:** Use module-level `all_probes` attribute: `injection.all_probes + jailbreak.all_probes`. Avoid calling `.all()` when you need ProbeSet composition.
 **Status:** Open
+
+---
+
+## F-033: `generate_pr_comment` has no `eval_summary` parameter — regressions not surfaceable in PR comments
+**Date:** 2026-04-05
+**Severity:** medium
+**Category:** missing-feature
+**Description:** `generate_pr_comment` accepts `test_summary`, `gate_report`, and `cost_report`, but has no parameter for eval results or regressions. The eval module has `detect_regressions()` and `RunSummary.regressions`, but there is no path to include regression data in generated PR comments. The CI module and eval module are not integrated.
+**Expected:** A way to surface regression results (metric drops vs baseline) in the PR comment — either via an `eval_summary` parameter or a dedicated regressions section.
+**Actual:** `generate_pr_comment(eval_summary=...)` → `TypeError: unexpected keyword argument`. Regressions detected by `detect_regressions()` can only be printed manually; they have no place in the automated PR reporter.
+**Workaround:** Append regression info to the comment manually, or translate regressions into quality gate failures and pass via `gate_report`.
+**Status:** Open
+
+---
+
+## F-034: `checkagent run` silently runs only `@pytest.mark.agent_test` tests — different set than `pytest tests/`
+**Date:** 2026-04-05
+**Severity:** medium
+**Category:** dx-friction
+**Description:** `checkagent run tests/` appends `-m agent_test` by default if no `-m` flag is specified. This means it only runs tests explicitly marked with `@pytest.mark.agent_test`. Running `pytest tests/ -v` (549 tests) and `checkagent run tests/` (221 tests) produce different coverage sets. Users who follow the README and use `checkagent run` are silently running a subset of their tests.
+**Expected:** Either `checkagent run` documents this `-m agent_test` default prominently, or it runs all tests like `pytest` does (and uses `--layer` for filtering).
+**Actual:** `checkagent run tests/` → "221 passed, 328 deselected". The 328 deselected tests are the ones that don't have the `@pytest.mark.agent_test` marker. No warning is printed about this filtering.
+**Workaround:** Use `pytest tests/ -v` directly to run all tests. Or mark all agent tests with `@pytest.mark.agent_test` so `checkagent run` catches them.
+**Status:** Open
+
+---
+
+## F-035: `RunSummary.load()` silently drops regressions — save/load round-trip is lossy
+**Date:** 2026-04-05
+**Severity:** medium
+**Category:** bug
+**Description:** `RunSummary.to_dict()` and `RunSummary.save()` correctly serialize `regressions` to JSON. But `RunSummary.load()` only restores `aggregates`, `step_stats`, and `total_cost` — it never reads back the `regressions` list. After a save/load round-trip, `loaded.regressions` is always `[]`, even when the JSON file contains regression data.
+**Expected:** `RunSummary.load()` to restore all fields that `save()` serializes, including `regressions`.
+**Actual:** `summary.save(path); loaded = RunSummary.load(path); loaded.regressions` → `[]`. The regressions are in the JSON file but are never read.
+**Workaround:** Recompute regressions after loading: `regressions = detect_regressions(loaded.aggregates, baseline.aggregates)`. Do not rely on round-tripped regressions.
+**Status:** Open
