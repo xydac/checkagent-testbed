@@ -313,3 +313,63 @@ Format:
 **Expected:** Pydantic's `model_config = ConfigDict(extra='forbid')` would raise `ValidationError` on unknown fields, giving the user an immediate "unknown field 'output'" message.
 **Actual:** `AgentRun(output='hello').final_output` → `None`. No exception, no warning.
 **Workaround:** Use correct field names: `final_output` (not `output`) for `AgentRun`; `input_text`/`output_text` (not `input`/`output`) for `Step`.
+
+---
+
+## F-028: `checkagent.ci` classes not exported from top-level `checkagent`
+**Date:** 2026-04-05
+**Severity:** medium
+**Category:** dx-friction
+**Description:** The new `checkagent.ci` module adds `GateResult`, `GateVerdict`, `QualityGateReport`, `CiRunSummary`, `evaluate_gate`, `evaluate_gates`, `generate_pr_comment`, and `scores_to_dict`. None of these are in the top-level `checkagent` namespace. Additionally, `QualityGateEntry` — the core config type for defining gates — is not even in `checkagent.ci.__all__`; users must import from `checkagent.ci.quality_gate`. Pattern consistent with F-020/F-021.
+**Expected:** CI gate classes exported at top-level alongside `CostTracker`, `Score`, etc. At minimum `evaluate_gates`, `generate_pr_comment`, and `QualityGateEntry` should be in `checkagent.ci.__all__`.
+**Actual:** `from checkagent import evaluate_gates` → `ImportError`. `from checkagent.ci import QualityGateEntry` → `ImportError` (not in `__all__`). Must use `from checkagent.ci.quality_gate import QualityGateEntry`.
+**Workaround:** `from checkagent import ci` works as a module import. `from checkagent.ci.quality_gate import QualityGateEntry` for the entry config type.
+**Status:** Open
+
+---
+
+## F-029: Two incompatible `RunSummary` classes with the same name
+**Date:** 2026-04-05
+**Severity:** high
+**Category:** dx-friction
+**Description:** `checkagent` now has two distinct `RunSummary` classes: `checkagent.ci.RunSummary` (CI test run counts: `total`, `passed`, `failed`, `skipped`, `errors`, `duration_s`, `pass_rate`) and `checkagent.eval.aggregate.RunSummary` (eval aggregate results: `aggregates`, `step_stats`, `regressions`, `save()`, `load()`). They are different types, have different fields, and are mutually incompatible. Passing the eval version to `generate_pr_comment(test_summary=...)` raises `AttributeError: 'RunSummary' object has no attribute 'total'` with no helpful message.
+**Expected:** Either a single `RunSummary` class, or clearly namespaced names (`CiRunSummary`, `EvalRunSummary`) with type-checked function signatures.
+**Actual:** Both are named `RunSummary`. `from checkagent.ci import RunSummary` and `from checkagent.eval.aggregate import RunSummary` give different incompatible types. The wrong one fails silently until `generate_pr_comment` runs.
+**Workaround:** Always import `RunSummary` explicitly from the correct submodule. Never alias both in the same file without renaming.
+**Status:** Open
+
+---
+
+## F-030: `QualityGateEntry` missing from `checkagent.ci.__all__`
+**Date:** 2026-04-05
+**Severity:** medium
+**Category:** dx-friction
+**Description:** `QualityGateEntry` is the required configuration type for defining quality gates — you must construct it to call `evaluate_gate()` or `evaluate_gates()`. Yet it is not in `checkagent.ci.__all__`, not accessible as `checkagent.ci.QualityGateEntry`, and not discoverable from `dir(checkagent.ci)`. Users who do `from checkagent.ci import *` or rely on tab-completion in the ci namespace will miss it entirely.
+**Expected:** `QualityGateEntry` in `checkagent.ci.__all__` alongside `evaluate_gates` and `evaluate_gate`.
+**Actual:** `from checkagent.ci import QualityGateEntry` → `ImportError`. Must use `from checkagent.ci.quality_gate import QualityGateEntry`.
+**Workaround:** `from checkagent.ci.quality_gate import QualityGateEntry`
+**Status:** Open
+
+---
+
+## F-031: `task_completion` treats `None` output as `''` — `None == ''` returns `True`
+**Date:** 2026-04-05
+**Severity:** medium
+**Category:** bug
+**Description:** `task_completion(run, expected_output_equals='')` returns `passed=True` when `run.final_output is None`. The implementation appears to normalize `None` to `''` before comparison (`if final_output is None: actual = ''`), making `None == ''` evaluate as `True`. This is incorrect: `None` means "no output produced", which should never equal an expected empty string output.
+**Expected:** `task_completion` with `expected_output_equals=''` should only pass when `final_output` is actually `''`, not when it is `None`.
+**Actual:** `AgentRun(input=..., final_output=None)` + `expected_output_equals=''` → `Score(value=1.0, passed=True)`. Silently masks agents that produced no output when an empty string was expected.
+**Workaround:** Always check `run.final_output is not None` before calling `task_completion`, or use `check_no_error=True` + a non-empty `expected_output_contains` to avoid the empty-string trap.
+**Status:** Open
+
+---
+
+## F-032: `injection.direct.all()` returns `list`, not `ProbeSet` — breaks `+` composition
+**Date:** 2026-04-05
+**Severity:** low
+**Category:** dx-friction
+**Description:** The pattern `injection.direct.all()` (calling the `.all()` method on a probe submodule) returns a Python `list`, not a `ProbeSet`. This means `injection.direct.all() + jailbreak.all_probes` raises `TypeError: can only concatenate list (not "ProbeSet") to list`. The `all_probes` attribute (not method) correctly returns a `ProbeSet`. The two access patterns look equivalent but behave differently.
+**Expected:** `.all()` and `.all_probes` to return the same type (ProbeSet), or for `.all()` to return a ProbeSet so it can be composed with `+`.
+**Actual:** `type(injection.direct.all())` → `list`. `type(injection.direct.all_probes)` → N/A (`.all()` is the method; attribute access differs by module). Use `injection.all_probes` (module attribute, not method) for ProbeSet operations.
+**Workaround:** Use module-level `all_probes` attribute: `injection.all_probes + jailbreak.all_probes`. Avoid calling `.all()` when you need ProbeSet composition.
+**Status:** Open

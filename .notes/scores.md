@@ -87,3 +87,16 @@ Rate each feature on:
 | ProbeSet.filter() tags OR logic | 5 | 3 | filter(tags={'a','b'}) is OR (any match) not AND (all required) — not documented, surprising to users expecting AND logic | 2026-04-05 |
 | task_completion expected_output_contains list | 5 | 4 | AND logic: all items must appear; partial scores; threshold applies to fraction; check_no_error=True adds implicit check | 2026-04-05 |
 | AgentRun / Step field names | 2 | 1 | Silent field drop: AgentRun(output=...) discards value (correct: final_output); Step(input=...) discards (correct: input_text). No ValidationError (F-027) | 2026-04-05 |
+| checkagent.ci (quality gates module) | 5 | 3 | Core gate logic solid (min/max/range/warn/block); QualityGateEntry not in ci.__all__ (F-030); all CI types absent from top-level checkagent (F-028) | 2026-04-05 |
+| evaluate_gate / evaluate_gates | 5 | 4 | Correct logic; missing metric → SKIPPED; on_fail=ignore → SKIPPED; no min/max → always PASSED (silent trap); invalid on_fail raises ValidationError | 2026-04-05 |
+| QualityGateReport | 5 | 5 | .passed, .blocked_gates, .warned_gates, .passed_gates, .has_warnings all work cleanly | 2026-04-05 |
+| QualityGateEntry | 4 | 2 | Works correctly; not in ci.__all__ (F-030); no min+max → silently passes anything | 2026-04-05 |
+| generate_pr_comment | 5 | 4 | Generates GitHub Markdown tables for test summary, quality gates, cost; footer always present; accepts all-None; RunSummary name collision (F-029) | 2026-04-05 |
+| checkagent.ci.RunSummary | 4 | 2 | Test run counts (total/passed/failed/etc.) + pass_rate; name collides with eval.aggregate.RunSummary (F-029) | 2026-04-05 |
+| scores_to_dict | 5 | 5 | Clean list[Score] → dict[str, float] conversion; empty list returns {}; integrates with evaluate_gates | 2026-04-05 |
+| GateVerdict enum | 5 | 5 | 4 values (passed/warned/blocked/skipped); string values; used cleanly in report properties | 2026-04-05 |
+| ProbeSet chained filter (AND logic) | 5 | 4 | .filter().filter() achieves AND — works correctly; not documented; OR is the single-call behavior | 2026-04-05 |
+| ProbeSet parametrize compatibility | 5 | 5 | iter() gives Probe objects; str(probe) returns probe.name (pytest-friendly IDs); len() works; can pass list(ProbeSet) directly to parametrize | 2026-04-05 |
+| injection.direct.all() vs all_probes | 3 | 2 | .all() returns list; .all_probes is ProbeSet; inconsistent — mixing them breaks + composition (F-032) | 2026-04-05 |
+| task_completion expected_output_equals | 4 | 3 | Exact match works; case-sensitive (expected); None treated as '' — None == '' → True (F-031); can combine with expected_output_contains | 2026-04-05 |
+| checkagent run --layer judge | 5 | 4 | Correctly deselects all non-judge tests; needs @pytest.mark.agent_test(layer='judge') to select tests | 2026-04-05 |

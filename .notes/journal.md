@@ -500,3 +500,67 @@ Accessible via `from checkagent.safety import probes_jailbreak` (module object) 
 - Test what happens when you pass a ProbeSet directly to `@pytest.mark.parametrize` (does it unpack properly?)
 - Test `task_completion` with `expected_output_equals` for exact match
 - Check if there's a way to extend scope/boundary probes with custom actions
+
+---
+
+## Session 013 — 2026-04-05 (CI quality gates, ProbeSet AND logic, task_completion bugs)
+
+**Upgraded from:** 27d4af4 → 735700f (still 0.0.1a1)
+**New commit message:** "Add CI quality gates, PR reporter, and GitHub Action (F5.1, F5.3)"
+
+**What I tried:**
+- Upgraded checkagent from git main
+- Re-ran 475 existing tests — all pass, no regressions
+- Explored the new `checkagent.ci` module thoroughly
+- Tested ProbeSet chained filter for AND logic (from session-012 "next time" list)
+- Tested ProbeSet with `@pytest.mark.parametrize` directly
+- Investigated `task_completion` with `expected_output_equals`
+- Tested `checkagent run --layer judge`
+- Filed F-028 through F-032
+
+**What I found:**
+
+**New `checkagent.ci` module — quality gates and PR reporter:**
+The big new feature this session. `checkagent.ci` exposes `evaluate_gate`, `evaluate_gates`, `QualityGateReport`, `generate_pr_comment`, `scores_to_dict`, `GateResult`, `GateVerdict`, and a CI-focused `RunSummary`. 
+
+The core gate logic is solid: min/max/range gates all work, `on_fail='block'|'warn'|'ignore'` all behave correctly (ignore → SKIPPED), missing metrics → SKIPPED. `QualityGateReport` has clean properties: `.passed` (False if any blocked), `.blocked_gates`, `.warned_gates`, `.passed_gates`, `.has_warnings`. Warnings don't block (`.passed` stays True with only warnings).
+
+`generate_pr_comment` produces clean GitHub-flavored Markdown tables with emoji status markers (✅ ⚠️ ❌). Works with test_summary, gate_report, cost_report, or any combination. All-None produces a minimal header. Nice feature.
+
+**F-028: CI types not at top-level (consistent with F-020/F-021):**
+`from checkagent import evaluate_gates` → ImportError. Continuing the pattern.
+
+**F-030: QualityGateEntry not in checkagent.ci.__all__:**
+This is worse than F-028 — QualityGateEntry isn't even in `checkagent.ci.__all__`, so it's invisible to `from checkagent.ci import *` and tab completion on the ci module. You need `from checkagent.ci.quality_gate import QualityGateEntry`. Discovered this when trying to use the gates API.
+
+**F-029: Two RunSummary classes, same name, incompatible:**
+`checkagent.ci.RunSummary` (test run counts) and `checkagent.eval.aggregate.RunSummary` (eval aggregates) coexist. `generate_pr_comment(test_summary=eval_summary)` raises `AttributeError: 'RunSummary' object has no attribute 'total'`. No type hint enforcement prevents the mistake. Worst part: if you're using both eval and CI features in the same test suite, you have to alias one of them on import.
+
+**ProbeSet chained filter for AND logic (confirmed!):**
+`probeset.filter(tags={'a'}).filter(tags={'b'})` achieves AND logic. `jailbreak.all_probes.filter(tags={'roleplay'}).filter(tags={'persona'})` → 2 probes (both tags required). Single `filter(tags={'roleplay','persona'})` → 7 probes (either tag). Works cross-dimension too: `.filter(tags={'roleplay'}).filter(severity='critical')` gives roleplay AND critical. This should be documented.
+
+**ProbeSet with pytest.mark.parametrize works natively:**
+`@pytest.mark.parametrize("probe", list(injection.direct.filter(severity='critical')))` — 7 parametrized test cases, each with a Probe object. `str(probe)` returns `probe.name` (pytest-friendly hyphenated IDs like `ignore-previous-basic`). Clean DX once you know to call `list()` on the ProbeSet.
+
+**F-032: injection.direct.all() returns list, not ProbeSet:**
+`injection.direct.all()` (calling the `.all()` method) returns a Python list. `injection.all_probes` (module attribute) returns a ProbeSet. This makes `injection.direct.all() + jailbreak.all_probes` fail with `TypeError`. Burned time on this when writing the cross-module AND filter test. Use `injection.all_probes` for composition.
+
+**F-031: task_completion None == '' bug:**
+`task_completion(run, expected_output_equals='')` passes when `final_output=None`. The implementation normalizes None → '' before comparison. Confirmed via testing: `None == '0'` fails correctly; `None == ''` passes. Silently masks agents that produced no output. Filed as medium bug — could cause false positives in suites that check for "agent produced empty output successfully".
+
+**task_completion with expected_output_equals:**
+Case-sensitive exact match (as expected). Can be combined with `expected_output_contains` (both are checked, all must pass). Partial substrings don't match. Clean API overall, aside from the None bug.
+
+**checkagent run --layer judge:**
+Works. Deselects all 475 tests because none have `@pytest.mark.agent_test(layer='judge')`. Confirmed the layer filtering mechanism is functioning.
+
+**Wrote 74 new tests; total now 549, all pass.**
+
+**Next time I want to try:**
+- Test the full CI pipeline end-to-end: write a conftest fixture that runs evaluate_gates after tests and can block CI
+- Check if there's a pytest plugin hook that connects checkagent.ci to pytest exit codes
+- Test `QualityGateEntry(on_fail='ignore')` more — does SKIPPED count toward report.passed?
+- Test `generate_pr_comment` with regressions in the eval RunSummary (there's a `regressions` field)
+- Investigate whether `ProbeSet.__add__` preserves ordering
+- Check if there's a `checkagent.ci` pytest fixture (like `ap_quality_gates`)
+- Test what happens with `@pytest.mark.agent_test(layer='judge')` — can we write a judge test?
