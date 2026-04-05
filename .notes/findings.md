@@ -420,7 +420,7 @@ Format:
 **Expected:** Backward-compatible upgrade — all public API from 90ab3c5 should still work after upgrading to ed0b21a.
 **Actual:** 7 test files (tests/test_session007.py through test_session014.py) fail to collect with ImportError. 383 previously-passing tests are now uncollectable. Only sessions 004-008 (core mock layer) still work — 186 of 590 tests pass.
 **Workaround:** None. Regression blocks all eval, dataset, CI, safety, and cost-tracking work. Pin to 90ab3c5 to retain full functionality.
-**Status:** Open
+**Status:** Fixed in 6a8eaf4 — all modules restored. 10 xfails from session-015 now pass. Total test suite: 668 passing. Second time this pattern appeared (first: F-014 in 8e6a0a8, fixed in e38593a).
 
 ---
 
@@ -444,4 +444,40 @@ Format:
 **Expected:** Either backward-compatible string coercion (wraps string in `AgentInput(query=string)`) or an explicit `ValidationError` message that names `AgentInput` as the required type and shows the correct syntax.
 **Actual:** `AgentRun(input="find cats")` → `ValidationError: Input should be a valid dictionary or instance of AgentInput`. The error message does not hint that wrapping with `AgentInput(query="find cats")` is the fix.
 **Workaround:** Always construct with `AgentRun(input=AgentInput(query="..."), ...)` or `AgentRun(input={"query": "..."}, ...)`.
+**Status:** Open
+
+---
+
+## F-039: `Cassette.load()` warns about `checkagent migrate-cassettes` command that doesn't exist
+**Date:** 2026-04-05
+**Severity:** medium
+**Category:** docs-mismatch
+**Description:** `Cassette.load()` emits a `UserWarning` when loading a cassette with an older schema version: "Run 'checkagent migrate-cassettes' to upgrade." But the `checkagent` CLI has no `migrate-cassettes` command — only `demo`, `init`, and `run`. A user who encounters this warning and tries to follow its advice will get "No such command 'migrate-cassettes'".
+**Expected:** Either implement `checkagent migrate-cassettes`, or change the warning to describe what migration means (e.g., "Re-record your cassettes to update to schema v1").
+**Actual:** `Cassette.load()` → `UserWarning: ... Run 'checkagent migrate-cassettes' to upgrade.` → `checkagent migrate-cassettes` → `Error: No such command 'migrate-cassettes'.`
+**Workaround:** Ignore the warning or manually re-save cassettes. No CLI migration is needed yet (schema v1 is the only version).
+**Status:** Open
+
+---
+
+## F-040: `CassetteMeta.checkagent_version` never populated by `finalize()`
+**Date:** 2026-04-05
+**Severity:** low
+**Category:** dx-friction
+**Description:** `CassetteMeta` has a `checkagent_version` field intended to record which version of checkagent created the cassette — useful for diagnosing compatibility issues across upgrades. But `Cassette.finalize()` never populates this field; it stays `''` even though `checkagent.__version__` is available. Every cassette saved with the current implementation will have an empty `checkagent_version`.
+**Expected:** `Cassette.finalize()` to set `meta.checkagent_version = checkagent.__version__` automatically, so cassettes have auditable provenance.
+**Actual:** `Cassette().finalize().meta.checkagent_version` → `''`.
+**Workaround:** Set manually before saving: `c.meta.checkagent_version = checkagent.__version__`.
+**Status:** Open
+
+---
+
+## F-041: `checkagent.replay` classes not exported from top-level `checkagent`
+**Date:** 2026-04-05
+**Severity:** low
+**Category:** dx-friction
+**Description:** `Cassette`, `CassetteMeta`, `Interaction`, `RecordedRequest`, `RecordedResponse`, `redact_dict`, and `CASSETTE_SCHEMA_VERSION` are all in `checkagent.replay` but none appear in the top-level `checkagent` namespace. This is consistent with the established pattern (F-020, F-021, F-026, F-028) but continues to force users to discover and remember internal submodule paths. The `replay` submodule is accessible as `import checkagent; checkagent.replay`, but not via `from checkagent import Cassette`.
+**Expected:** Core cassette types (`Cassette`, `Interaction`, `RecordedRequest`, `RecordedResponse`) exported at top-level alongside `AgentRun`, `MockLLM`, etc.
+**Actual:** `from checkagent import Cassette` → `ImportError`. Must use `from checkagent.replay import Cassette`.
+**Workaround:** `from checkagent.replay import Cassette, Interaction, RecordedRequest, RecordedResponse, redact_dict`
 **Status:** Open

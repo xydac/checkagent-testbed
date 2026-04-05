@@ -666,3 +666,61 @@ For slow faults specifically, `await fault.check_tool_async("tool")` does the ri
 - Test what `checkagent.yml` quality_gates config does in the CLI (when ci module is restored)
 - When check_llm_async() is added, document it and test the full async fault pattern
 - Check if AgentRun.input string coercion is added (F-038 resolution path)
+
+---
+
+## Session 016 — 2026-04-05
+
+**Upgraded from:** ed0b21a → 6a8eaf4 (still 0.0.1a1)
+
+**What I tried:**
+- Upgraded checkagent from git main (6a8eaf4)
+- Checked upstream CI — all 3 latest runs failing
+- Re-ran all tests — discovered F-036 regression is now fixed
+- Promoted 10 xfail markers from session-015 to passing tests
+- Explored new `checkagent.replay` cassette data model (added in 6a8eaf4)
+- Filed F-039, F-040, F-041
+- Wrote 47 new tests covering the cassette API
+
+**What I found:**
+
+**F-036 FIXED in 6a8eaf4:**
+Second regression of this type — same pattern as F-014 (8e6a0a8 wiped datasets, e38593a fixed it). This time ed0b21a wiped everything, and 6a8eaf4 brought it all back. The 10 xfail markers from session-015 now xpass; I've promoted them to regular passing tests. Total test suite: 668 passing, 0 xfail.
+
+**Upstream CI: 3 consecutive failing runs.**
+Root cause is F-008 — jsonschema isn't in checkagent's declared dependencies. The CI installs fresh and then runs tests, hitting `ModuleNotFoundError: No module named 'jsonschema'` in `assert_json_schema`. This is a known finding, but it's now visibly breaking the project's own CI. A framework whose CI is perpetually red is a bad look for users evaluating it.
+
+**New: `checkagent.replay` cassette data model.**
+The commit "Add cassette data model for record-and-replay" adds a substantial data model:
+- `Cassette` — top-level container (meta + interactions list)
+- `CassetteMeta` — schema version, timestamps, content hash, test_id
+- `Interaction` — request/response pair with deterministic ID
+- `RecordedRequest` / `RecordedResponse` — typed request/response structs
+- `redact_dict()` — recursive sensitive key scrubbing
+- Content-addressed filenames via `short_hash()` and `cassette_path()`
+- Integrity verification via SHA-256 hash comparison
+
+All the data model primitives work correctly. `finalize()` assigns sequences, computes IDs, and hashes. `verify_integrity()` detects tampering. `save()`/`load()` round-trips with parent directory creation. `redact_dict()` handles nested structures and doesn't mutate the original.
+
+**F-039: `migrate-cassettes` command referenced but doesn't exist.**
+The schema version warning says to run `checkagent migrate-cassettes`, but the CLI only has `demo`, `init`, and `run`. If a user encounters this warning, the suggested fix fails immediately. The warning should either describe the actual fix (re-record cassettes) or wait until the command is implemented.
+
+**F-040: `checkagent_version` never populated.**
+`CassetteMeta.checkagent_version` is `''` after `finalize()`. The framework has `checkagent.__version__` but `finalize()` doesn't use it. Cassettes have no provenance tracking, defeating the purpose of the field.
+
+**F-041: replay module classes not at top-level.**
+Same pattern as F-020, F-021, F-026, F-028. `from checkagent import Cassette` fails. Must use `from checkagent.replay import Cassette`. Consistent pattern across every new module added since session-010.
+
+**Still missing: actual record/replay behavior.**
+The `@pytest.mark.cassette` marker still has no behavior — it doesn't auto-load cassettes for replay or auto-save recordings. The data model exists but there's no recording integration with MockLLM/MockTool, no fixture that injects a cassette into a test, and no replay mode that intercepts calls. The cassette is a container with nowhere to put recordings yet.
+
+**Wrote 47 new tests; total now 668, all pass.**
+
+**Next time I want to try:**
+- When cassette recording is implemented, test the `@pytest.mark.cassette` flow end-to-end
+- Check if `migrate-cassettes` CLI command is added (resolves F-039)
+- Test CostReport.budget_utilization() with None total_cost edge case
+- Write conftest.py wiring evaluate_gates() into pytest sessionfinish for real CI gate enforcement
+- Test what `checkagent.yml` quality_gates field does in the CLI now that ci module is restored
+- Check if AgentRun.input string coercion is added (F-038 resolution path)
+- Watch for check_llm_async() — F-037 still open

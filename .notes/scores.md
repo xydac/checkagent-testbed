@@ -109,6 +109,16 @@ Rate each feature on:
 | CI quality gates pytest integration | 1 | 1 | No pytest_sessionfinish/terminal_summary hooks; no ap_quality_gates fixture; gates defined in config are not auto-evaluated; users must wire everything manually (F-034) | 2026-04-05 |
 | QualityGateEntry missing metric typo | 2 | 2 | Misconfigured gate metric name → SKIPPED (not an error); silently passes — no validation that gate names match computed score names | 2026-04-05 |
 | checkagent package stability (ed0b21a) | 1 | 1 | CRITICAL REGRESSION: datasets, eval.metrics, eval.aggregate, eval.evaluator, ci, safety, cost tracking all stripped (F-036). Only sessions 004-008 survive | 2026-04-05 |
+| checkagent package stability (6a8eaf4) | 4 | 4 | F-036 FIXED — all modules restored. 668 tests passing. Second regression of this type; stability improving but pattern is concerning | 2026-04-05 |
+| checkagent.replay (Cassette data model) | 4 | 3 | Core cassette API solid: finalize/integrity/serialize/save/load all work; redact_dict correctly handles nested dicts; schema version warning works; but: not at top-level (F-041), migrate-cassettes CLI missing (F-039), checkagent_version never set (F-040) | 2026-04-05 |
+| Cassette.finalize() | 5 | 4 | Assigns sequential IDs, sequence numbers, content hash correctly; deterministic ID from request body | 2026-04-05 |
+| Cassette.verify_integrity() | 5 | 5 | Detects tampering reliably; empty-hash cassette passes without check | 2026-04-05 |
+| Cassette save/load round-trip | 5 | 5 | Full fidelity: all fields preserved; parent dirs auto-created | 2026-04-05 |
+| Cassette schema version warning | 4 | 2 | Warning fires correctly on old schema; message references non-existent migrate-cassettes CLI (F-039) | 2026-04-05 |
+| redact_dict | 5 | 5 | Recursive; handles nested dicts and lists; doesn't mutate original; configurable key set | 2026-04-05 |
+| Cassette.cassette_path() | 4 | 3 | Correct :: → / mapping and space → _ substitution; square brackets not sanitized (potential Windows issue); path is content-addressed | 2026-04-05 |
+| @pytest.mark.cassette (with replay module) | 3 | 2 | Data model exists now; marker still has no record/replay behavior; F-039/F-040/F-041 all open | 2026-04-05 |
+| upstream CI (3 consecutive failures) | 1 | 1 | CI red for all 3 latest runs — F-008 (jsonschema undeclared dep) breaks checkagent's own test suite | 2026-04-05 |
 | FaultInjector.check_tool_async() | 5 | 4 | Real latency simulation: 80ms slow fault → 80ms actual sleep; no exception unlike sync; records in was_triggered/trigger_count; other fault types still raise | 2026-04-05 |
 | FaultInjector async LLM faults | 1 | 1 | check_llm_async() does not exist — no async LLM fault simulation (F-037). Only check_llm() sync available | 2026-04-05 |
 | FaultInjector.intermittent() fail_rate | 5 | 4 | fail_rate=1.0 always raises; fail_rate=0.0 never raises; seed param for deterministic results; async works same as sync | 2026-04-05 |

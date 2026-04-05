@@ -39,52 +39,45 @@ from checkagent.mock.fault import (
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="datasets module stripped in ed0b21a (regression)")
+# F-036 FIXED in 6a8eaf4 — these xfails promoted to passing tests (session-016)
+
+
 def test_regression_datasets_golddataset():
     from checkagent.datasets import GoldenDataset  # noqa: F401
 
 
-@pytest.mark.xfail(reason="datasets module stripped in ed0b21a (regression)")
 def test_regression_datasets_testcase():
     from checkagent.datasets import TestCase  # noqa: F401
 
 
-@pytest.mark.xfail(reason="eval.metrics module stripped in ed0b21a (regression)")
 def test_regression_eval_metrics():
     from checkagent.eval.metrics import task_completion  # noqa: F401
 
 
-@pytest.mark.xfail(reason="eval.aggregate module stripped in ed0b21a (regression)")
 def test_regression_eval_aggregate():
     from checkagent.eval.aggregate import aggregate_scores  # noqa: F401
 
 
-@pytest.mark.xfail(reason="eval.evaluator module stripped in ed0b21a (regression)")
 def test_regression_eval_evaluator():
     from checkagent.eval.evaluator import Evaluator  # noqa: F401
 
 
-@pytest.mark.xfail(reason="ci module stripped in ed0b21a (regression)")
 def test_regression_ci_gate():
     from checkagent.ci import GateResult, GateVerdict  # noqa: F401
 
 
-@pytest.mark.xfail(reason="ci module stripped in ed0b21a (regression)")
 def test_regression_ci_quality_gate_entry():
     from checkagent.ci.quality_gate import QualityGateEntry  # noqa: F401
 
 
-@pytest.mark.xfail(reason="safety module stripped in ed0b21a (regression)")
 def test_regression_safety_detectors():
     from checkagent.safety import PromptInjectionDetector  # noqa: F401
 
 
-@pytest.mark.xfail(reason="cost tracking stripped in ed0b21a (regression)")
 def test_regression_cost_tracker():
     from checkagent import CostTracker  # noqa: F401
 
 
-@pytest.mark.xfail(reason="cost tracking stripped in ed0b21a (regression)")
 def test_regression_cost_budget_exceeded_error():
     from checkagent import BudgetExceededError  # noqa: F401
 
