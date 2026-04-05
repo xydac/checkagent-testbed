@@ -65,7 +65,7 @@ Format:
 **Expected:** "The generated tests pass immediately with no API keys required" (from `checkagent init --help`)
 **Actual:** Zero tests pass out of the box. Two structural issues: no pythonpath config, no asyncio_mode config.
 **Workaround:** Manually create `pyproject.toml` with `[tool.pytest.ini_options] asyncio_mode = "auto"` and `pythonpath = ["."]`
-**Status:** Open (still not fixed in session-006 — sixth session without a fix)
+**Status:** Open (still not fixed in session-009 — ninth session without a fix)
 
 ## F-006: `context_references` heuristic produces false positives on short inputs
 **Date:** 2026-04-05
@@ -157,7 +157,7 @@ Format:
 **Expected:** Backward-compatible upgrade — all public API from c786006 should still work after upgrading to 8e6a0a8.
 **Actual:** `from checkagent.datasets import GoldenDataset` raises `ImportError`. All 35 session-007 tests are uncollectable. The test_session007.py file cannot even be imported.
 **Workaround:** None. Pin to c786006 to retain datasets support. The datasets regression also blocks `checkagent run --layer judge tests/` from completing (collection aborts on the import error).
-**Status:** Open
+**Status:** Fixed in e38593a — datasets module fully restored. GoldenDataset, TestCase, load_dataset, load_cases, parametrize_cases all importable again. All 35 session-007 tests pass.
 
 ---
 
@@ -193,4 +193,28 @@ Format:
 **Expected:** Either the two methods do different things (e.g., `reset()` clears everything including rules, `reset_calls()` only clears history), or one is an alias of the other with documentation explaining why both exist.
 **Actual:** No observable difference. Having two methods with the same behavior creates confusion about which to use.
 **Workaround:** Use either one — they're interchangeable.
+**Status:** Open
+
+---
+
+## F-018: `ProviderPricing`, `BudgetConfig`, `BUILTIN_PRICING` not importable from top-level `checkagent`
+**Date:** 2026-04-05
+**Severity:** medium
+**Category:** dx-friction
+**Description:** The new cost tracking API requires `ProviderPricing` (to pass custom pricing), `BudgetConfig` (to set budget limits on `CostTracker`), and `BUILTIN_PRICING` (to inspect or extend built-in rates), but none of these are exported from the top-level `checkagent` namespace. Users must reach into internal paths: `from checkagent.core.cost import ProviderPricing, BUILTIN_PRICING` and `from checkagent.core.config import BudgetConfig`.
+**Expected:** Cost tracking companion types (`ProviderPricing`, `BudgetConfig`, `BUILTIN_PRICING`) exported alongside `CostTracker`, `CostBreakdown`, `CostReport`, and `BudgetExceededError` (which ARE in the top-level namespace).
+**Actual:** `from checkagent import ProviderPricing` → `ImportError`. Same for `BudgetConfig` and `BUILTIN_PRICING`. The four cost-tracking classes that ARE at top-level (`CostTracker`, `CostBreakdown`, `CostReport`, `BudgetExceededError`) require these companion types but don't export them.
+**Workaround:** Use internal imports: `from checkagent.core.cost import ProviderPricing, BUILTIN_PRICING` and `from checkagent.core.config import BudgetConfig`.
+**Status:** Open
+
+---
+
+## F-019: No `ap_cost_tracker` pytest fixture — cost tracking has no pytest integration
+**Date:** 2026-04-05
+**Severity:** medium
+**Category:** missing-feature
+**Description:** `CostTracker` is a stateful accumulator meant to track costs across multiple test runs. Without a fixture, users must instantiate it manually (typically at module level or in a session-scoped fixture they write themselves), which means no automatic reset between test sessions, no budget enforcement wired into pytest's pass/fail lifecycle, and no standard way to get a per-suite cost report.
+**Expected:** An `ap_cost_tracker` fixture (session or module scoped) that provides a pre-configured `CostTracker` from `ap_config.budget`, with automatic `check_suite_budget()` teardown so tests fail when budget is exceeded.
+**Actual:** No fixture exists. `CostTracker` is a standalone class. Users must wire budget enforcement manually in their own conftest or test teardown.
+**Workaround:** Create a session-scoped fixture in conftest.py: `@pytest.fixture(scope="session") def cost_tracker(ap_config): return CostTracker(budget=ap_config.budget)`.
 **Status:** Open

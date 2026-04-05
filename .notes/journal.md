@@ -4,6 +4,47 @@ What I tried each cycle, what happened, what surprised me.
 
 ---
 
+## Session 9 — 2026-04-05 (cost tracking: CostTracker, CostBreakdown, BudgetExceededError)
+
+**Upgraded from:** 8e6a0a8 → e38593a
+
+**What I tried:**
+- Upgraded checkagent from git main (8e6a0a8 → e38593a)
+- Re-ran 225 existing tests — all 225 pass cleanly (no collection errors, no new failures)
+- Confirmed F-014 is fixed: datasets module fully restored in e38593a. GoldenDataset, TestCase, parametrize_cases all importable. All 35 session-007 tests pass. The session-008 regression xfail markers now fall through to normal pass (because the import succeeds, the xfail branch is never hit).
+- Explored the new cost tracking API: `calculate_run_cost`, `CostTracker`, `CostBreakdown`, `CostReport`, `BudgetExceededError`, `BUILTIN_PRICING`
+- Tested `calculate_run_cost` with known models (claude-sonnet), unknown models (unpriced), custom pricing_overrides, and default_pricing fallback
+- Tested `CostTracker` accumulation: run_count, total_cost, total_tokens all accumulate correctly across multiple `record()` calls
+- Tested all three budget enforcement methods: `check_test_budget(breakdown)`, `check_suite_budget()`, `check_ci_budget()` — all raise `BudgetExceededError` correctly when over limit
+- Verified that no budget configured → no error (all three check methods are no-ops)
+- Tested `CostReport.budget_utilization()` — returns fractions for each configured limit
+- Probed top-level namespace for companion types (`ProviderPricing`, `BudgetConfig`, `BUILTIN_PRICING`) — none are top-level exported. Filed F-018.
+- Checked for `ap_cost_tracker` fixture — does not exist. Filed F-019.
+- Confirmed F-005 (checkagent init) still broken — ninth session without a fix. Still emits "async def functions are not natively supported" because generated project lacks asyncio_mode = "auto".
+- Wrote 36 new tests — all 36 pass
+- Total: 261 tests pass, 0 failures, 1 warning (F-013 TestCase collection warning, still open)
+
+**What surprised me:**
+- The datasets regression is fully fixed. This is the right call — the entire module was wiped in 8e6a0a8, and having it back restores confidence in the framework. The fix came one session after I filed the critical finding, which is a reasonable turnaround.
+- The cost tracking API is thoughtfully designed. The three-level budget model (`per_test`, `per_suite`, `per_ci_run`) maps well to real CI workflows. `BUILTIN_PRICING` already has 16 models including Claude 4, GPT-4o, and Gemini 2.5 Pro — this is genuinely useful without configuration.
+- The unpriced_steps design is good: instead of raising or silently skipping, it counts steps with no pricing and returns `total_cost=0.0` for those steps while still tracking the ones it can. This gives partial information rather than all-or-nothing.
+- The biggest DX rough edge: `ProviderPricing`, `BudgetConfig`, and `BUILTIN_PRICING` are all needed to use `CostTracker` customizations, but none are at top-level. You export `CostTracker` (which takes a `BudgetConfig`) but not `BudgetConfig` itself. A user reading the docstring for `CostTracker.__init__` will see `budget: BudgetConfig | None` and then have to hunt for where to import `BudgetConfig` from. It's at `checkagent.core.config` — an implementation-internal path.
+- The missing `ap_cost_tracker` fixture is the larger gap. `CostTracker` is stateful and session-scoped by nature, but there's no standard pytest integration. The obvious pattern — budget from `ap_config`, teardown that calls `check_suite_budget()`, so suite tests fail if budget is exceeded — is left entirely to the user. This is the same pattern checkagent follows for `ap_config` (auto-wired), `ap_mock_llm` (auto-fresh per test), etc. Cost tracking should get the same treatment.
+
+**Overall impression:**
+Two sessions: critical crash (datasets gone) followed by a clean fix (datasets restored, cost tracking added). The cost tracking module itself is well-implemented — math is correct, three-tier budget model is practical, error messages are helpful. The DX issues are fixable: promote `ProviderPricing`/`BudgetConfig`/`BUILTIN_PRICING` to top-level exports, and add an `ap_cost_tracker` fixture. F-005 (`checkagent init`) remains the most embarrassing persistent bug — the very first thing a new user does after reading the README fails, and it's been broken for nine consecutive sessions.
+
+**Next time I want to try:**
+- Test `check_tool_async()` with `slow()` to confirm real latency vs just raising (F-016 in async context)
+- Test FaultInjector `intermittent()` at edge probabilities (0.0, 1.0, 0.5) — determinism guarantees?
+- Test `MockTool.was_called` predicate (vs `assert_tool_called` assertion)
+- Test `MockTool.get_calls_for("name")` — verify it filters by tool name
+- Check if `checkagent run --layer judge` now works (F-014 fixed, so collection should succeed)
+- Test `CostTracker` with `pricing_overrides` parameter at construction vs at `calculate_run_cost` level
+- Probe whether `CostReport.to_dict()` matches `CostBreakdown.to_dict()` structure
+
+---
+
 ## Session 1 — 2026-04-05 (Initial Setup)
 
 **What I tried:**

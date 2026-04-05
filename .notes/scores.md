@@ -41,10 +41,17 @@ Rate each feature on:
 | MockLLM.was_called_with() | 3 | 2 | Exact match only — misleading name implies substring; use get_calls_matching() for substring (F-009) | 2026-04-05 |
 | MockTool.call_sync() | 5 | 5 | Synchronous counterpart to call(); validates schema, records ToolCallRecord, failed calls also recorded | 2026-04-05 |
 | MockTool.assert_tool_called() | 4 | 3 | Raises correctly on miss; returns None (not ToolCallRecord) — inconsistent with top-level assert_tool_called() (F-010) | 2026-04-05 |
-| checkagent.datasets (GoldenDataset, TestCase, load_dataset, load_cases, parametrize_cases) | 1 | 1 | REGRESSION in 8e6a0a8: entire datasets module wiped — all classes removed, __init__.py empty. Was 5/4 in c786006 (F-014) | 2026-04-05 |
+| checkagent.datasets (GoldenDataset, TestCase, load_dataset, load_cases, parametrize_cases) | 5 | 4 | FIXED in e38593a: datasets module restored — all classes back. F-012/F-013 still open (F-014 closed) | 2026-04-05 |
 | AgentInput | 5 | 5 | Clean struct for query+context+conversation_history+metadata; importable from top-level checkagent | 2026-04-05 |
 | MockTool.strict_validation=False | 5 | 5 | Skips schema validation entirely; call still recorded; works for both call() and call_sync() | 2026-04-05 |
 | MockLLM.reset() / reset_calls() | 4 | 3 | Both clear history and preserve rules — identical observable behavior. Duplication confusing; no docs on difference (F-017) | 2026-04-05 |
 | MockTool.reset() / reset_calls() | 4 | 3 | Both clear history and preserve registered tools — identical observable behavior. Same duplication issue (F-017) | 2026-04-05 |
 | FaultInjector.slow() sync behavior | 2 | 2 | Raises ToolSlowError in sync check_tool() instead of sleeping — converts latency sim into exception (F-016). Use check_tool_async() for real delay | 2026-04-05 |
 | assert_tool_called(call_index=N) multi-step | 5 | 5 | Correctly indexes across step boundaries; OOB gives clean StructuredAssertionError with count; works for all tool names | 2026-04-05 |
+| checkagent.datasets (restored) | 5 | 4 | F-014 fixed in e38593a — GoldenDataset, TestCase, parametrize_cases all back; F-012/F-013 still open | 2026-04-05 |
+| calculate_run_cost | 5 | 4 | Correct math, unpriced_steps for missing models, pricing_overrides and default_pricing both work; companion types need internal imports (F-018) | 2026-04-05 |
+| CostBreakdown | 5 | 5 | per_model breakdown, total_tokens, to_dict() — clean dataclass with all expected fields | 2026-04-05 |
+| CostTracker | 5 | 3 | Accumulation, budget enforcement (per_test/suite/ci), summary() all work correctly; no ap_cost_tracker fixture (F-019); BudgetConfig requires internal import (F-018) | 2026-04-05 |
+| CostReport / budget_utilization | 5 | 5 | avg_cost_per_run, budget_utilization() fractions, run_count all correct; to_dict() has expected keys | 2026-04-05 |
+| BudgetExceededError | 5 | 5 | Clear error message with limit value and which limit triggered; raised correctly for per_test/suite/ci | 2026-04-05 |
+| BUILTIN_PRICING | 5 | 3 | Contains major models (GPT-4o, Claude, Gemini); correct rates; not importable from top-level checkagent (F-018) | 2026-04-05 |
