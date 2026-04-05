@@ -41,5 +41,10 @@ Rate each feature on:
 | MockLLM.was_called_with() | 3 | 2 | Exact match only — misleading name implies substring; use get_calls_matching() for substring (F-009) | 2026-04-05 |
 | MockTool.call_sync() | 5 | 5 | Synchronous counterpart to call(); validates schema, records ToolCallRecord, failed calls also recorded | 2026-04-05 |
 | MockTool.assert_tool_called() | 4 | 3 | Raises correctly on miss; returns None (not ToolCallRecord) — inconsistent with top-level assert_tool_called() (F-010) | 2026-04-05 |
-| checkagent.datasets (GoldenDataset, TestCase, load_dataset, load_cases, parametrize_cases) | 5 | 4 | Solid feature: JSON+YAML loading, tag filtering, pytest parametrize integration, duplicate ID detection, context/metadata fields. Two issues: YAML integer version rejected (F-012), TestCase name triggers PytestCollectionWarning (F-013) | 2026-04-05 |
+| checkagent.datasets (GoldenDataset, TestCase, load_dataset, load_cases, parametrize_cases) | 1 | 1 | REGRESSION in 8e6a0a8: entire datasets module wiped — all classes removed, __init__.py empty. Was 5/4 in c786006 (F-014) | 2026-04-05 |
 | AgentInput | 5 | 5 | Clean struct for query+context+conversation_history+metadata; importable from top-level checkagent | 2026-04-05 |
+| MockTool.strict_validation=False | 5 | 5 | Skips schema validation entirely; call still recorded; works for both call() and call_sync() | 2026-04-05 |
+| MockLLM.reset() / reset_calls() | 4 | 3 | Both clear history and preserve rules — identical observable behavior. Duplication confusing; no docs on difference (F-017) | 2026-04-05 |
+| MockTool.reset() / reset_calls() | 4 | 3 | Both clear history and preserve registered tools — identical observable behavior. Same duplication issue (F-017) | 2026-04-05 |
+| FaultInjector.slow() sync behavior | 2 | 2 | Raises ToolSlowError in sync check_tool() instead of sleeping — converts latency sim into exception (F-016). Use check_tool_async() for real delay | 2026-04-05 |
+| assert_tool_called(call_index=N) multi-step | 5 | 5 | Correctly indexes across step boundaries; OOB gives clean StructuredAssertionError with count; works for all tool names | 2026-04-05 |

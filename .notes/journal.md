@@ -279,3 +279,43 @@ The `datasets` module is a meaningful addition — it bridges the gap between "w
 - Test `AgentRun` with multiple Step objects and `assert_tool_called(call_index=N)` across steps
 - Check if YAML coercion for `GoldenDataset.version` is fixed (F-012)
 - Check if `TestCase` naming warning is resolved (F-013)
+
+---
+
+## Session 8 — 2026-04-05 (strict_validation, reset, FaultInjector+sync, multi-step indexing)
+
+**Upgraded from:** c786006 → 8e6a0a8
+
+**What I tried:**
+- Upgraded checkagent from git main (c786006 → 8e6a0a8)
+- Re-ran 159 existing tests — immediately hit two collection errors: (1) `dirty_equals` not installed, (2) `checkagent.datasets.GoldenDataset` missing
+- Installed dirty_equals manually — session-006 tests recovered (159 pass)
+- Confirmed that the entire datasets module was emptied in 8e6a0a8 — F-014 filed
+- Tested `MockTool.strict_validation=False` — skips schema validation, call still recorded, works with both call() and call_sync()
+- Tested `MockLLM.reset()` vs `reset_calls()` and `MockTool.reset()` vs `reset_calls()` — identical observable behavior (F-017)
+- Tested FaultInjector with `MockTool.call_sync()` manual guard pattern — timeout, rate_limit, not_triggered_for_different_tool all work as expected
+- Discovered `slow()` raises `ToolSlowError` in sync check_tool() context instead of sleeping (F-016)
+- Tested `checkagent run --layer judge` — fails because test_session007.py collection error aborts run
+- Tested `assert_tool_called(run, name, call_index=N)` across multiple Steps — indexes globally across steps, OOB gives clean error
+- Wrote 31 new tests (27 pass, 4 xfailed documenting datasets regression)
+- Total: 186 tests pass, 4 xfailed (datasets regression markers in test_session008.py), test_session007.py still uncollectable
+
+**What surprised me:**
+- The biggest shock: the entire datasets module was wiped in the upgrade. 35 session-007 tests are now uncollectable. This is a critical regression — the datasets feature was one of the best additions in the prior session.
+- `dirty_equals` was never a checkagent dependency — it must have been manually installed in a prior session. When the venv needed it fresh this session, it wasn't there. Filed as F-015.
+- `slow()` RAISES instead of sleeping in sync context. The error message says "use async for real delay" — so the design intent is that `check_tool_async()` does actual latency simulation. The sync version converts a latency sim into a call-abort. This is a sharp edge that will trip up users who write sync agents. Filed as F-016.
+- `reset()` and `reset_calls()` are functionally identical on both MockLLM and MockTool — neither method removes registered rules or tools, both just clear call history. Having two methods with identical behavior and no documented distinction is pure confusion. Filed as F-017.
+- `assert_tool_called(call_index=N)` correctly indexes tool calls across step boundaries, not per-step. So if step 0 has 2 `search` calls and step 1 has 1, then `call_index=2` would be out of bounds (only 2 search calls total). The `summarize` call in step 1 is at `call_index=0` since it's the only summarize call. Correct and useful behavior.
+
+**Overall impression:**
+This session was dominated by the datasets regression — a critical backward compatibility break in the upgrade from c786006 to 8e6a0a8. The rest of the mock layer continues to be solid: strict_validation, reset/reset_calls, and FaultInjector all work correctly (with the slow() async caveat). The multi-step call_index feature is exactly right. But losing the entire datasets module in an upgrade is a serious red flag for production-readiness. The framework is still alpha (0.0.1a1) but this kind of regression undermines trust. The datasets module was the most user-visible new feature in session-007; having it vanish in session-008 is the kind of thing that would make a real user uninstall.
+
+**Next time I want to try:**
+- Check if datasets regression (F-014) is fixed
+- Check if dirty_equals dependency (F-015) is declared
+- Test `check_tool_async()` with `slow()` to confirm it actually introduces latency (not just raises)
+- Test FaultInjector `intermittent()` fault — what's the trigger probability semantics?
+- Test `MockTool.was_called` — is this a predicate or an assertion?
+- Test `MockTool.get_calls_for("name")` — returns all calls for a specific tool name
+- Probe whether any new modules were added in 8e6a0a8 to replace what was removed
+- Try `checkagent run --layer judge` once test_session007.py collection is fixed

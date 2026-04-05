@@ -146,3 +146,51 @@ Format:
 **Actual:** Warning fires on any import: `cannot collect test class 'TestCase' because it has a __init__ constructor (from: tests/test_session007.py)`.
 **Workaround:** Can suppress with `filterwarnings = ["ignore::pytest.PytestCollectionWarning"]` in pytest config, but shouldn't have to.
 **Status:** Open
+
+---
+
+## F-014: `checkagent.datasets` module emptied in 8e6a0a8 — GoldenDataset and all dataset classes removed
+**Date:** 2026-04-05
+**Severity:** critical
+**Category:** bug
+**Description:** Upgrading from c786006 to 8e6a0a8 wiped the entire `checkagent.datasets` module. `GoldenDataset`, `TestCase`, `load_dataset`, `load_cases`, and `parametrize_cases` all gone. `checkagent.datasets.__init__.py` is now empty. The datasets subpackage directory still exists but exports nothing.
+**Expected:** Backward-compatible upgrade — all public API from c786006 should still work after upgrading to 8e6a0a8.
+**Actual:** `from checkagent.datasets import GoldenDataset` raises `ImportError`. All 35 session-007 tests are uncollectable. The test_session007.py file cannot even be imported.
+**Workaround:** None. Pin to c786006 to retain datasets support. The datasets regression also blocks `checkagent run --layer judge tests/` from completing (collection aborts on the import error).
+**Status:** Open
+
+---
+
+## F-015: `dirty_equals` not declared as a checkagent dependency
+**Date:** 2026-04-05
+**Severity:** medium
+**Category:** bug
+**Description:** `checkagent` uses `dirty_equals` matchers in `assert_output_matches` (and test files use it directly) but `dirty_equals` is not listed in checkagent's declared dependencies (`Requires: click, pluggy, pydantic, pytest, pytest-asyncio, pyyaml, rich`). After upgrading checkagent from a fresh environment, `dirty_equals` is not installed and test_session006.py fails to collect with `ModuleNotFoundError: No module named 'dirty_equals'`.
+**Expected:** `dirty_equals` listed as a required or optional checkagent dependency so it installs automatically.
+**Actual:** `uv pip install checkagent@git...` does not install dirty_equals. Any file importing from `dirty_equals` fails with `ModuleNotFoundError` on collection.
+**Workaround:** Manually run `pip install dirty-equals` after installing checkagent.
+**Status:** Open
+
+---
+
+## F-016: `FaultInjector.slow()` raises `ToolSlowError` in sync context — not a latency simulation
+**Date:** 2026-04-05
+**Severity:** medium
+**Category:** dx-friction
+**Description:** `fault.on_tool("x").slow()` is expected to simulate slow responses by adding latency. But calling `fault.check_tool("x")` in a synchronous context raises `ToolSlowError: FaultInjection(x): slow response (Nms) — use async for real delay`. The fault raises instead of sleeping, which is surprising. The error message suggests using `check_tool_async()` for real delay.
+**Expected:** `slow()` should simulate latency — either sleep synchronously or be clearly documented as async-only. The current behavior converts a latency simulation into an exception that aborts the tool call.
+**Actual:** Synchronous `check_tool()` raises `ToolSlowError`. Only `check_tool_async()` produces real latency simulation.
+**Workaround:** Use `await fault.check_tool_async("x")` for slow fault simulation. Never use `check_tool()` for slow faults.
+**Status:** Open
+
+---
+
+## F-017: `MockLLM.reset()` and `reset_calls()` are functionally identical — undocumented duplication
+**Date:** 2026-04-05
+**Severity:** low
+**Category:** dx-friction
+**Description:** Both `MockLLM.reset()` and `MockLLM.reset_calls()` clear call history and preserve registered rules. Same for `MockTool.reset()` and `MockTool.reset_calls()`. They have different names but identical observable behavior — neither removes registered rules or tools.
+**Expected:** Either the two methods do different things (e.g., `reset()` clears everything including rules, `reset_calls()` only clears history), or one is an alias of the other with documentation explaining why both exist.
+**Actual:** No observable difference. Having two methods with the same behavior creates confusion about which to use.
+**Workaround:** Use either one — they're interchangeable.
+**Status:** Open
