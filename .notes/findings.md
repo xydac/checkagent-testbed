@@ -302,3 +302,14 @@ Format:
 **Actual:** `from checkagent import probes` → `ImportError`. `from checkagent import Probe` → `ImportError`. Must use `from checkagent.safety import probes`.
 **Workaround:** `from checkagent.safety import probes`, then `probes.injection.direct.all()` for parametrize.
 **Status:** Open
+
+---
+
+## F-027: `AgentRun` and `Step` silently drop unknown field names
+**Date:** 2026-04-05
+**Severity:** high
+**Category:** dx-friction
+**Description:** `AgentRun` and `Step` are Pydantic models with `model_extra` unset (defaults to `ignore`). Passing wrong field names — like `AgentRun(output='hello')` instead of `AgentRun(final_output='hello')`, or `Step(input='x', output='y')` instead of `Step(input_text='x', output_text='y')` — silently discards the values with no `ValidationError`. The run's `final_output` stays `None`. This is a silent data-loss trap that produces confusing failures downstream (e.g., `task_completion` seeing `None` output).
+**Expected:** Pydantic's `model_config = ConfigDict(extra='forbid')` would raise `ValidationError` on unknown fields, giving the user an immediate "unknown field 'output'" message.
+**Actual:** `AgentRun(output='hello').final_output` → `None`. No exception, no warning.
+**Workaround:** Use correct field names: `final_output` (not `output`) for `AgentRun`; `input_text`/`output_text` (not `input`/`output`) for `Step`.

@@ -449,3 +449,54 @@ F-005 continues to be the framework's longest-running embarrassment.
 - Probe whether `task_completion` correctly handles `expected_output_contains` list with multiple items (AND vs OR logic)
 - Test `TestCase` with a string-serialized JSON input to work around the str-only input field
 - Check if F-005 has any progress — maybe add a conftest manually to see if there's a hint
+
+---
+
+## Session 12 — 2026-04-05 (new probe categories, task_completion AND logic, F-027 silent field drop)
+
+**Upgraded from:** 0a91584 → 27d4af4 (still 0.0.1a1)
+
+**What I tried:**
+- Upgraded checkagent from git main
+- Re-ran 422 existing tests — all pass, no regressions
+- Explored new probe categories in the safety module
+- Investigated task_completion expected_output_contains list behavior
+- Tested checkagent run --layer safety (invalid layer)
+- Verified F-024, F-025 still open
+- Checked F-005 (init): now generates conftest.py but it's empty — still broken
+- Filed F-027: AgentRun/Step silently drop unknown fields
+- Wrote 53 new tests; total now 475, all pass
+
+**What I found:**
+
+**Three new probe categories — probe library is now 68 total:**
+- `probes_jailbreak` (15 probes): roleplay (7) + encoding (8). Roleplay attacks range from "you are NoPolicies" persona to screenwriter framing; encoding attacks cover base64, ROT13, hex, homoglyphs, zero-width chars. CRITICAL to LOW severity.
+- `probes_pii` (10 probes): all PII extraction attempts — direct (email/phone), social engineering, bulk export, metadata harvesting, document export, credentials, financial, conversation replay. All HIGH severity.
+- `probes_scope` (8 probes): boundary tests for actions outside agent scope — booking flights, bank transfers, SQL execution, medical advice, destructive actions. MEDIUM to CRITICAL severity.
+
+Accessible via `from checkagent.safety import probes_jailbreak` (module object) or `from checkagent.safety.probes import jailbreak`. ProbeSet combination across categories works: `injection.all_probes + jailbreak.all_probes + pii.all_probes + scope.all_probes` → ProbeSet of 68. All 68 names are unique.
+
+**F-027: AgentRun/Step silently drop unknown fields — worst DX issue I've found:**
+`AgentRun(output='hello')` silently discards the value because the correct field is `final_output`. No ValidationError, no warning. `final_output` stays `None`. Same trap exists in `Step`: correct fields are `input_text`/`output_text`, not `input`/`output`. I burned time debugging this when testing task_completion — the metric kept seeing `None` output and scoring 0. Adding `extra='forbid'` to the model config would immediately expose this mistake.
+
+**task_completion with list confirmed AND logic:**
+`expected_output_contains=['42', 'Paris']` — all items must appear in `final_output`. Partial scores work: 1 of 2 matched → value=0.5. `threshold` applies to the fractional score. `check_no_error=True` (default) prepends an implicit error-check, so a 2-item list results in 3 checks total. This is documented via `metadata['checks']`.
+
+**ProbeSet.filter() DX gotchas:**
+- Tags filter uses OR logic: `filter(tags={'roleplay', 'persona'})` matches probes with ANY of those tags. Not AND. Not documented.
+- Severity filter is case-sensitive for strings: `filter(severity='CRITICAL')` → 0 results. Must use lowercase `'critical'` or `Severity.CRITICAL` enum.
+
+**checkagent run --layer safety:** Not a valid layer. `--layer` only accepts `mock|replay|eval|judge`. Safety tests currently have no designated layer marker, so they run in all layers.
+
+**F-005 (init) progress note:** `checkagent init` now generates `tests/conftest.py` — this is new. But the conftest is empty (just a docstring). The fundamental bugs remain: no `pythonpath` config → `ModuleNotFoundError: No module named 'sample_agent'`. Twelfth session without a fix.
+
+**F-024, F-025:** Both path boundary security bugs confirmed still open.
+
+**Next time I want to try:**
+- Test whether `ProbeSet.filter(tags={'a', 'b'})` AND logic can be achieved by chaining `.filter()` calls
+- Test `ap_safety.assert_no_injection()` — does it exist?
+- Try `checkagent run --layer judge` to confirm judge layer works
+- Test `EvaluatorRegistry.discover_entry_points()` with an actual installed plugin
+- Test what happens when you pass a ProbeSet directly to `@pytest.mark.parametrize` (does it unpack properly?)
+- Test `task_completion` with `expected_output_equals` for exact match
+- Check if there's a way to extend scope/boundary probes with custom actions
