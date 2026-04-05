@@ -10,3 +10,9 @@ build/
 venv/
 .pytest_cache/
 .mypy_cache/
+
+# QA agent private notes
+.notes/
+
+# QA agent private notes
+.notes/
