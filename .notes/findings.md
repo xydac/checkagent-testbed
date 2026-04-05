@@ -481,3 +481,39 @@ Format:
 **Actual:** `from checkagent import Cassette` → `ImportError`. Must use `from checkagent.replay import Cassette`.
 **Workaround:** `from checkagent.replay import Cassette, Interaction, RecordedRequest, RecordedResponse, redact_dict`
 **Status:** Open
+
+---
+
+## F-042: `ReplayEngine(block_unmatched=False)` never suppresses `CassetteMismatchError`
+**Date:** 2026-04-05
+**Severity:** medium
+**Category:** bug
+**Description:** `ReplayEngine` accepts a `block_unmatched` constructor parameter, but setting it to `False` has no observable effect. All three strategies (EXACT, SEQUENCE, SUBSET) still raise `CassetteMismatchError` when there is no match — even with `block_unmatched=False`. The expected semantics of `block_unmatched=False` is passthrough mode: when no recorded interaction matches, return `None` and let the real call proceed (useful for partial recording modes). Currently there is no way to achieve passthrough behavior.
+**Expected:** `ReplayEngine(..., block_unmatched=False).match(unmatched_req)` → returns `None` (passthrough). `block_unmatched=True` → raises `CassetteMismatchError` (strict mode).
+**Actual:** `block_unmatched=False` always raises `CassetteMismatchError` identically to `block_unmatched=True`. The parameter is accepted but has no effect.
+**Workaround:** Wrap `engine.match()` in a try/except and catch `CassetteMismatchError` yourself to simulate passthrough behavior.
+**Status:** Open
+
+---
+
+## F-043: Upstream CI failing with Windows encoding error in demo-generated test file
+**Date:** 2026-04-05
+**Severity:** high
+**Category:** bug
+**Description:** Upstream CI is failing on all 3 latest runs (as of c03b11f) with a new root cause: the `checkagent demo` command generates a test file that includes an em dash character (`—`) in the module docstring, but the file has no `# -*- coding: utf-8 -*-` declaration. On Windows with Python 3.11, this causes `SyntaxError: (unicode error) 'utf-8' codec can't decode byte 0x97 in position 22`. Byte `0x97` is the em dash in Windows-1252 encoding, meaning the file is being written with the system's default encoding instead of UTF-8.
+**Expected:** Generated test files should either use ASCII-safe characters in docstrings or include an explicit UTF-8 encoding declaration. Files written by `checkagent demo` should be platform-safe.
+**Actual:** `checkagent demo` → generates file with em dash → CI on Windows fails with `SyntaxError` during collection → CI red. Previous CI failure root cause was F-008 (jsonschema missing dep); this is a separate Windows encoding issue that has become the new blocking failure.
+**Workaround:** Only run CI on Linux/macOS. No user-facing workaround — the demo generates the file.
+**Status:** Open
+
+---
+
+## F-044: `ReplayEngine` SEQUENCE strategy ignores all request fields including `kind`
+**Date:** 2026-04-05
+**Severity:** medium
+**Category:** dx-friction
+**Description:** `ReplayEngine` with `MatchStrategy.SEQUENCE` returns the next recorded interaction in order regardless of the incoming request — it ignores `kind`, `method`, and `body`. A `kind='tool'` request will match a recorded `kind='llm'` interaction if it's next in sequence. While pure sequence replay is a valid choice for simple playback, the complete absence of kind/method validation makes it easy to accidentally replay the wrong interaction type with no error signal. A user testing a multi-step agent (llm → tool → llm) who passes `kind='llm'` for all three calls will silently get tool responses for LLM calls.
+**Expected:** SEQUENCE strategy should at minimum warn when incoming `kind` doesn't match recorded `kind`. Users who want unchecked sequence playback should opt in explicitly.
+**Actual:** `RecordedRequest(kind='tool', method='search')` + recorded `llm` interaction → match succeeds silently.
+**Workaround:** After each `match()`, verify that `matched.request.kind == expected_kind`. Or use EXACT strategy which enforces body matching.
+**Status:** Open

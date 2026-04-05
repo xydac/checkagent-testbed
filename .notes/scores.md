@@ -123,3 +123,13 @@ Rate each feature on:
 | FaultInjector async LLM faults | 1 | 1 | check_llm_async() does not exist — no async LLM fault simulation (F-037). Only check_llm() sync available | 2026-04-05 |
 | FaultInjector.intermittent() fail_rate | 5 | 4 | fail_rate=1.0 always raises; fail_rate=0.0 never raises; seed param for deterministic results; async works same as sync | 2026-04-05 |
 | AgentRun.input strict typing | 3 | 2 | Requires AgentInput (or dict coercion); plain string raises ValidationError with unhelpful message — doesn't hint at AgentInput(query=...) fix (F-038) | 2026-04-05 |
+| CassetteRecorder | 5 | 4 | record_llm_call/record_tool_call work correctly; tokens/duration/status/redact all captured; finalize() → Cassette with correct metadata; not at top-level (F-041) | 2026-04-05 |
+| ReplayEngine (SEQUENCE) | 4 | 3 | Core playback works; remaining/all_used/reset all correct; but silently ignores kind — tool request matches llm interaction (F-044) | 2026-04-05 |
+| ReplayEngine (EXACT) | 5 | 4 | Body matching correct; raises CassetteMismatchError with strategy name in message; default strategy | 2026-04-05 |
+| ReplayEngine (SUBSET) | 5 | 4 | Recorded body must be subset of request body — semantics are correct if you read docs carefully; error on subset mismatch | 2026-04-05 |
+| ReplayEngine block_unmatched | 1 | 1 | block_unmatched=False has no effect — always raises CassetteMismatchError (F-042). Passthrough mode not implemented | 2026-04-05 |
+| CassetteMismatchError | 5 | 5 | Clean exception hierarchy; message includes kind and strategy; raised on exhausted cassette | 2026-04-05 |
+| MatchStrategy enum | 5 | 4 | 3 values (EXACT/SEQUENCE/SUBSET); string values; default is EXACT (sensible) | 2026-04-05 |
+| TimedCall | 5 | 4 | Context manager; accurate ms timing; reusable; only one field (duration_ms); minimal but functional | 2026-04-05 |
+| upstream CI (c03b11f) | 1 | 1 | Still red — new failure: Windows encoding error in demo-generated test (byte 0x97 em dash, F-043). Previous root cause F-008 may also still apply | 2026-04-05 |
+| @pytest.mark.cassette (session-017) | 2 | 2 | CassetteRecorder+ReplayEngine exist now but still no pytest fixture — marker still no-op; no ap_cassette, no auto record/replay | 2026-04-05 |

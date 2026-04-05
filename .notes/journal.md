@@ -724,3 +724,57 @@ The `@pytest.mark.cassette` marker still has no behavior — it doesn't auto-loa
 - Test what `checkagent.yml` quality_gates field does in the CLI now that ci module is restored
 - Check if AgentRun.input string coercion is added (F-038 resolution path)
 - Watch for check_llm_async() — F-037 still open
+
+---
+
+## Session 017 — 2026-04-05
+
+**Upgraded from:** 6a8eaf4 → c03b11f (still 0.0.1a1)
+
+**What I tried:**
+- Upgraded checkagent from git main (c03b11f)
+- Checked upstream CI — still 3 consecutive failures, new root cause
+- Re-ran all 668 tests — all pass, no regressions
+- Explored new `CassetteRecorder`, `ReplayEngine`, `MatchStrategy`, `TimedCall`, `CassetteMismatchError` in `checkagent.replay`
+- Tested all three matching strategies: EXACT, SEQUENCE, SUBSET
+- Tested `block_unmatched=False` behavior
+- Tested full record→save→load→replay cycle
+- Filed F-042, F-043, F-044
+- Wrote 59 new tests covering the replay engine
+
+**What I found:**
+
+**No regressions.** All 668 previous tests still pass. New total: 727.
+
+**New: `CassetteRecorder` and `ReplayEngine` added in c03b11f.**
+The commit "Update roadmap: mark cassettes and replay engine as complete" shipped the actual implementation:
+- `CassetteRecorder(test_id, redact_keys)` — records LLM and tool calls to a `Cassette`
+- `ReplayEngine(cassette, strategy, block_unmatched)` — replays interactions from a cassette
+- `MatchStrategy` enum with EXACT, SEQUENCE, SUBSET values
+- `TimedCall` — context manager for measuring call duration in ms
+- `CassetteMismatchError` — raised when no match found
+
+**Core functionality solid.** `CassetteRecorder` correctly captures kind, method, body, tokens, duration, status. `finalize()` returns a `Cassette` with all interactions correctly sequenced and assigned IDs. `save()`/`load()` round-trips work. Redaction via `redact_keys` works. The EXACT and SUBSET strategies both work correctly. `ReplayEngine.reset()` re-enables replay from the start.
+
+**F-042: `block_unmatched=False` has no effect.**
+`ReplayEngine` accepts `block_unmatched` as a constructor parameter but it never changes behavior. Setting `block_unmatched=False` is supposed to enable passthrough mode (return `None` when no match, let real call through). It still raises `CassetteMismatchError`. This makes it impossible to do partial-record workflows where some calls are recorded and others pass through live.
+
+**Upstream CI: still red, new cause.**
+The CI was previously failing due to F-008 (jsonschema missing dep). Now it's failing with a Windows-specific error: `SyntaxError: (unicode error) 'utf-8' codec can't decode byte 0x97`. The em dash character (`—`) in the demo-generated test file's docstring is written with the system's default encoding on Windows (Windows-1252), producing byte 0x97 instead of the UTF-8 sequence. The fix is either ASCII-safe docstrings or an explicit `# -*- coding: utf-8 -*-` at the top of generated files.
+
+**F-044: SEQUENCE strategy ignores everything including `kind`.**
+`MatchStrategy.SEQUENCE` returns the next interaction in order regardless of the incoming request's `kind`, `method`, or `body`. A `kind='tool'` request will match a recorded `kind='llm'` interaction. This is surprising — most users would expect at minimum the `kind` (llm vs tool) to be checked. Silent kind mismatches could lead to test scenarios that silently return wrong response types. The other strategies are fine.
+
+**F-037, F-038 still open.** `check_llm_async()` still doesn't exist. `AgentRun(input="string")` still raises `ValidationError`.
+
+**No `ap_cassette` fixture yet.** The `@pytest.mark.cassette` marker still has no pytest integration. `CassetteRecorder` and `ReplayEngine` are standalone classes — no fixture that auto-starts recording, no marker behavior that injects a cassette. The pieces exist but aren't wired together.
+
+**Wrote 59 new tests; total now 727, all pass.**
+
+**Next time I want to try:**
+- Watch for `ap_cassette` fixture — that would complete the pytest cassette integration
+- Test `block_unmatched=False` when it's fixed (F-042)
+- Check if `migrate-cassettes` CLI command is added (F-039)
+- Check if F-037 (`check_llm_async`) is fixed
+- Write conftest.py wiring evaluate_gates() into pytest sessionfinish
+- Test what `checkagent.yml` quality_gates field does in the CLI
