@@ -266,3 +266,39 @@ Format:
 **Actual:** `Severity.HIGH.value >= 3` → `TypeError: '>=' not supported between instances of 'str' and 'int'`. Must compare enum members directly (`severity in {Severity.HIGH, Severity.CRITICAL}`).
 **Workaround:** Compare enum members directly: `f.severity in {Severity.HIGH, Severity.CRITICAL}` or use the internal `SEVERITY_ORDER[severity]` for numeric comparison.
 **Status:** Open
+
+---
+
+## F-024: `ToolCallBoundaryValidator` allows path prefix confusion — `/dataextra` passes `/data` boundary
+**Date:** 2026-04-05
+**Severity:** high
+**Category:** bug
+**Description:** `ToolCallBoundaryValidator` uses naive string prefix matching for path boundary checks. If `allowed_paths=["/data"]`, a tool call with `path="/dataextra/file.txt"` passes the check even though `/dataextra` is a completely different directory. The implementation appears to do `path.startswith(allowed)` without ensuring a path separator follows the prefix.
+**Expected:** Path boundary check should verify proper directory containment. `/dataextra/file.txt` should NOT match when `/data` is the allowed path.
+**Actual:** `ToolBoundary(allowed_paths=["/data"])` + path `/dataextra/file.txt` → `SafetyResult(passed=True)`. This is a security vulnerability in the boundary validator.
+**Workaround:** Use more specific allowed paths (e.g., `/data/` with trailing slash, or the full absolute path). Do not rely on `ToolCallBoundaryValidator` for security-critical path enforcement.
+**Status:** Open
+
+---
+
+## F-025: `ToolCallBoundaryValidator` doesn't normalize paths — traversal `/data/../etc/passwd` bypasses boundary
+**Date:** 2026-04-05
+**Severity:** high
+**Category:** bug
+**Description:** `ToolCallBoundaryValidator` does not normalize paths before checking boundaries. A path like `/data/../etc/passwd` passes when `allowed_paths=["/data"]` because the raw string starts with `/data`. After normalization with `os.path.normpath()`, the path resolves to `/etc/passwd`, which is outside the allowed boundary.
+**Expected:** Path boundary check should normalize paths (resolve `..`, `.`, symlinks conceptually) before checking containment. This is a standard security requirement for path traversal prevention.
+**Actual:** `/data/../etc/passwd` with `allowed_paths=["/data"]` → `SafetyResult(passed=True)`. Attacker can escape any allowed directory with `../` traversal.
+**Workaround:** Agents using `ToolCallBoundaryValidator` for security enforcement must pre-normalize paths themselves: `os.path.normpath(path)` before passing to the agent. Do not rely on checkagent for path traversal protection.
+**Status:** Open
+
+---
+
+## F-026: Attack probe library not importable from top-level `checkagent`
+**Date:** 2026-04-05
+**Severity:** low
+**Category:** dx-friction
+**Description:** `checkagent.safety.probes` is a new attack probe library with `Probe`, `ProbeSet`, `probes.injection.direct`, `probes.injection.indirect`, and `probes.injection.all_probes`. None of these are importable from top-level `checkagent`. Users must `from checkagent.safety import probes` — which works but is undiscoverable from `import checkagent`.
+**Expected:** `Probe` and `ProbeSet` at top-level (or at least documented with the other safety exports). `probes.injection` is a namespace that naturally lives under `checkagent.safety.probes`, so not top-level there, but the README/docs should prominently feature it.
+**Actual:** `from checkagent import probes` → `ImportError`. `from checkagent import Probe` → `ImportError`. Must use `from checkagent.safety import probes`.
+**Workaround:** `from checkagent.safety import probes`, then `probes.injection.direct.all()` for parametrize.
+**Status:** Open

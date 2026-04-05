@@ -398,3 +398,54 @@ The persistent frustration is discoverability: none of these new classes are at 
 - Check if `@pytest.mark.safety` marker now does anything with the `ap_safety` fixture in scope
 - Probe `OWASP_MAPPING` in the safety module
 - Test path-boundary edge cases: symlinks, relative paths, subdirectory traversal
+
+---
+
+## Session 11 — 2026-04-05 (attack probe library, path boundary security, end-to-end eval pipeline)
+
+**Upgraded from:** 0a91584 → latest main (still 0.0.1a1)
+
+**What I tried:**
+- Upgraded checkagent from git main
+- Re-ran 357 existing tests — all pass, no regressions
+- Confirmed open findings: F-005 (init still broken — 11th session), F-018, F-020, F-021, F-022, F-023 all still open
+- Discovered new module: `checkagent.safety.probes` with attack probe library
+- Wrote 65 new tests covering: attack probe library (Probe, ProbeSet), severity_meets_threshold, OWASP_MAPPING, end-to-end eval pipeline, ToolCallBoundaryValidator path edge cases
+- Filed F-024 (path prefix confusion bug), F-025 (path traversal bypass bug), F-026 (probes not at top-level)
+- Total: 422 tests pass, 0 failures
+
+**What surprised me:**
+- The attack probe library is a significant new addition — 35 injection probes (25 direct + 10 indirect) covering classic attacks, persona hijacking, system prompt extraction, and indirect injection via tool results/RAG/email/calendar. The API is clean and composable: `ProbeSet.filter(tags={"ignore"})`, `direct + indirect`, iteration works with `for probe in probe_set`. The `@pytest.mark.parametrize("attack", probes.injection.direct.all())` pattern works exactly as documented.
+- `severity_meets_threshold(sev, threshold)` is a proper fix for F-023 — it correctly implements `SEVERITY_ORDER[sev] >= SEVERITY_ORDER[threshold]` so users can filter findings by severity without dealing with the string enum limitation. This function should have been the headline feature in the safety module release instead of buried in `checkagent.safety.taxonomy`.
+- **Two security bugs in `ToolCallBoundaryValidator`**: (1) `/dataextra/file.txt` passes when `allowed_paths=["/data"]` — naive `startswith` without path separator check. (2) `/data/../etc/passwd` passes the same boundary — no path normalization. These are not just DX issues, they're security vulnerabilities in a module that exists specifically for security enforcement. Filed as F-024 and F-025.
+- `aggregate_scores` takes `list[tuple[str, float, bool | None]]` not `list[Score]` — this is a surprising API choice. The `Score` object already has `name`, `value`, and `passed` fields, but `aggregate_scores` ignores them and requires you to unpack manually. The session-010 tests documented this correctly but I still fell into the trap when writing the pipeline tests.
+- `TestCase.input` is typed as `str`, not `dict` or `Any`. This means you can't pass structured input (e.g., `{"query": "...", "context": {...}}`) to a TestCase. For multi-parameter agents, users must serialize to a string. This is a usability gap for anything beyond single-string queries.
+- End-to-end pipeline (`TestCase → task_completion → aggregate_scores → RunSummary → detect_regressions`) works correctly when you use the right API shapes. The regression detection is elegant: `detect_regressions(current_aggs, baseline_aggs, threshold=0.1)` returns `list[RegressionResult]` with `.regressed`, `.metric_name`, `.delta` fields.
+- F-005 (checkagent init) still broken in session 11. The generated tests still fail due to missing `asyncio_mode = "auto"` in pytest config. Eleven sessions. This is the most embarrassing persistent bug.
+
+**Path boundary security analysis:**
+```
+allowed_paths=["/data"]
+
+/data/subdir/file.txt     → passed=True   ✓ correct
+/etc/passwd               → passed=False  ✓ correct
+/dataextra/file.txt       → passed=True   ✗ should be False (F-024)
+/data/../etc/passwd       → passed=True   ✗ should be False (F-025)
+```
+The implementation appears to use simple `str.startswith(allowed_path)` matching. Both bugs arise from not doing proper path handling. These are meaningful security vulnerabilities, not just edge cases.
+
+**Overall impression:**
+The attack probe library is the headline feature this session. It's well-designed, composable, and ready for `@pytest.mark.parametrize` usage. The `severity_meets_threshold` function quietly fixes the F-023 usability issue without requiring enum changes. 
+
+The path boundary security bugs (F-024, F-025) are serious. `ToolCallBoundaryValidator` is positioned as a security feature, but it fails on basic adversarial paths. A user who trusts this for security enforcement is vulnerable. These should be P0 fixes.
+
+F-005 continues to be the framework's longest-running embarrassment.
+
+**Next time I want to try:**
+- Test `ap_safety.assert_no_injection()` pattern — is there such a method? (implied by probe README example)
+- Test `ProbeSet` with real agent + `PromptInjectionDetector.evaluate()` in parametrized test
+- Test `checkagent run --layer safety` if it exists  
+- Investigate whether `ToolCallBoundaryValidator` has a `normalize_paths` option we missed
+- Probe whether `task_completion` correctly handles `expected_output_contains` list with multiple items (AND vs OR logic)
+- Test `TestCase` with a string-serialized JSON input to work around the str-only input field
+- Check if F-005 has any progress — maybe add a conftest manually to see if there's a hint

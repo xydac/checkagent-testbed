@@ -71,3 +71,12 @@ Rate each feature on:
 | RefusalComplianceChecker | 5 | 5 | Both modes (expect/forbid refusal) work correctly; add_pattern(); result.details populated | 2026-04-05 |
 | ToolCallBoundaryValidator | 4 | 3 | Allowed/forbidden tools, path boundaries, arg patterns all work correctly; evaluate(text) silent no-op is misleading (F-022); not at top-level (F-021) | 2026-04-05 |
 | Severity enum | 3 | 2 | String values instead of ordered integers — can't compare with >= or <; must use set membership or SEVERITY_ORDER dict (F-023) | 2026-04-05 |
+| attack probe library (Probe, ProbeSet) | 5 | 4 | 35 probes (25 direct + 10 indirect), clean composable API (filter/+/iter), parametrize-friendly; not at top-level (F-026) | 2026-04-05 |
+| probes.injection.direct | 5 | 5 | 25 well-categorized probes; Severity.CRITICAL for high-risk attacks; names are pytest-friendly param IDs | 2026-04-05 |
+| probes.injection.indirect | 5 | 5 | 10 indirect injection probes (tool results, RAG, email, calendar, DB); all tagged "indirect" | 2026-04-05 |
+| ProbeSet.filter() | 5 | 5 | Filter by tags, category, severity; returns new ProbeSet; combined filtering works | 2026-04-05 |
+| severity_meets_threshold | 5 | 5 | Correct ordering (LOW<MED<HIGH<CRITICAL); works as F-023 workaround; importable from checkagent.safety | 2026-04-05 |
+| OWASP_MAPPING | 5 | 4 | All SafetyCategory values covered; string values (OWASP IDs); importable from checkagent.safety | 2026-04-05 |
+| ToolCallBoundaryValidator path checks | 2 | 3 | Basic pass/fail works; but naive string prefix allows /dataextra bypass (F-024) and no path normalization allows ../traversal (F-025) — security bugs | 2026-04-05 |
+| end-to-end eval pipeline (datasets→metrics→aggregate→RunSummary) | 5 | 3 | Full pipeline works: TestCase → task_completion → aggregate_scores → RunSummary.save/load → detect_regressions; API requires tuples not Score objects (surprising) | 2026-04-05 |
+| TestCase.input field | 3 | 2 | Input is `str` not `dict` — surprising for agents that expect structured input. Users who pass dicts get ValidationError with confusing message | 2026-04-05 |
