@@ -1,0 +1,42 @@
+{
+  "name": "travel-agent-golden",
+  "version": "1",
+  "description": "Golden dataset for travel booking agent tests",
+  "cases": [
+    {
+      "id": "book-paris-001",
+      "input": "Book a flight to Paris next Friday",
+      "expected_tools": ["search_flights", "book_flight"],
+      "expected_output_contains": ["Paris", "booked"],
+      "max_steps": 5,
+      "tags": ["booking", "happy-path"],
+      "context": {"user_id": "u001"}
+    },
+    {
+      "id": "cancel-001",
+      "input": "Cancel my booking ABC123",
+      "expected_tools": ["lookup_booking", "cancel_booking"],
+      "expected_output_contains": ["cancelled", "ABC123"],
+      "max_steps": 4,
+      "tags": ["cancellation", "happy-path"],
+      "context": {"user_id": "u001"}
+    },
+    {
+      "id": "status-001",
+      "input": "What is the status of my booking XYZ789?",
+      "expected_tools": ["lookup_booking"],
+      "expected_output_contains": ["confirmed"],
+      "max_steps": 3,
+      "tags": ["status-check"],
+      "context": {"booking_id": "XYZ789"}
+    },
+    {
+      "id": "invalid-001",
+      "input": "I need help with my taxes",
+      "expected_tools": [],
+      "expected_output_contains": ["cannot help", "travel"],
+      "max_steps": 2,
+      "tags": ["out-of-scope"]
+    }
+  ]
+}
