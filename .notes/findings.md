@@ -218,3 +218,51 @@ Format:
 **Actual:** No fixture exists. `CostTracker` is a standalone class. Users must wire budget enforcement manually in their own conftest or test teardown.
 **Workaround:** Create a session-scoped fixture in conftest.py: `@pytest.fixture(scope="session") def cost_tracker(ap_config): return CostTracker(budget=ap_config.budget)`.
 **Status:** Open
+
+---
+
+## F-020: New eval module classes not exported from top-level `checkagent`
+**Date:** 2026-04-05
+**Severity:** medium
+**Category:** dx-friction
+**Description:** The new `checkagent.eval` module adds significant functionality: `step_efficiency`, `task_completion`, `tool_correctness`, `trajectory_match` (metric functions), `Evaluator` (ABC), `EvaluatorRegistry`, `AggregateResult`, `RunSummary`, `StepStats`, `aggregate_scores`, `compute_step_stats`, `detect_regressions`. None of these are exported from the top-level `checkagent` namespace. Users must reach into internal submodules: `from checkagent.eval.metrics import step_efficiency`, `from checkagent.eval.evaluator import Evaluator, EvaluatorRegistry`, `from checkagent.eval.aggregate import aggregate_scores`, etc.
+**Expected:** Eval metrics and aggregate helpers exported at top-level alongside the assertion functions (`assert_tool_called`, `assert_output_schema`, etc.) that ARE already there. At minimum `Evaluator` and `EvaluatorRegistry` should be top-level since they are the primary extension point.
+**Actual:** `from checkagent import step_efficiency` → `ImportError`. Same for all other eval classes.
+**Workaround:** Use internal imports from submodules.
+**Status:** Open
+
+---
+
+## F-021: Safety module not exported from top-level `checkagent`
+**Date:** 2026-04-05
+**Severity:** medium
+**Category:** dx-friction
+**Description:** The new `checkagent.safety` module adds `PromptInjectionDetector`, `PIILeakageScanner`, `SystemPromptLeakDetector`, `RefusalComplianceChecker`, `ToolCallBoundaryValidator`, `ToolBoundary`, `SafetyResult`, `SafetyFinding`, `SafetyEvaluator`, `SafetyCategory`, `Severity`. None of these are exported from top-level `checkagent`. The `ap_safety` fixture is registered and works, but the classes themselves (needed to configure boundaries, add custom patterns, inspect results) require internal imports: `from checkagent.safety import ToolCallBoundaryValidator, ToolBoundary`.
+**Expected:** Safety evaluator classes and supporting types exported at top-level, or at least from `checkagent.safety` as a clean public namespace (which it does provide, but is undiscoverable from `import checkagent`).
+**Actual:** `from checkagent import PromptInjectionDetector` → `ImportError`. `from checkagent import SafetyResult` → `ImportError`.
+**Workaround:** Use `from checkagent.safety import PromptInjectionDetector, PIILeakageScanner, ...` — these do work as a public subpackage import.
+**Status:** Open
+
+---
+
+## F-022: `ToolCallBoundaryValidator.evaluate(text)` is a silent no-op — always passes
+**Date:** 2026-04-05
+**Severity:** low
+**Category:** dx-friction
+**Description:** `ToolCallBoundaryValidator.evaluate(text)` always returns `SafetyResult(passed=True)` with the comment "Text-only evaluation is not meaningful for tool boundary checks." If a user calls `validator.evaluate(agent_output)` instead of `validator.evaluate_run(run)`, they'll always get a pass — with no warning or exception.
+**Expected:** Either raise `NotImplementedError` (with a message directing to `evaluate_run`), or emit a warning. Silent no-op is misleading.
+**Actual:** `validator.evaluate("call dangerous tool now")` → `SafetyResult(passed=True)`. The user has no idea they used the wrong method.
+**Workaround:** Always use `evaluate_run(run)` for `ToolCallBoundaryValidator`. Never use `evaluate(text)`.
+**Status:** Open
+
+---
+
+## F-023: `Severity` enum uses string values — `.value` comparison with integers fails silently
+**Date:** 2026-04-05
+**Severity:** low
+**Category:** dx-friction
+**Description:** `checkagent.safety.taxonomy.Severity` is an enum with string values: `LOW='low'`, `MEDIUM='medium'`, `HIGH='high'`, `CRITICAL='critical'`. Any code that assumes enum values are integers (a common pattern for ordered enums) will either raise a `TypeError` or produce incorrect comparisons. The `SEVERITY_ORDER` dict in the taxonomy module provides correct ordering, but it's an internal detail not surfaced in the public API.
+**Expected:** Either integer values for ordered comparison (`LOW=1`, `MEDIUM=2`, `HIGH=3`, `CRITICAL=4`) or implement `__lt__`/`__le__` on the enum so `Severity.HIGH > Severity.LOW` works naturally.
+**Actual:** `Severity.HIGH.value >= 3` → `TypeError: '>=' not supported between instances of 'str' and 'int'`. Must compare enum members directly (`severity in {Severity.HIGH, Severity.CRITICAL}`).
+**Workaround:** Compare enum members directly: `f.severity in {Severity.HIGH, Severity.CRITICAL}` or use the internal `SEVERITY_ORDER[severity]` for numeric comparison.
+**Status:** Open

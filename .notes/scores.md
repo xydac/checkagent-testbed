@@ -55,3 +55,19 @@ Rate each feature on:
 | CostReport / budget_utilization | 5 | 5 | avg_cost_per_run, budget_utilization() fractions, run_count all correct; to_dict() has expected keys | 2026-04-05 |
 | BudgetExceededError | 5 | 5 | Clear error message with limit value and which limit triggered; raised correctly for per_test/suite/ci | 2026-04-05 |
 | BUILTIN_PRICING | 5 | 3 | Contains major models (GPT-4o, Claude, Gemini); correct rates; not importable from top-level checkagent (F-018) | 2026-04-05 |
+| step_efficiency | 5 | 3 | Correct ratio capping, metadata, threshold; not at top-level (F-020) | 2026-04-05 |
+| task_completion | 5 | 4 | case-insensitive substring, exact match, error check, partial score all correct; not at top-level (F-020) | 2026-04-05 |
+| tool_correctness | 5 | 4 | P/R/F1 correct, FP/FN metadata, both-empty → 1.0; not at top-level (F-020) | 2026-04-05 |
+| trajectory_match | 5 | 4 | strict/ordered/unordered all work; invalid mode raises ValueError; not at top-level (F-020) | 2026-04-05 |
+| Evaluator (ABC) + EvaluatorRegistry | 5 | 3 | Subclassing works, register/unregister/score_all/discover_entry_points all correct; not at top-level (F-020) | 2026-04-05 |
+| aggregate_scores | 5 | 4 | Grouping, mean, pass_rate, min/max all correct; None pass_rate when no flags; not at top-level (F-020) | 2026-04-05 |
+| compute_step_stats | 5 | 4 | mean, p50, p95, min, max correct; empty list returns zeros; not at top-level (F-020) | 2026-04-05 |
+| detect_regressions | 5 | 4 | Detects drops, ignores improvements, skips missing baseline metrics; threshold works; not at top-level (F-020) | 2026-04-05 |
+| RunSummary save/load | 5 | 4 | Round-trip with aggregates, step_stats, total_cost all preserved; not at top-level (F-020) | 2026-04-05 |
+| ap_safety fixture | 5 | 4 | Returns all 5 evaluators (injection/pii/system_prompt/tool_boundary/refusal); fixture works; evaluator classes not at top-level (F-021) | 2026-04-05 |
+| PromptInjectionDetector | 5 | 4 | Detects 6 built-in patterns; add_pattern() works; Severity enum string values not comparable with int (F-023) | 2026-04-05 |
+| PIILeakageScanner | 5 | 5 | Email, SSN, CC, phone detection; disabled set works; add_pattern() works; deduplicates findings | 2026-04-05 |
+| SystemPromptLeakDetector | 5 | 5 | Pattern detection + verbatim fragment leak; set_system_prompt with min_fragment_len; clean API | 2026-04-05 |
+| RefusalComplianceChecker | 5 | 5 | Both modes (expect/forbid refusal) work correctly; add_pattern(); result.details populated | 2026-04-05 |
+| ToolCallBoundaryValidator | 4 | 3 | Allowed/forbidden tools, path boundaries, arg patterns all work correctly; evaluate(text) silent no-op is misleading (F-022); not at top-level (F-021) | 2026-04-05 |
+| Severity enum | 3 | 2 | String values instead of ordered integers — can't compare with >= or <; must use set membership or SEVERITY_ORDER dict (F-023) | 2026-04-05 |

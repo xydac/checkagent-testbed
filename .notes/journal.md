@@ -360,3 +360,41 @@ This session was dominated by the datasets regression — a critical backward co
 - Test `MockTool.get_calls_for("name")` — returns all calls for a specific tool name
 - Probe whether any new modules were added in 8e6a0a8 to replace what was removed
 - Try `checkagent run --layer judge` once test_session007.py collection is fixed
+
+---
+
+## Session 10 — 2026-04-05 (eval metrics, aggregate stats, Evaluator/Registry, safety module)
+
+**Upgraded from:** e38593a → 0a91584
+
+**What I tried:**
+- Upgraded checkagent from git main (e38593a → 0a91584)
+- Re-ran 261 existing tests — all pass, no regressions from prior sessions
+- Confirmed F-018 (ProviderPricing/BudgetConfig/BUILTIN_PRICING not at top-level) still open
+- Discovered two major new feature areas: `checkagent.eval` metrics/aggregate/evaluator and `checkagent.safety` module
+- Tested `checkagent run --layer judge tests/` — correctly deselects all 261 tests (no judge-layer tests exist yet)
+- Wrote 96 new tests covering: eval metrics (step_efficiency, task_completion, tool_correctness, trajectory_match), aggregate functions (aggregate_scores, compute_step_stats, detect_regressions), RunSummary save/load, Evaluator/EvaluatorRegistry, ap_safety fixture, and all 5 safety evaluators
+- Filed F-020 (eval classes not at top-level), F-021 (safety classes not at top-level), F-022 (ToolCallBoundaryValidator.evaluate() silent no-op), F-023 (Severity enum string values)
+- Total: 357 tests pass, 0 failures
+
+**What surprised me:**
+- The `ap_safety` fixture is brand new and actually useful — it returns all 5 safety evaluators pre-configured. The `@pytest.mark.safety` marker was previously a no-op stub (scored 3/5), and now there are real safety evaluators — but the marker still doesn't auto-apply them. The fixture approach is more flexible.
+- `Severity` enum uses string values (`'low'`, `'medium'`, `'high'`, `'critical'`) instead of integers. This means `Severity.HIGH > Severity.LOW` is False (string comparison is alphabetical — 'high' < 'low'!), and `Severity.HIGH.value >= 3` raises `TypeError`. The `SEVERITY_ORDER` dict exists internally for correct ordering, but it's not surfaced in the public API. Any user who tries to filter "HIGH or above" will be surprised. Filed as F-023.
+- `ToolCallBoundaryValidator.evaluate(text)` is a silent pass-through — it always returns `passed=True` with no warning. The docstring says "Text-only evaluation is not meaningful for tool boundary checks" — but a user who calls the wrong method gets a false pass with no indication of the mistake. Compare to `SystemPromptLeakDetector` and others which DO implement `evaluate(text)` correctly. The asymmetry is confusing. Filed as F-022.
+- `Evaluator` ABC + `EvaluatorRegistry` are a well-designed extension point. Subclassing is clean, `discover_entry_points()` enables plugin distribution, and `score_all()` runs all registered evaluators. Not at top-level (F-020) but the API itself is solid.
+- `RunSummary.save()` and `.load()` enable baseline comparisons across test runs — this plus `detect_regressions()` creates a real regression detection pipeline. The design is good; the discoverability is poor (requires knowing the internal module path).
+- F-005 (`checkagent init` still broken): not retested this session, but it's been open for 10 sessions now.
+
+**Overall impression:**
+This is the biggest feature drop yet. The eval metrics + safety module together represent a significant step toward production-readiness. The eval functions (`step_efficiency`, `task_completion`, `tool_correctness`, `trajectory_match`) are well-designed and cover the most common "did the agent do what we expected" questions. The safety module is surprisingly complete — 5 evaluators covering injection, PII, system prompt leakage, refusal compliance, and tool boundaries. All of it works correctly.
+
+The persistent frustration is discoverability: none of these new classes are at the top-level `checkagent` namespace. Every feature release adds more internal module paths a user needs to memorize. The pattern has now repeated across 4 sessions (F-018, F-020, F-021). F-005 (`checkagent init` still broken) is the other lingering embarrassment — a new user's first experience remains broken.
+
+**Next time I want to try:**
+- Test `checkagent init` again — ten sessions and still broken (F-005)
+- Try `ToolCallBoundaryValidator` with `path_arg_names` — what constitutes a "path-like" argument?
+- Test `EvaluatorRegistry.discover_entry_points()` with an actual installed entry point
+- Try building a real end-to-end eval scenario: datasets → parametrize_cases → trajectory_match + tool_correctness → aggregate_scores → RunSummary → detect_regressions
+- Check if `@pytest.mark.safety` marker now does anything with the `ap_safety` fixture in scope
+- Probe `OWASP_MAPPING` in the safety module
+- Test path-boundary edge cases: symlinks, relative paths, subdirectory traversal
