@@ -108,3 +108,8 @@ Rate each feature on:
 | judge layer marker | 4 | 3 | @pytest.mark.agent_test(layer='judge') filters correctly; checkagent run --layer judge works; but judge module is empty — no judge fixtures, no JudgeLLM, nothing | 2026-04-05 |
 | CI quality gates pytest integration | 1 | 1 | No pytest_sessionfinish/terminal_summary hooks; no ap_quality_gates fixture; gates defined in config are not auto-evaluated; users must wire everything manually (F-034) | 2026-04-05 |
 | QualityGateEntry missing metric typo | 2 | 2 | Misconfigured gate metric name → SKIPPED (not an error); silently passes — no validation that gate names match computed score names | 2026-04-05 |
+| checkagent package stability (ed0b21a) | 1 | 1 | CRITICAL REGRESSION: datasets, eval.metrics, eval.aggregate, eval.evaluator, ci, safety, cost tracking all stripped (F-036). Only sessions 004-008 survive | 2026-04-05 |
+| FaultInjector.check_tool_async() | 5 | 4 | Real latency simulation: 80ms slow fault → 80ms actual sleep; no exception unlike sync; records in was_triggered/trigger_count; other fault types still raise | 2026-04-05 |
+| FaultInjector async LLM faults | 1 | 1 | check_llm_async() does not exist — no async LLM fault simulation (F-037). Only check_llm() sync available | 2026-04-05 |
+| FaultInjector.intermittent() fail_rate | 5 | 4 | fail_rate=1.0 always raises; fail_rate=0.0 never raises; seed param for deterministic results; async works same as sync | 2026-04-05 |
+| AgentRun.input strict typing | 3 | 2 | Requires AgentInput (or dict coercion); plain string raises ValidationError with unhelpful message — doesn't hint at AgentInput(query=...) fix (F-038) | 2026-04-05 |

@@ -4,7 +4,7 @@ version = "0.0.1"
 description = "Customer-zero testbed for CheckAgent framework"
 requires-python = ">=3.10"
 dependencies = [
-    "checkagent @ git+https://github.com/xydac/checkagent.git@main",
+    "checkagent",
     "dirty-equals>=0.6",
 ]
 
@@ -16,3 +16,6 @@ dev = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+
+[tool.uv.sources]
+checkagent = { git = "https://github.com/xydac/checkagent.git", rev = "main" }

@@ -621,3 +621,48 @@ If a quality gate is configured for `task_completion` but the user accidentally 
 - Investigate whether `checkagent run` with existing -m still merges with agent_test somehow
 - Check `CostReport.budget_utilization()` with None total_cost edge case
 - Test `FaultInjector.check_tool_async()` for real latency simulation (F-016 workaround)
+
+---
+
+## Session 015 — 2026-04-05
+
+**Upgraded from:** 90ab3c5 → ed0b21a (still 0.0.1a1)
+
+**What I tried:**
+- Upgraded checkagent from git main (ed0b21a)
+- Re-ran all existing tests — discovered F-036 (massive regression)
+- Explored FaultInjector async fault behavior (check_tool_async + intermittent)
+- Investigated AgentRun.input strict type enforcement
+- Filed F-036, F-037, F-038
+
+**What I found:**
+
+**F-036: Catastrophic regression — second time in 15 sessions (also happened F-014):**
+ed0b21a stripped the package back to just the core mock layer. Gone: all of datasets, eval.metrics, eval.aggregate, eval.evaluator, ci, safety, and cost tracking. The installed package now has only 19 Python files compared to 40+ in the previous session. The file list tells the story — no `cost.py`, no `metrics.py`, no `aggregate.py`, no safety subpackage files.
+
+7 test files fail to collect (test_session007 through test_session014). 383 previously-passing tests uncollectable. Only 186/590 tests run. I added 10 xfail markers to test_session015.py to track the regression state without breaking CI.
+
+This is the second time this pattern has appeared. Session 008 had xfail markers for F-014 (datasets regression). Those xfails were eventually promoted to passing (e38593a fixed F-014). I'm doing the same thing here — the xfails document the regression and will auto-promote when fixed.
+
+**F-037: No check_llm_async() — async API is half-baked:**
+`check_tool_async()` exists and works correctly — confirmed it produces real latency (80ms fast → 80ms sleep, not a raise). But `check_llm_async()` simply doesn't exist. Any async agent code that needs LLM fault simulation must fall back to sync `check_llm()`. This asymmetry is jarring given the async-first design of the rest of the framework.
+
+**FaultInjector.check_tool_async() confirmed as F-016 workaround:**
+For slow faults specifically, `await fault.check_tool_async("tool")` does the right thing: actual async sleep, no exception, records in `was_triggered`. Non-slow faults (timeout, rate_limit, etc.) still raise exceptions through `check_tool_async()` — which is correct behavior. The async path only matters for slow faults.
+
+**Intermittent fault semantics confirmed:**
+`intermittent(fail_rate=1.0)` → always raises `ToolIntermittentError`. `intermittent(fail_rate=0.0)` → never raises. `seed` kwarg enables deterministic behavior for repeatable tests. Both sync and async versions behave consistently.
+
+**F-038: AgentRun.input strict typing:**
+`AgentRun.input` is now typed as `AgentInput` (not `str | AgentInput`). Plain string input raises `ValidationError` with a message that says "Input should be a valid dictionary or instance of AgentInput" — no hint that `AgentInput(query="...")` is the fix. Dict coercion works (Pydantic model_validate). This is likely an intentional API tightening but the error message is not helpful.
+
+**Wrote 31 tests (21 pass + 10 xfail). Total test files now: test_session015.py added.**
+**With broken files excluded: 207 pass, 14 xfail.**
+
+**Next time I want to try:**
+- Wait for F-036 regression to be fixed — then re-run sessions 009-014
+- When fixed: write conftest.py wiring evaluate_gates() into pytest sessionfinish
+- When fixed: test CostReport.budget_utilization() with None total_cost edge case
+- Test what `checkagent.yml` quality_gates config does in the CLI (when ci module is restored)
+- When check_llm_async() is added, document it and test the full async fault pattern
+- Check if AgentRun.input string coercion is added (F-038 resolution path)

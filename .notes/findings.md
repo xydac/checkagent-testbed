@@ -409,3 +409,39 @@ Format:
 **Actual:** `summary.save(path); loaded = RunSummary.load(path); loaded.regressions` → `[]`. The regressions are in the JSON file but are never read.
 **Workaround:** Recompute regressions after loading: `regressions = detect_regressions(loaded.aggregates, baseline.aggregates)`. Do not rely on round-tripped regressions.
 **Status:** Open
+
+---
+
+## F-036: Massive regression in ed0b21a — datasets, eval.metrics, eval.aggregate, eval.evaluator, ci, safety, and cost tracking all stripped
+**Date:** 2026-04-05
+**Severity:** critical
+**Category:** bug
+**Description:** Upgrading from 90ab3c5 to ed0b21a wiped large portions of the package. The following modules/features are now gone: `checkagent.datasets` (GoldenDataset, TestCase, load_dataset, load_cases, parametrize_cases), `checkagent.eval.metrics` (task_completion, step_efficiency, tool_correctness, trajectory_match), `checkagent.eval.aggregate` (aggregate_scores, RunSummary, detect_regressions, compute_step_stats), `checkagent.eval.evaluator` (Evaluator, EvaluatorRegistry), `checkagent.ci` (entirely empty — GateResult, GateVerdict, QualityGateReport, evaluate_gates, generate_pr_comment all gone), `checkagent.safety` (entirely empty — all 5 safety evaluators gone), and top-level cost tracking exports (CostTracker, CostBreakdown, CostReport, BudgetExceededError). The installed package file list confirms only 19 Python files remain (down from ~40+ previously).
+**Expected:** Backward-compatible upgrade — all public API from 90ab3c5 should still work after upgrading to ed0b21a.
+**Actual:** 7 test files (tests/test_session007.py through test_session014.py) fail to collect with ImportError. 383 previously-passing tests are now uncollectable. Only sessions 004-008 (core mock layer) still work — 186 of 590 tests pass.
+**Workaround:** None. Regression blocks all eval, dataset, CI, safety, and cost-tracking work. Pin to 90ab3c5 to retain full functionality.
+**Status:** Open
+
+---
+
+## F-037: `FaultInjector.check_llm_async()` does not exist — async LLM fault checking unavailable
+**Date:** 2026-04-05
+**Severity:** medium
+**Category:** missing-feature
+**Description:** `FaultInjector` has `check_tool_async()` for async latency simulation but no `check_llm_async()`. LLM faults (server_error, rate_limit, context_overflow, content_filter, partial_response) can only be triggered via `check_llm()` — which is synchronous-only. Any agent code that uses `await` with LLM operations must fall back to sync `check_llm()` calls, breaking the async-first design.
+**Expected:** `check_llm_async()` parallel to `check_tool_async()`, enabling async agent code to trigger LLM faults without mixing sync/async.
+**Actual:** `hasattr(fault, 'check_llm_async')` → `False`. The method simply doesn't exist. Users must call sync `check_llm()` inside async agent code.
+**Workaround:** Call `fault.check_llm()` (sync) from within async agent code. No async LLM fault simulation available.
+**Status:** Open
+
+---
+
+## F-038: `AgentRun.input` now requires `AgentInput` — plain string input raises `ValidationError`
+**Date:** 2026-04-05
+**Severity:** high
+**Category:** docs-mismatch
+**Description:** In ed0b21a, `AgentRun.input` is typed strictly as `AgentInput`. Passing a plain string (`AgentRun(input="some query", ...)`) raises `ValidationError: Input should be a valid dictionary or instance of AgentInput`. Dict input is coerced (`AgentRun(input={"query": "..."}, ...)` works), but string input fails. Any code or documentation example that constructs `AgentRun` with a string `input` argument is now broken.
+**Expected:** Either backward-compatible string coercion (wraps string in `AgentInput(query=string)`) or an explicit `ValidationError` message that names `AgentInput` as the required type and shows the correct syntax.
+**Actual:** `AgentRun(input="find cats")` → `ValidationError: Input should be a valid dictionary or instance of AgentInput`. The error message does not hint that wrapping with `AgentInput(query="find cats")` is the fix.
+**Workaround:** Always construct with `AgentRun(input=AgentInput(query="..."), ...)` or `AgentRun(input={"query": "..."}, ...)`.
+**Status:** Open
