@@ -1,0 +1,21 @@
+{
+  "name": "traces",
+  "version": "1",
+  "description": "Auto-generated from 1 imported production traces",
+  "cases": [
+    {
+      "id": "test-9f86d081",
+      "input": "test",
+      "expected_tools": [],
+      "expected_output_contains": [],
+      "expected_output_equals": null,
+      "max_steps": null,
+      "tags": [
+        "imported"
+      ],
+      "context": {},
+      "metadata": {}
+    }
+  ],
+  "metadata": {}
+}

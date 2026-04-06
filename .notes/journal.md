@@ -1027,3 +1027,56 @@ Latest commit message: "Update roadmap: mark multi-judge consensus as complete"
 - Check if ap_cassette fixture is added
 - Try AnthropicAdapter with a real (mocked) streaming response to test run_stream
 - Try CrewAIAdapter with tasks_output to verify step extraction from CrewAI result
+
+**Next time I want to try:**
+- Check if F-066 (PII ID collision) is fixed — expect either counter-suffix or friendly error message
+- Check if F-067 (trace_import top-level exports) is fixed
+- Check if F-038 (AgentRun string input coercion) is fixed
+- Check if F-042 (block_unmatched=False) is fixed — open since session-017
+- Check if F-062 (AnthropicAdapter.final_output) is fixed
+- Check if F-061 (agents/ naming conflict for OpenAIAgentsAdapter) is fixed
+- Try using JsonFileImporter in a parametrized test with GoldenDataset
+- Try PiiScrubber.use_ner=True (with spaCy installed)
+
+---
+
+## Session 023 — 2026-04-06
+
+**Upgraded from:** "mark all framework adapters as complete" → "mark production trace import as complete"
+
+**What I tried:**
+- Upgraded checkagent from git main
+- Checked upstream CI — **passing** for last 2 runs. Stable for third consecutive session.
+- Re-ran all 881 previous tests — all pass, no regressions
+- Explored the new `checkagent.trace_import` module (new in this release)
+- Tested `JsonFileImporter`, `OtelJsonImporter`, `PiiScrubber`, `generate_test_cases`
+- Tested the new `checkagent import-trace` CLI command
+- Wrote 73 new tests; total now 954
+
+**What I found:**
+
+**CI green.** The upstream "mark production trace import as complete" run passes. Stable.
+
+**New feature: `checkagent.trace_import`.** A production trace import system that converts observability traces into golden dataset test cases. Four main components:
+
+1. **`JsonFileImporter`** — handles JSON, JSONL, and three data shapes (flat `{input, output}`, native `{input, steps, ...}`, span-based `{spans: [...]}`). Filters by status (error/success), limit. Solid.
+
+2. **`OtelJsonImporter`** — parses OTLP JSON export format. Groups spans by `traceId`, identifies root span (no `parentSpanId`), extracts tool calls from child spans with "tool"/"function"/"action" in name. Handles error status code 2 correctly. Solid.
+
+3. **`PiiScrubber`** — regex-based PII replacement with deterministic placeholders. Covers email, phone, SSN, credit card, IP. Supports `extra_patterns`, `scrub_value` for nested dicts/lists. The `reset()` per-run design is intentional but creates a footgun (see F-066). This is genuinely well-implemented.
+
+4. **`generate_test_cases`** — converts `AgentRun` list to `GoldenDataset`. Tags runs with "imported", "error", "has-tools". Sets `max_steps`, `expected_tools`, `expected_output_contains`. Solid when IDs don't collide.
+
+**`checkagent import-trace` CLI** is well-designed: auto-detects format from extension, handles `--filter-status`, `--limit`, `--tag`, `--no-pii-scrub`, `--source otel`. Friendly "does not exist" error for missing files. Good DX overall.
+
+**F-066 (new, high, bug): PII ID collision crashes with raw traceback.** The most significant bug this session. `generate_test_cases(scrub_pii=True)` resets the `PiiScrubber` before each trace (good for isolation), but this means two traces "Find john@example.com" and "Find jane@example.com" both produce `"Find <EMAIL_1>"` — same scrubbed text, same hash, same ID. `GoldenDataset` raises `ValidationError: Duplicate test case IDs`. The CLI surfaces this as an unhandled Python traceback. This will happen constantly in production: any site with multiple users issuing similar queries will hit this immediately. The fix is straightforward (append a deduplication counter to the ID) but the current crash is bad UX.
+
+**F-067 (new, medium, dx-friction): trace_import not at top-level.** Eleventh instance of the same pattern. At this point it's clearly architectural — checkagent has a "keep the base install minimal" philosophy but provides no opt-in mechanism to get these exports at top-level. Every new module requires discovering and remembering an internal submodule path.
+
+**F-038, F-042, F-061, F-062 still open.** None of the carryover findings from previous sessions were addressed in this release.
+
+**Positive notes:**
+- `PiiScrubber` is genuinely well-implemented — deterministic, handles edge cases cleanly, composable with `extra_patterns`
+- The CLI has the right shape: auto-detection, good option names, helpful error messages (except for the ID collision case)
+- `OtelJsonImporter` correctly handles the OTLP JSON format including the attribute array structure (`[{key: "k", value: {stringValue: "v"}}]`)
+- `generate_test_cases` correctly uses `AgentRun.tool_calls` (which is a computed property flattening steps) — that was a pleasant surprise

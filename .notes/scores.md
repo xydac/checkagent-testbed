@@ -167,3 +167,10 @@ Rate each feature on:
 | checkagent.ci.junit_xml (JUnit XML) | 5 | 4 | render_junit_xml, from_run_summary, from_quality_gate_report all work; valid XML output; time_s aggregates correctly; gate verdicts map to failures/skipped correctly; accessible from checkagent.ci (good); not at top-level checkagent (F-065) | 2026-04-06 |
 | JUnit XML from_run_summary | 5 | 4 | Synthetic mode creates generic test cases; test_details mode creates named cases with failure/skip support; integrates with RunSummary counts | 2026-04-06 |
 | JUnit XML from_quality_gate_report | 5 | 5 | Blocked → failure, Warned → pass with property, Skipped → skipped; properties attached (actual/threshold/direction); clean mapping | 2026-04-06 |
+| upstream CI (session-023) | 5 | 5 | Green for last 2 runs ("mark production trace import as complete", "mark all framework adapters"). Stable | 2026-04-06 |
+| checkagent import-trace CLI | 4 | 4 | Solid: auto-detect JSON/JSONL/OTel, --filter-status, --limit, --tag, --no-pii-scrub, --source; friendly missing-file error; crashes with raw traceback on PII ID collision (F-066) | 2026-04-06 |
+| JsonFileImporter | 5 | 4 | Handles flat, native (steps), span, and JSONL formats; filter by status; limit; not at top-level (F-067) | 2026-04-06 |
+| OtelJsonImporter | 5 | 4 | Parses OTLP JSON correctly; groups by traceId; root span detection; tool spans from child names; error from status.code; not at top-level (F-067) | 2026-04-06 |
+| PiiScrubber | 5 | 5 | Deterministic replacements; 5 built-in patterns (email/phone/SSN/CC/IP); extra_patterns; scrub_value for nested dicts/lists; reset() works correctly | 2026-04-06 |
+| generate_test_cases | 3 | 3 | Works correctly for distinct queries; PII ID collision crashes with raw ValidationError (F-066) — common real-world scenario; not at top-level (F-067) | 2026-04-06 |
+| trace_import top-level exports | N/A | 1 | Eleventh instance of missing-top-level-export pattern (F-067) | 2026-04-06 |

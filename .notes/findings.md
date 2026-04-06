@@ -783,3 +783,27 @@ Format:
 **Actual:** `from checkagent import render_junit_xml` → `ImportError`. `from checkagent.ci import render_junit_xml` works correctly.
 **Workaround:** `from checkagent.ci import render_junit_xml, from_run_summary, from_quality_gate_report, JUnitTestSuite, JUnitTestCase`
 **Status:** Open
+
+---
+
+## F-066: `generate_test_cases` / `checkagent import-trace` crashes with raw traceback when PII causes ID collision
+**Date:** 2026-04-06
+**Severity:** high
+**Category:** bug
+**Description:** `generate_test_cases(runs, scrub_pii=True)` raises a raw `pydantic.ValidationError` traceback when two traces produce the same ID after PII scrubbing. The canonical case: "Find john@example.com" and "Find jane@example.com" both become "Find <EMAIL_1>" (scrubber resets per-run, so both emails become `<EMAIL_1>`), and `_generate_id("Find <EMAIL_1>")` produces the same hash. `GoldenDataset` then raises `ValidationError: Duplicate test case IDs`. The CLI surfaces this as an unhandled Python traceback — no friendly error message, no hint about how to fix it (e.g., use `--no-pii-scrub` or add unique context to traces).
+**Expected:** Either `generate_test_cases` handles ID collision gracefully (appending a counter suffix), or the CLI catches the `ValidationError` and surfaces a user-friendly message like "Two traces produced the same test case ID after PII scrubbing. Use --no-pii-scrub or ensure queries have distinct non-PII content."
+**Actual:** Raw Python traceback: `pydantic_core._pydantic_core.ValidationError: 1 validation error for GoldenDataset: Value error, Duplicate test case IDs: {'find-594f4982'}`. CLI exits with code 1 but shows full stack trace.
+**Workaround:** Use `--no-pii-scrub` if traces have distinct non-PII query structures, or ensure queries have unique distinguishing words. Cannot use `generate_test_cases(scrub_pii=True)` when queries share structure but differ only in PII values.
+**Status:** Open
+
+---
+
+## F-067: `trace_import` module not exported from top-level `checkagent`
+**Date:** 2026-04-06
+**Severity:** medium
+**Category:** dx-friction
+**Description:** `TraceImporter`, `JsonFileImporter`, `OtelJsonImporter`, `PiiScrubber`, and `generate_test_cases` are all accessible from `checkagent.trace_import` but none appear in the top-level `checkagent` namespace. `trace_import` is also not listed in `dir(checkagent)`. This is the eleventh instance of the same missing-top-level-export pattern (F-020, F-021, F-026, F-028, F-041, F-048, F-053, F-057, F-063, F-065, F-067).
+**Expected:** Core trace import types (`JsonFileImporter`, `OtelJsonImporter`, `PiiScrubber`, `generate_test_cases`) exported at top-level alongside `AgentRun`, `MockLLM`, etc., or at minimum `trace_import` accessible as `checkagent.trace_import` from `dir(checkagent)`.
+**Actual:** `from checkagent import JsonFileImporter` → `ImportError`. `from checkagent import generate_test_cases` → `ImportError`. `'trace_import' in dir(checkagent)` → `False`.
+**Workaround:** `from checkagent.trace_import import JsonFileImporter, OtelJsonImporter, PiiScrubber, generate_test_cases`
+**Status:** Open

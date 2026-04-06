@@ -1,0 +1,38 @@
+{
+  "name": "test-import",
+  "version": "1",
+  "description": "Auto-generated from 2 imported production traces",
+  "cases": [
+    {
+      "id": "what-is-52cb6b5e",
+      "input": "What is 2+2?",
+      "expected_tools": [],
+      "expected_output_contains": [
+        "The answer is 4"
+      ],
+      "expected_output_equals": null,
+      "max_steps": null,
+      "tags": [
+        "imported"
+      ],
+      "context": {},
+      "metadata": {}
+    },
+    {
+      "id": "who-wrote-0b06d1b8",
+      "input": "Who wrote Hamlet?",
+      "expected_tools": [],
+      "expected_output_contains": [
+        "William Shakespeare wrote Hamlet"
+      ],
+      "expected_output_equals": null,
+      "max_steps": null,
+      "tags": [
+        "imported"
+      ],
+      "context": {},
+      "metadata": {}
+    }
+  ],
+  "metadata": {}
+}
