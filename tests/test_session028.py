@@ -172,19 +172,18 @@ async def test_f080_auto_estimate_discrepancy_confirmed():
 
 @pytest.mark.agent_test
 @pytest.mark.asyncio
-async def test_f081_both_fixed_and_auto_estimate_no_error():
+async def test_f081_both_fixed_and_auto_estimate_now_raises():
     """
-    F-081: Setting both prompt_tokens and auto_estimate=True raises no error.
-    Neither the fixed value nor the estimated value is used as documented.
-    Behavior is undefined; users need guidance on precedence.
+    F-081 FIXED (session-029): with_usage() now raises ValueError when both
+    auto_estimate=True and explicit token counts are provided.
+    Previously this was silent undefined behavior.
     """
-    # No ValueError raised, no warning
-    llm = MockLLM().with_usage(prompt_tokens=999, auto_estimate=True)
-    await llm.complete("test")
-    call = llm.last_call
-    # Should be 999 (fixed) OR ceil(4/4)=1 (estimated) — neither is what we get
-    assert call.prompt_tokens != 999, "Fixed value NOT used (auto_estimate takes precedence)"
-    # What we get is unpredictable — just document it's not the fixed value
+    import pytest as _pytest
+    with _pytest.raises(ValueError, match="Cannot set both auto_estimate"):
+        MockLLM().with_usage(prompt_tokens=999, auto_estimate=True)
+
+    with _pytest.raises(ValueError, match="Cannot set both auto_estimate"):
+        MockLLM().with_usage(completion_tokens=50, auto_estimate=True)
 
 
 # ---------------------------------------------------------------------------

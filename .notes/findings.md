@@ -94,8 +94,8 @@ Format:
 **Description:** `assert_json_schema` requires the `jsonschema` package at runtime but it is not declared in checkagent's package dependencies. On a fresh `pip install checkagent`, calling `assert_json_schema` raises `ImportError: jsonschema is required for assert_json_schema. Install it with: pip install jsonschema`. This caused 7 previously-passing tests to fail after a clean upgrade in session-005.
 **Expected:** `jsonschema` listed as either a required dependency or an optional extra (`checkagent[json-schema]`), so it's installed automatically
 **Actual:** `uv pip install checkagent` does not install `jsonschema`. Any test using `assert_json_schema` fails with `ImportError` on fresh install.
-**Workaround:** Manually run `pip install jsonschema` after installing checkagent
-**Status:** Open
+**Workaround:** Manually run `pip install jsonschema` after installing checkagent; or `pip install checkagent[json-schema]` (partial fix session-029)
+**Status:** Partial fix in session-029 — `jsonschema` now declared under `[json-schema]` optional extra. Users can `pip install checkagent[json-schema]`. Still not a default dep — `assert_json_schema` breaks on bare `pip install checkagent`. CI now installs `[dev]` extras which includes `jsonschema`, so upstream tests no longer fail on this.
 
 ## F-009: `MockLLM.was_called_with` does exact match but name implies substring
 **Date:** 2026-04-05
@@ -964,8 +964,8 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Description:** `FaultInjector.was_triggered` is a method (`was_triggered(target=None) -> bool`), not a property. This means `if fi.was_triggered:` is always `True` — you're testing truthiness of the bound method object, not the result. The fix is `fi.was_triggered()` (with parens). Similar named APIs in checkagent (`ap_mock_tool.was_called`, etc.) are also methods, but `was_triggered` is particularly easy to misuse in assertions like `assert not ap_fault.was_triggered`.
 **Expected:** Either make `was_triggered` a `@property` (no-arg call → bool), or name it `has_triggered` to signal it's a method.
 **Actual:** `fi.was_triggered` returns `<bound method ...>` which is always truthy. `fi.was_triggered()` returns the correct bool.
-**Workaround:** Always call with parentheses: `fi.was_triggered()`.
-**Status:** Open
+**Workaround:** Always call with parentheses: `fi.was_triggered()`. Or use the new `fi.triggered` property (session-029).
+**Status:** Partial fix in session-029 — `fi.triggered` @property added as the no-arg bool check. `fi.trigger_count` (int) and `fi.triggered_records` (list) also added. `was_triggered(target)` method still exists for target-filtered checks.
 
 ---
 
@@ -985,11 +985,11 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Date:** 2026-04-06
 **Severity:** low
 **Category:** docs-mismatch
-**Description:** The `with_usage()` docstring says token estimation uses `len(text) // 4`. The actual formula is `len(text) // 4 + 1`. This means every estimate is exactly 1 token higher than documented. For short inputs (len < 4), the documented formula gives 0 tokens but the actual gives 1. The +1 likely accounts for a BOS or special token, but this is undocumented.
+**Description:** The `with_usage()` docstring said token estimation uses `len(text) // 4`. The actual formula is `len(text) // 4 + 1`. This means every estimate is exactly 1 token higher than documented. For short inputs (len < 4), the documented formula gives 0 tokens but the actual gives 1. The +1 likely accounts for a BOS or special token, but this is undocumented.
 **Expected:** `MockLLM().with_usage(auto_estimate=True)` + input of 40 chars → `prompt_tokens = 40 // 4 = 10`
 **Actual:** `prompt_tokens = 11` (`40 // 4 + 1`)
 **Workaround:** Use `len(text) // 4 + 1` when predicting token counts in tests.
-**Status:** Open
+**Status:** Fixed in session-029 — docstring now correctly says `len(text) // 4 + 1`.
 
 ---
 
@@ -997,8 +997,32 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Date:** 2026-04-06
 **Severity:** low
 **Category:** dx-friction
-**Description:** Calling `MockLLM().with_usage(prompt_tokens=999, auto_estimate=True)` raises no error and emits no warning. The fixed `prompt_tokens` value is silently ignored and `auto_estimate` takes precedence, but the result is not simply `len(input) // 4 + 1` either — it appears to compute something that doesn't match either configured value. Users who accidentally set both get neither. Pydantic could validate this at construction time.
+**Description:** Calling `MockLLM().with_usage(prompt_tokens=999, auto_estimate=True)` raised no error and emitted no warning. The fixed `prompt_tokens` value was silently ignored and `auto_estimate` took precedence with unexpected results.
 **Expected:** Either: (a) raise `ValueError("Cannot set both prompt_tokens and auto_estimate=True")`, or (b) document clearly that `auto_estimate=True` always overrides fixed values.
-**Actual:** Silent undefined behavior — neither value is used as specified.
+**Actual:** Silent undefined behavior — neither value was used as specified.
 **Workaround:** Set only one of `prompt_tokens`/`completion_tokens` OR `auto_estimate=True`, never both.
+**Status:** Fixed in session-029 — `with_usage()` now raises `ValueError: Cannot set both auto_estimate=True and explicit token counts.`
+
+---
+
+## F-082: `on_llm()` fault builder lacks `intermittent()` and `slow()` — no LLM latency or probabilistic simulation
+**Date:** 2026-04-06
+**Severity:** medium
+**Category:** missing-feature
+**Description:** The tool fault builder (`on_tool()`) supports `intermittent(fail_rate=0.3)` and `slow(latency_ms=500)`. The LLM fault builder (`on_llm()`) has none of these. Users cannot simulate: (a) an LLM that fails 20% of the time, (b) a slow LLM response (e.g. to test timeout handling). The LLM fault set is: `content_filter`, `context_overflow`, `partial_response`, `rate_limit(after_n)`, `server_error`. No probabilistic fault, no latency simulation.
+**Expected:** `on_llm().intermittent(fail_rate=0.3)` and `on_llm().slow(latency_ms=N)` matching tool fault parity
+**Actual:** `AttributeError` — neither method exists on LLM fault builder
+**Workaround:** None — cannot test LLM latency or intermittent LLM failures with FaultInjector
+**Status:** Open
+
+---
+
+## F-083: `dirty-equals` and `deepdiff` declared under `[structured]` optional extra — `assert_output_matches` breaks on minimal install
+**Date:** 2026-04-06
+**Severity:** high
+**Category:** bug
+**Description:** `assert_output_matches` (which uses `dirty_equals`) and related structured assertion internals (which use `deepdiff`) are declared under the `[structured]` optional extra. A user who runs `pip install checkagent` and then calls `assert_output_matches(run, IsStr())` will get an `ImportError` if `dirty_equals` isn't installed. Similarly `deepdiff` is needed for structured diffing. These are core assertion utilities used in almost every test — they should be default dependencies, not optional extras.
+**Expected:** `dirty-equals` and `deepdiff` installed automatically with `pip install checkagent`
+**Actual:** Only available via `pip install checkagent[structured]`; absent from default deps
+**Workaround:** `pip install checkagent[structured]` or install `dirty-equals deepdiff` manually
 **Status:** Open

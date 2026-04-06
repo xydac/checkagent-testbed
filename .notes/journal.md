@@ -1317,3 +1317,50 @@ def test_resilience(ap_fault, ap_mock_tool):
 - Check if the LLM fault builder has parity with the tool fault builder — `on_llm()` has no `timeout` or `slow` (only rate_limit, server_error, content_filter, context_overflow, partial_response)
 - Investigate if there's a new `ap_cost_tracker` fixture (F-019 still open)
 - Consider trying a real external agent integration
+
+---
+
+## Session 029 — 2026-04-06
+
+**What I did:**
+- Upgraded checkagent from git main (still v0.0.1a1)
+- Checked upstream CI: green — 7 consecutive successes, extremely stable
+- Ran full test suite: 1095/1096 passing (1 expected failure — F-081 test needed updating)
+- Fixed failing test: F-081 (with_usage conflict) was fixed upstream; updated test to document the fix
+- Explored new features: LLM fault methods, triggered property additions, optional dep structure
+- Wrote 21 new session-029 tests; total now 1117
+
+**CI status:** Green — 7 consecutive successes. Latest commit: "Fix DX issues: jsonschema dep, triggered property, with_usage validation". The project is clearly in a polish phase before launch (Milestones 9-10 on the roadmap).
+
+**F-078 partial fix: `triggered` @property added.** The commit adds three new @property members to FaultInjector:
+- `fi.triggered` — bool, no parentheses needed (the DX fix for the original trap)
+- `fi.trigger_count` — int count of activations
+- `fi.triggered_records` — list of FaultRecord objects with target/fault_type/call_index
+
+The `was_triggered(target)` method still exists for backward compat + target-filtered checks. This is a well-executed partial fix — they didn't break the existing API, just added the clean property alternative.
+
+**F-080 FIXED:** Docstring now correctly documents `len(text) // 4 + 1`. Verified via `__doc__` inspection.
+
+**F-081 FIXED:** `with_usage()` now raises `ValueError: Cannot set both auto_estimate=True and explicit token counts.` when both are provided. Clean, actionable error message.
+
+**F-008 partial fix:** `jsonschema` is now declared as `checkagent[json-schema]` optional extra. Users can `pip install checkagent[json-schema]`. Still not a default dep — a bare `pip install checkagent` still lacks it. The CI now installs `[dev]` extras so upstream tests no longer fail on this.
+
+**New finding F-082: LLM fault builder lacks `intermittent()` and `slow()`.** The tool fault builder has both (`intermittent(fail_rate=0.3)` for probabilistic failures, `slow(latency_ms=500)` for latency sim). The LLM fault builder has neither. Users cannot test retry logic against intermittent LLM failures, nor simulate slow LLM responses. Medium severity — important for realistic testing but has workarounds (e.g., manually raising in agent code).
+
+**New finding F-083: `dirty-equals` and `deepdiff` are optional extras under `[structured]`.** Discovered by inspecting `importlib.metadata.requires('checkagent')`. Both `dirty-equals` (needed for `assert_output_matches` with `IsStr()`, `IsInt()`, etc.) and `deepdiff` are only installed via `pip install checkagent[structured]`. On a minimal `pip install checkagent`, these would be absent, breaking the core assertion API. This is high severity — `assert_output_matches` is a flagship feature prominently documented. This mirrors F-008 (jsonschema) but is arguably worse since dirty-equals powers the primary assertion API.
+
+**LLM fault methods all work correctly.** Tested all 5 types:
+- `content_filter()` → `LLMContentFilterError` with "content policy" message
+- `context_overflow()` → `LLMContextOverflowError` with "128000 tokens" message
+- `partial_response()` → `LLMPartialResponseError` with "streaming terminated" message
+- `rate_limit(after_n=N)` → first N calls succeed, then `LLMRateLimitError` with "429" message
+- `server_error(msg)` → `LLMServerError` with custom message
+
+All exceptions are importable from `checkagent.mock.fault` but NOT from top-level `checkagent` (consistent with the broader F-020/F-067/F-068 pattern).
+
+**What I want to try next session:**
+- Check if F-082 (on_llm() intermittent/slow) gets implemented
+- Check if F-083 (dirty-equals/deepdiff as optional) gets addressed
+- Explore the docs site when it launches (Milestone 9 is dashboard — might be the live docs?)
+- Investigate if F-073 (get_children API inconsistency) ever gets fully resolved — the warning added in session-025 was good but API still inconsistent
+- Try a real external agent integration — LangChain or PydanticAI with a real LLM call mocked

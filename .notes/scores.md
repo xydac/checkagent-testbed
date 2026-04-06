@@ -210,3 +210,8 @@ Rate each feature on:
 | MockLLM.with_usage() | 4 | 3 | Fixed tokens work on complete/complete_sync/stream; auto_estimate formula wrong in docs (F-080: actual is len//4+1 not len//4); setting both fixed+auto_estimate is silent undefined behavior (F-081); no error raised | 2026-04-06 |
 | MatchMode top-level export | 5 | 5 | Importable from checkagent; EXACT/SUBSTRING/REGEX all work; SUBSTRING default for add_rule means '.*' is literal (DX trap but documented behavior) | 2026-04-06 |
 | upstream CI (session-028) | 5 | 5 | Green — 6 consecutive successes. "Add framework overhead benchmarks for RQ4 paper data" passes all platforms | 2026-04-06 |
+| MockLLM.with_usage() (session-029) | 5 | 5 | F-080 FIXED (docstring now correct), F-081 FIXED (ValueError on conflict), F-078 partial fix (triggered property added) | 2026-04-06 |
+| FaultInjector.triggered property | 5 | 5 | New @property returning bool; trigger_count and triggered_records also added; was_triggered(target) still works | 2026-04-06 |
+| on_llm() fault methods | 4 | 3 | content_filter/context_overflow/partial_response/rate_limit/server_error all work correctly; missing intermittent+slow vs tool fault parity (F-082) | 2026-04-06 |
+| assert_json_schema (session-029) | 2 | 3 | F-008 partial fix: jsonschema now under [json-schema] extra; still not default dep. dirty-equals/deepdiff also only under [structured] (F-083) | 2026-04-06 |
+| upstream CI (session-029) | 5 | 5 | Green — 7 consecutive successes. "Fix DX issues: jsonschema dep, triggered property, with_usage validation" passes all platforms | 2026-04-06 |
