@@ -1403,3 +1403,52 @@ All exceptions are importable from `checkagent.mock.fault` but NOT from top-leve
 - Check if F-083 (dirty-equals/deepdiff optional dep) gets addressed — this is a high severity DX issue
 - Check docs site / Milestone 9 progress
 - Explore whether there's a `checkagent[all]` extra that installs everything for power users
+
+---
+
+## Session 31 — 2026-04-06 (LangChain real agent integration)
+
+**Upgraded from:** ed0b21a → d0dd9265 (same as session-030 — no new upstream commits)
+
+**Upstream CI:** Green — 8 consecutive successes. Latest: "Add intermittent and slow faults to LLM fault builder (F-082)". No new upstream changes since session-030.
+
+**Session setup trap — uv.lock stale commit hash:**
+Opening the session revealed a critical meta-issue: `uv run pytest` was silently downgrading checkagent from d0dd9265 back to ed0b21a (the old commit). Root cause: `uv.lock` had the old commit hash pinned. `uv pip install --upgrade` without `uv run` installs the latest, but `uv run` reads the lockfile. Fix: `uv lock --upgrade-package checkagent` updates the pin. Added this to session procedures.
+
+This same issue likely affected the start of every session — `uv run pytest` was using an older version than expected. Worth remembering.
+
+**What I tried:**
+
+1. **Force-reinstalled checkagent** to verify modules — found `checkagent.multiagent`, `checkagent.cost`, `checkagent.trace_import` missing. Updated uv.lock (ed0b21a → d0dd9265). All 1131 tests passed.
+
+2. **Real LangChain agent integration** — highest priority from prior sessions:
+   - Created `agents/langchain_qa_agent.py`: a real LCEL chain using `ChatPromptTemplate | llm | StrOutputParser()`
+   - Tested with `LangChainAdapter` + `langchain_core.language_models.fake_chat_models.GenericFakeChatModel`
+   - Result: **it works**. No API key needed. `final_output` is a string (correct for StrOutputParser), steps captured with input/output, duration_ms measured, error captured on failure.
+   - Wrote 8 tests covering: basic run, step capture, duration, assertions, AgentInput, multiple runs, error handling, multi-variable chain limitation
+   - All 8 pass.
+
+3. **Discovered F-084**: LangChainAdapter only passes `{input_key: query}`. Chains with extra template variables (e.g. `{context}`) fail. Workaround: use `prompt.partial(...)` to pre-fill extra variables before building the chain. This is a real limitation for RAG and contextual Q&A pipelines.
+
+4. **Verified F-018 partial improvement**: `calculate_run_cost` is now at top-level `checkagent` (alongside CostTracker/CostBreakdown/CostReport/BudgetExceededError). `BUILTIN_PRICING`, `ProviderPricing`, `BudgetConfig` still require internal imports. F-018 remains open but is less painful.
+
+5. **Confirmed F-083 still open**: `dirty-equals` and `deepdiff` remain under `[structured]` optional extra, not default deps.
+
+**What surprised me:**
+- `GenericFakeChatModel` in `langchain_core` is perfect for testing LangChain chains without an API key. It accepts an iterator of `AIMessage` objects and returns them in sequence. Every LangChain adapter test should use this.
+- `RunnableSequence.partial()` doesn't exist — it's `prompt.partial()` you need. This tripped me up and reveals the F-084 limitation more clearly: there's no clean "post-chain partial application" in LCEL.
+- The uv.lock stale hash problem means every session that "upgraded" checkagent was actually running the OLD version via `uv run`. The force-reinstall via `uv pip install` works but `uv run` reverts it. This explains why some things appeared to work/fail inconsistently across sessions.
+
+**Status of previously-open "next session" items:**
+- Real agent integration: ✅ DONE — LangChain LCEL chain with FakeChatModel tested successfully
+- F-083 (dirty-equals/deepdiff optional): still open
+- F-073 (get_children API inconsistency): still open, warning added in session-025 but API unchanged
+
+**Total tests:** 1143 (up from 1131)
+
+**What I want to try next session:**
+- Try PydanticAI agent integration with a real PydanticAI model + fake backend
+- Try a LangChain agent with tool calling (ToolNode or custom tool) — F-084 shows a clear gap here
+- Check if `checkagent[all]` extra exists for power users
+- Investigate whether `assert_output_matches` silently fails on fresh install (F-083 impact)
+- Look for a real GitHub agent to integrate — minimal-dependency, no API key needed

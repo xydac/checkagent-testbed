@@ -205,7 +205,7 @@ Format:
 **Expected:** Cost tracking companion types (`ProviderPricing`, `BudgetConfig`, `BUILTIN_PRICING`) exported alongside `CostTracker`, `CostBreakdown`, `CostReport`, and `BudgetExceededError` (which ARE in the top-level namespace).
 **Actual:** `from checkagent import ProviderPricing` → `ImportError`. Same for `BudgetConfig` and `BUILTIN_PRICING`. The four cost-tracking classes that ARE at top-level (`CostTracker`, `CostBreakdown`, `CostReport`, `BudgetExceededError`) require these companion types but don't export them.
 **Workaround:** Use internal imports: `from checkagent.core.cost import ProviderPricing, BUILTIN_PRICING` and `from checkagent.core.config import BudgetConfig`.
-**Status:** Open
+**Status:** Partially improved in d0dd9265 (session-031): `calculate_run_cost` added to top-level exports (was missing before). `ProviderPricing`, `BudgetConfig`, `BUILTIN_PRICING` still require internal imports. Open.
 
 ---
 
@@ -1026,3 +1026,16 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Actual:** Only available via `pip install checkagent[structured]`; absent from default deps
 **Workaround:** `pip install checkagent[structured]` or install `dirty-equals deepdiff` manually
 **Status:** Open
+
+---
+
+## F-084: `LangChainAdapter` only passes `{input_key: query}` — multi-variable chains fail
+**Date:** 2026-04-06
+**Severity:** medium
+**Category:** dx-friction
+**Description:** `LangChainAdapter` constructs the invocation dict as `{input_key: query_string}`. If the wrapped chain expects additional template variables (e.g. `{context}`, `{history}`, `{language}`), the invocation will fail with a LangChain `KeyError` about missing variables. The adapter provides no way to inject supplementary variables at run time. This is a real constraint for contextual Q&A chains, RAG chains, and any LCEL pipeline with multiple prompt inputs.
+**Expected:** Some way to pass additional variables — perhaps via `AgentInput.metadata`, or via `LangChainAdapter(chain, extra_inputs={...})`, or via an `AgentInput`-field-to-input-key mapping.
+**Actual:** `run = await adapter.run("query")` → `KeyError: "Input to ChatPromptTemplate is missing variables {'context'}"` when chain has extra variables.
+**Workaround:** Use `prompt.partial(context="...")` to pre-fill extra variables before building the chain. This bakes in a fixed value for the lifetime of the adapter.
+**Status:** Open
+

@@ -23,7 +23,7 @@ wheels = [
 [[package]]
 name = "checkagent"
 version = "0.0.1a1"
-source = { git = "https://github.com/xydac/checkagent.git?rev=main#ed0b21a613411ed275a1512e1fc414e46c7c6394" }
+source = { git = "https://github.com/xydac/checkagent.git?rev=main#d0dd9265022b6d4ea66f468125f416cd980ecf85" }
 dependencies = [
     { name = "click" },
     { name = "pluggy" },
