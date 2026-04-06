@@ -978,3 +978,27 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Actual:** The second `attach_faults()` call replaces the first. The original injector's faults are lost.
 **Workaround:** Create one FaultInjector with all desired faults before calling `attach_faults()` once.
 **Status:** Open
+
+---
+
+## F-080: `MockLLM.with_usage(auto_estimate=True)` uses `len // 4 + 1`, not `len // 4`
+**Date:** 2026-04-06
+**Severity:** low
+**Category:** docs-mismatch
+**Description:** The `with_usage()` docstring says token estimation uses `len(text) // 4`. The actual formula is `len(text) // 4 + 1`. This means every estimate is exactly 1 token higher than documented. For short inputs (len < 4), the documented formula gives 0 tokens but the actual gives 1. The +1 likely accounts for a BOS or special token, but this is undocumented.
+**Expected:** `MockLLM().with_usage(auto_estimate=True)` + input of 40 chars → `prompt_tokens = 40 // 4 = 10`
+**Actual:** `prompt_tokens = 11` (`40 // 4 + 1`)
+**Workaround:** Use `len(text) // 4 + 1` when predicting token counts in tests.
+**Status:** Open
+
+---
+
+## F-081: `with_usage(prompt_tokens=N, auto_estimate=True)` — no error, undefined behavior
+**Date:** 2026-04-06
+**Severity:** low
+**Category:** dx-friction
+**Description:** Calling `MockLLM().with_usage(prompt_tokens=999, auto_estimate=True)` raises no error and emits no warning. The fixed `prompt_tokens` value is silently ignored and `auto_estimate` takes precedence, but the result is not simply `len(input) // 4 + 1` either — it appears to compute something that doesn't match either configured value. Users who accidentally set both get neither. Pydantic could validate this at construction time.
+**Expected:** Either: (a) raise `ValueError("Cannot set both prompt_tokens and auto_estimate=True")`, or (b) document clearly that `auto_estimate=True` always overrides fixed values.
+**Actual:** Silent undefined behavior — neither value is used as specified.
+**Workaround:** Set only one of `prompt_tokens`/`completion_tokens` OR `auto_estimate=True`, never both.
+**Status:** Open

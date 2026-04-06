@@ -1282,3 +1282,38 @@ def test_resilience(ap_fault, ap_mock_tool):
 - Explore the docs site referenced in Milestone 8 if it goes live
 - Try a full end-to-end scenario that uses attach_faults in a realistic multi-step agent test
 - Investigate if there's any progress on F-016 (slow sync raises) — with attach_faults now wiring things in, this issue becomes more visible to users
+
+---
+
+## Session 028 — 2026-04-06
+
+**What I did:**
+- Upgraded checkagent from git main (still v0.0.1a1)
+- Checked upstream CI: green — 6 consecutive successes, very stable
+- Ran full test suite: 1073/1073 passing before new tests
+- Explored new feature: `MockLLM.with_usage()` (added session before last)
+- Explored `MatchMode` top-level export
+- Confirmed F-078/F-079 still open
+- Wrote 23 new session-028 tests; total now 1096
+
+**CI status:** Green — 6 consecutive successes. Latest: "Add framework overhead benchmarks for RQ4 paper data". The commit mentions "RQ4 paper data" — looks like the project is being used for a research paper (maybe the framework itself is being evaluated). Milestones 9 (dashboard) and 10 (launch) are roadmapped.
+
+**MockLLM.with_usage() — new token simulation API.** Returns `self` (fluent). Works on `complete()`, `complete_sync()`, and `stream()`. Fixed tokens stamped on every `LLMCall`. Token data accumulates across calls and can be summed manually. Works cleanly alongside `on_input().respond()` and `attach_faults()`.
+
+**F-080: `auto_estimate` formula is wrong in docs.** The docstring claims `len(text) // 4` but actual formula is `len(text) // 4 + 1`. Tested systematically across len 1–41. For every input length n, observed tokens = n//4 + 1. The +1 likely represents a BOS token but it's undocumented. Minor finding but will surprise users testing exact token counts.
+
+**F-081: Both fixed+auto_estimate — silent undefined behavior.** Setting `prompt_tokens=999` and `auto_estimate=True` simultaneously raises no error. The fixed value is ignored, auto_estimate wins, but result is still not simply `n//4+1` — some other formula appears to apply. No validation at construction time. Users should set one or the other.
+
+**MatchMode top-level export works cleanly.** `MatchMode.EXACT`, `SUBSTRING`, `REGEX` all function as expected. Important DX note: `add_rule('.*', ...)` with default `SUBSTRING` mode treats `'.*'` as a literal string, not regex. Users coming from regex background will be surprised. Use `MatchMode.REGEX` explicitly for patterns, or use `''` as catch-all with SUBSTRING.
+
+**F-078 and F-079 still open.** Neither the `was_triggered` method-not-property trap nor the double-attach overwrite issue has been addressed.
+
+**Fault exception imports.** The correct import path for fault exceptions is `checkagent.mock.fault` (e.g. `LLMRateLimitError`). No top-level export for these. Also discovered: `on_llm()` takes no arguments (unlike `on_tool(name)`) — applies to all LLM calls.
+
+**What I want to try next session:**
+- Check if F-080/F-081 get addressed in the docstring at minimum
+- Explore the docs site when it launches (Milestone 8/9 in roadmap)
+- Try `on_llm()` fault methods more thoroughly (content_filter, context_overflow, partial_response)
+- Check if the LLM fault builder has parity with the tool fault builder — `on_llm()` has no `timeout` or `slow` (only rate_limit, server_error, content_filter, context_overflow, partial_response)
+- Investigate if there's a new `ap_cost_tracker` fixture (F-019 still open)
+- Consider trying a real external agent integration

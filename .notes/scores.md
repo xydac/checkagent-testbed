@@ -207,3 +207,6 @@ Rate each feature on:
 | MultiAgentTrace.handoff_chain() with cycles | 3 | 2 | No crash on cyclic handoffs; returns list with repeated nodes (a→b→c→a → ['a','b','c','a']); no cycle detection or warning (F-077) | 2026-04-06 |
 | MultiAgentTrace JSON serialization | 5 | 5 | model_dump_json/model_validate_json round-trip preserves all fields: runs, handoffs, trace_id, agent_ids, HandoffType enums | 2026-04-06 |
 | assign_blame_ensemble lambda strategies | 3 | 3 | Accepts lambdas as strategies (undocumented); lambdas returning None are silently filtered; must return BlameResult to contribute | 2026-04-06 |
+| MockLLM.with_usage() | 4 | 3 | Fixed tokens work on complete/complete_sync/stream; auto_estimate formula wrong in docs (F-080: actual is len//4+1 not len//4); setting both fixed+auto_estimate is silent undefined behavior (F-081); no error raised | 2026-04-06 |
+| MatchMode top-level export | 5 | 5 | Importable from checkagent; EXACT/SUBSTRING/REGEX all work; SUBSTRING default for add_rule means '.*' is literal (DX trap but documented behavior) | 2026-04-06 |
+| upstream CI (session-028) | 5 | 5 | Green — 6 consecutive successes. "Add framework overhead benchmarks for RQ4 paper data" passes all platforms | 2026-04-06 |
