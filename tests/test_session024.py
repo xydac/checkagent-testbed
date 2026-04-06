@@ -122,10 +122,12 @@ def test_f068_multiagent_importable_from_submodule():
 
 @pytest.mark.agent_test
 def test_f071_handoff_type_not_in_multiagent_namespace():
-    """F-071: HandoffType requires import from internal checkagent.multiagent.trace submodule."""
+    """F-071 FIXED: HandoffType is now accessible from checkagent.multiagent."""
     import checkagent.multiagent as ma
-    assert not hasattr(ma, "HandoffType"), \
-        "F-071 FIXED: HandoffType is now accessible from checkagent.multiagent"
+    assert hasattr(ma, "HandoffType"), \
+        "HandoffType should be importable from checkagent.multiagent"
+    from checkagent.multiagent import HandoffType
+    assert set(e.value for e in HandoffType) == {"delegation", "relay", "broadcast"}
 
 
 @pytest.mark.agent_test
@@ -380,10 +382,9 @@ def test_f069_leaf_errors_blames_wrong_agent():
     )
     blame = assign_blame(trace, BlameStrategy.LEAF_ERRORS)
     assert blame is not None
-    # BUG F-069: should be "b" (the leaf, no outgoing handoffs) but returns "a"
-    # Remove/invert the assertion below when the bug is fixed:
-    assert blame.agent_id == "a", (
-        "F-069 FIXED: LEAF_ERRORS now correctly blames leaf agents (no outgoing handoffs)"
+    # F-069 FIXED: LEAF_ERRORS now correctly blames b (the leaf, no outgoing handoffs)
+    assert blame.agent_id == "b", (
+        f"Expected leaf agent 'b' to be blamed, got '{blame.agent_id}'"
     )
 
 
@@ -404,10 +405,9 @@ def test_f069_leaf_errors_expected_correct_behavior():
     )
     blame = assign_blame(trace, BlameStrategy.LEAF_ERRORS)
     assert blame is not None
-    # When fixed, this should pass (leaf = b, not a)
-    assert blame.agent_id != "b", (
-        "F-069 FIXED: uncommonly, this test documents the BUG. "
-        "Expected='b' actual='a'. When blame.agent_id == 'b', the bug is fixed."
+    # F-069 FIXED: LEAF_ERRORS now correctly blames the leaf (b), not the orchestrator (a)
+    assert blame.agent_id == "b", (
+        f"Expected leaf agent 'b' (no outgoing handoffs) to be blamed, got '{blame.agent_id}'"
     )
 
 

@@ -1136,3 +1136,54 @@ Latest commit message: "Update roadmap: mark multi-judge consensus as complete"
 - Try building a realistic test with `top_blamed_agent` across a complex agent graph (3+ levels)
 - Explore whether `MultiAgentTrace` has any serialization/deserialization support (save/load)
 - Try using `parent_run_id` on `AgentRun` to see if it integrates with handoff topology
+
+---
+
+## Session 025 — 2026-04-06
+
+**Upgraded from:** "mark multi-agent trace and credit assignment as complete" → "Fix checkagent init to generate tests that pass out of the box"
+
+**What I tried:**
+- Upgraded checkagent from git main
+- Checked upstream CI — **passing** for last 4 runs. Very stable.
+- Re-ran all 991 previous tests — 3 failures detected: my session-024 bug-documenting tests for F-069 and F-071 tripped their own "this is now fixed" detection paths
+- Confirmed F-005 (checkagent init), F-069 (LEAF_ERRORS), F-071 (HandoffType namespace) all fixed
+- Explored new MultiAgentTrace methods added in recent sessions: `add_run`, `add_handoff`, `root_runs`, `get_children`, `detect_handoffs`, `handoff_chain`, `total_steps`, `total_tokens`, `total_duration_ms`, `succeeded`, `failed_runs`, `get_runs_by_agent`, `get_handoffs_from`, `get_handoffs_to`
+- Found 4 new issues (F-073 through F-076)
+- Updated session-024 tests to reflect fixes
+- Wrote 37 new session-025 tests; total now 1028
+
+**What I found:**
+
+**CI green.** "Fix checkagent init to generate tests that pass out of the box" passes. Fourth consecutive success.
+
+**Big fix: F-005 resolved after 10 sessions.** `checkagent init` now generates a `pyproject.toml` with `asyncio_mode = "auto"` and `pythonpath = ["."]`. Generated tests pass immediately with `pytest tests/ -v`. The promise "tests pass without API keys" now holds. This was the highest-friction first-run experience issue in the framework.
+
+**F-069 FIXED (LEAF_ERRORS inverted logic).** LEAF_ERRORS now correctly blames agents with no outgoing handoffs. In an A→B chain where B errors, LEAF_ERRORS now blames B as expected. The fix landed cleanly — my 3 bug-documenting tests in session-024 detected it and needed to be inverted.
+
+**F-071 FIXED (HandoffType namespace).** `HandoffType` is now importable directly from `checkagent.multiagent`.
+
+**New MultiAgentTrace features explored.** The module gained a rich set of topology methods. The aggregate properties (`total_steps`, `total_tokens`, `total_duration_ms`, `succeeded`, `failed_runs`) are clean and work correctly. The graph traversal methods are useful but have consistency issues.
+
+**F-073 (new, medium, dx-friction): `get_children()` uses `run_id` not `agent_id`.** All other topology methods — `get_handoffs_from(agent_id)`, `get_handoffs_to(agent_id)`, `get_runs_by_agent(agent_id)` — take `agent_id`. But `get_children(run_id)` takes the `run_id` field of `AgentRun`, not the `agent_id`. This is a silent trap: `trace.get_children("my-orchestrator")` returns `[]`, while `trace.get_children("run-orch-001")` returns the correct children. No error, no warning.
+
+**F-074 (new, low, dx-friction): `add_run()` and `add_handoff()` return `None`.** Both mutate `trace.runs`/`trace.handoffs` correctly, but return `None` instead of `self`. Can't chain: `trace.add_run(a).add_run(b)` raises `AttributeError`. Standard builder pattern fix would be `return self`.
+
+**F-075 (new, medium, dx-friction): Mixed topology sources.** `MultiAgentTrace` has two ways to express the agent graph: explicit `handoffs` list and `parent_run_id` on `AgentRun`. Methods use different sources: `handoff_chain()` reads the explicit handoffs list; `root_runs`, `get_children()`, and `detect_handoffs()` read `parent_run_id`. A user who structures their trace via only `parent_run_id` will get `handoff_chain() == []`. A user who uses only explicit handoffs will get `root_runs == [all_runs]`. No documentation explains which methods use which representation.
+
+**F-076 (new, high, bug): `detect_handoffs()` is a mutating method.** `detect_handoffs()` reads `parent_run_id` linkages and returns corresponding `Handoff` objects — but also appends them to `trace.handoffs`. The name "detect" strongly implies read-only inspection. Calling it twice duplicates all handoffs. Calling it before `handoff_chain()` causes `handoff_chain()` to return the auto-detected chain, subverting the user's expectation that the chain only contains explicitly added handoffs. This was discovered when my test called `detect_handoffs()` in an assertion, then checked `handoff_chain()`, and found unexpected results.
+
+**Session discovery pattern.** The F-076 bug was only discoverable because my test combined two assertions in sequence: `assert len(trace.detect_handoffs()) == 1` then `assert trace.handoff_chain() == []`. If I'd only called one, I wouldn't have seen the interaction. This is the value of writing multi-step tests.
+
+**Post-fix blame analysis.** With F-069 fixed, `LEAF_ERRORS` and `LAST_AGENT` now both correctly identify the worker in an orch→worker failure. `FIRST_ERROR` and `MOST_STEPS` both identify the orchestrator (first in list, 0 steps). A 2-agent trace now produces a 2:2 tie, with the tiebreaker returning orch. The ensemble is now more semantically honest — previously, 3 of 4 strategies blamed the orchestrator due to the F-069 bug.
+
+**Observation on the dual-topology design.** It seems like `MultiAgentTrace` was designed to work two ways: (1) programmatic construction with explicit `Handoff` objects (the "test first" path), and (2) wrapping real agent runs where `parent_run_id` is set automatically by an orchestration framework. These are valid use cases, but the API doesn't guide users to understand which methods work in which mode. A `from_runs_with_parent_ids()` constructor that calls `detect_handoffs()` once and populates the handoffs list cleanly would make the second path discoverable.
+
+**Next time I want to try:**
+- Check if F-073 (get_children key type) is fixed
+- Check if F-076 (detect_handoffs mutation) is fixed — high severity
+- Check if F-074 (add_run returns None) is fixed
+- Try `MultiAgentTrace.from_runs_with_parent_ids()` if it exists (would be a nice factory)
+- Test `handoff_chain()` with cycles — what happens with circular handoffs?
+- Explore whether `blame_ensemble` custom strategies parameter accepts lambdas or only `BlameStrategy` values
+- Check if F-038 (AgentRun string input), F-042 (block_unmatched=False) are fixed — still open since session-015/017

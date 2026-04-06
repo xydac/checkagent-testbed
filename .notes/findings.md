@@ -868,3 +868,72 @@ Format:
 **Workaround:** Manually verify handoff agent IDs match the `agent_id` of your `AgentRun` objects. Use string constants rather than inline strings to avoid typos.
 **Status:** Open
 **Status:** Open
+
+---
+
+## F-005: `checkagent init` generates broken project — tests fail immediately
+**Status:** Fixed in "Fix checkagent init to generate tests that pass out of the box" (2026-04-06)
+*(Original entry updated — see above for full description)*
+
+---
+
+## F-069: `LEAF_ERRORS` blame strategy has inverted leaf detection logic
+**Status:** Fixed in 2026-04-06 — LEAF_ERRORS now correctly identifies leaf agents (no outgoing handoffs) and blames them, not the orchestrators with children.
+
+---
+
+## F-071: `HandoffType` not importable from `checkagent.multiagent`
+**Status:** Fixed in 2026-04-06 — `HandoffType` now in `checkagent.multiagent.__all__` and importable directly.
+
+---
+
+## F-073: `get_children()` takes `run_id`, but all other topology methods take `agent_id`
+**Date:** 2026-04-06
+**Severity:** medium
+**Category:** dx-friction
+**Description:** `MultiAgentTrace.get_children(run_id)` takes a `run_id` (the `run_id` field of `AgentRun`) as its parameter. Every other topology method uses `agent_id`: `get_handoffs_from(agent_id)`, `get_handoffs_to(agent_id)`, `get_runs_by_agent(agent_id)`. Users who learn the pattern from other methods will call `get_children("my-agent-id")` and silently get `[]`, even if children exist under that agent. The correct call is `get_children("run-orch-001")` — the `run_id` string, not the `agent_id`.
+**Expected:** `get_children` to take an `agent_id` for consistency with all other topology methods, or clearly named `get_children_by_run_id` to signal the different parameter type.
+**Actual:** `trace.get_children("orchestrator")` → `[]` even when orchestrator's children exist. `trace.get_children("run-orch-001")` → correct result. No error on wrong key type.
+**Workaround:** Pass `run_id` (the `run_id` field value of `AgentRun`) to `get_children()`, not `agent_id`.
+**Status:** Open
+
+---
+
+## F-074: `add_run()` and `add_handoff()` return `None` — builder pattern not chainable
+**Date:** 2026-04-06
+**Severity:** low
+**Category:** dx-friction
+**Description:** `MultiAgentTrace.add_run(run)` and `add_handoff(handoff)` both return `None`. They do correctly mutate `trace.runs` and `trace.handoffs`. But because they return `None`, the natural builder pattern `trace.add_run(run_a).add_run(run_b).add_handoff(h)` raises `AttributeError: 'NoneType' object has no attribute 'add_run'`.
+**Expected:** `add_run()` and `add_handoff()` to return `self` for chaining, following the standard builder pattern. Every popular fluent API does this.
+**Actual:** Both return `None`. Chaining fails with `AttributeError`.
+**Workaround:** Call them on separate lines: `trace.add_run(run_a); trace.add_run(run_b); trace.add_handoff(h)`.
+**Status:** Open
+
+---
+
+## F-075: `handoff_chain()` uses explicit `handoffs` list; `root_runs`/`get_children()`/`detect_handoffs()` use `parent_run_id`
+**Date:** 2026-04-06
+**Severity:** medium
+**Category:** dx-friction
+**Description:** `MultiAgentTrace` supports two topology representations: an explicit `handoffs` list (manually provided `Handoff` objects) and `parent_run_id` linkage (set on `AgentRun`). The topology methods use different sources without documenting which they use:
+- `handoff_chain()` → reads `handoffs` list
+- `root_runs` → reads `parent_run_id`
+- `get_children(run_id)` → reads `parent_run_id`
+- `detect_handoffs()` → reads `parent_run_id` (and mutates `handoffs`! — see F-076)
+A user who builds topology via `parent_run_id` (common when wrapping real agents) will get `handoff_chain() == []` even though the trace has a real structure. A user who uses explicit `handoffs` will find `root_runs` returning all runs as roots.
+**Expected:** Either a single topology source (explicit handoffs, auto-detected, or merged), or clear documentation that these methods use different sources.
+**Actual:** `parent_run_id`-only trace: `handoff_chain() == []`, `root_runs == [root_only]`. Explicit-handoffs-only trace: `handoff_chain() == [a, b, c]`, `root_runs == [all_runs]`.
+**Workaround:** Set both `parent_run_id` AND explicit `handoffs` for consistent topology, or call `detect_handoffs()` first (but see F-076 about its mutation side effect).
+**Status:** Open
+
+---
+
+## F-076: `detect_handoffs()` mutates `trace.handoffs` as a side effect — not read-only
+**Date:** 2026-04-06
+**Severity:** high
+**Category:** bug
+**Description:** `MultiAgentTrace.detect_handoffs()` is named like an inspection method (returns auto-detected handoffs derived from `parent_run_id`), but it also appends those detected handoffs directly to `trace.handoffs`. This has two serious consequences: (1) Calling `detect_handoffs()` twice duplicates all detected handoffs in `trace.handoffs`. (2) Calling `detect_handoffs()` before `handoff_chain()` causes `handoff_chain()` to return the auto-detected chain, surprising users who rely on `handoff_chain()` reflecting only explicitly added handoffs. The name "detect" strongly implies read-only inspection.
+**Expected:** `detect_handoffs()` to be pure/read-only: return detected handoffs without mutating `trace.handoffs`. If the intent is to also update the list, the method should be named `apply_detected_handoffs()` or similar.
+**Actual:** `trace.detect_handoffs()` called once → `len(trace.handoffs) == 1`. Called again → `len(trace.handoffs) == 2`. After first call, `trace.handoff_chain()` returns results from the auto-detected handoffs.
+**Workaround:** Only call `detect_handoffs()` once per trace. Never call it before `handoff_chain()` unless you want the detected handoffs to be included in the chain.
+**Status:** Open

@@ -187,3 +187,16 @@ Rate each feature on:
 | BlameResult model | 5 | 4 | agent_id, agent_name, strategy, confidence (0-1), reason, run_id all correct; confidence respects [0,1] bounds per strategy | 2026-04-06 |
 | multiagent top-level exports | N/A | 1 | Twelfth instance of missing-top-level-export pattern (F-068); HandoffType also missing from submodule namespace (F-071) | 2026-04-06 |
 | upstream CI (session-024) | 5 | 5 | Green for 3 consecutive runs including new "mark multi-agent trace and credit assignment as complete". Stable | 2026-04-06 |
+| checkagent init (session-025) | 5 | 5 | F-005 FIXED — generates pyproject.toml with asyncio_mode+pythonpath; generated tests pass immediately. 10-session fix finally landed | 2026-04-06 |
+| assign_blame LEAF_ERRORS (session-025) | 5 | 4 | F-069 FIXED — now correctly blames leaf agents (no outgoing handoffs). Root cause attribution now works as intended | 2026-04-06 |
+| HandoffType namespace (session-025) | 5 | 5 | F-071 FIXED — HandoffType importable from checkagent.multiagent directly | 2026-04-06 |
+| MultiAgentTrace.add_run/add_handoff | 3 | 2 | Correctly mutates trace state; returns None (not chainable — F-074); works correctly for sequential calls | 2026-04-06 |
+| MultiAgentTrace.root_runs | 4 | 3 | Correctly identifies roots via parent_run_id; returns all runs when no parent_run_id set (expected); uses parent_run_id not explicit handoffs (F-075) | 2026-04-06 |
+| MultiAgentTrace.get_children | 3 | 2 | Works correctly when given run_id; takes run_id not agent_id unlike all other topology methods — API inconsistency trap (F-073) | 2026-04-06 |
+| MultiAgentTrace.detect_handoffs | 2 | 2 | Auto-detects from parent_run_id correctly; MUTATES trace.handoffs as side effect (F-076); calling twice duplicates handoffs; name implies read-only | 2026-04-06 |
+| MultiAgentTrace.handoff_chain | 4 | 3 | Returns topological order from explicit handoffs; correct when handoffs set; returns [] when only parent_run_id used (F-075) | 2026-04-06 |
+| MultiAgentTrace aggregate properties | 5 | 5 | total_steps, total_tokens, total_duration_ms, succeeded, failed_runs all correct; None when data missing (expected) | 2026-04-06 |
+| MultiAgentTrace.agent_ids | 5 | 5 | Returns all agent IDs in order; correct | 2026-04-06 |
+| MultiAgentTrace.get_runs_by_agent | 5 | 4 | Returns all runs for agent_id; handles multi-run agents correctly | 2026-04-06 |
+| MultiAgentTrace.get_handoffs_from/to | 5 | 4 | Both work correctly from explicit handoffs; use agent_id (consistent with get_runs_by_agent) | 2026-04-06 |
+| upstream CI (session-025) | 5 | 5 | Green for 4 consecutive runs including latest "Fix checkagent init". Very stable | 2026-04-06 |
