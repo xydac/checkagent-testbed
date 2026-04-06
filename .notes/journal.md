@@ -834,3 +834,52 @@ The upstream test `test_timing_is_positive_for_slow_ops` asserts `tc.duration_ms
 - Check if Cassette.save/load gets str coercion (F-046)
 - Try writing a real conftest.py with sessionfinish gate enforcement
 - Check if F-038 (AgentRun string input coercion) is fixed
+
+---
+
+## Session 019 — 2026-04-06
+
+**Upgraded from:** (latest main, still 0.0.1a1)
+
+Latest commit message: "Update roadmap: mark rubric evaluation and statistical verdicts as complete"
+
+**What I tried:**
+- Upgraded checkagent from git main
+- Checked upstream CI — **finally green!** First passing run in 3 sessions. F-047 (Windows timing) and F-043 (em dash encoding) both resolved upstream
+- Re-ran all 765 previous tests — all pass, no regressions
+- Explored the new `checkagent.judge` module: `Judge`, `RubricJudge`, `Rubric`, `Criterion`, `ScaleType`, `JudgeScore`, `JudgeVerdict`, `Verdict`, `compute_verdict`
+- Tested RubricJudge with mock LLM callables (JSON response format required)
+- Tested all 3 scale types: numeric (default [1-5]), binary, categorical
+- Tested weighted criteria scoring
+- Tested compute_verdict PASS/FAIL/INCONCLUSIVE logic with different pass rates
+- Tested error cases: bad JSON, unknown criterion names, num_trials=0, evaluate() raises
+- Tested markdown-fenced JSON stripping
+- Tested JudgeScore.score_for() and JudgeVerdict.passed property
+- Wrote 34 new tests; total now 799
+
+**What I found:**
+
+**CI is green for the first time since session-015.** The upstream "mark rubric evaluation and statistical verdicts as complete" commit fixed both F-043 (Windows em dash) and F-047 (TimedCall Windows timing). Both findings marked as fixed.
+
+**F-048: Judge module not at top-level.** Same pattern as F-020/F-021/F-026/F-028. All 10 judge classes require `from checkagent.judge import ...`. Fifth instance of this pattern — feels like a deliberate design decision at this point, but still a DX cost.
+
+**F-049: No ap_judge fixture.** Judge module has zero pytest integration. Worse than other modules: `MockLLM` cannot be passed to `RubricJudge(llm=...)` because the judge expects `async (system, user) -> str` but `MockLLM` has a different interface. Every test file needs to define its own mock LLM callable returning valid JSON.
+
+**F-050: Bad JSON propagates raw JSONDecodeError.** When the LLM returns non-JSON (common with real LLMs), `evaluate()` raises `json.decoder.JSONDecodeError: Expecting value: line 1 column 1`. The error message is unhelpful — no checkagent wrapper, no expected format hint, no actual LLM response included.
+
+**F-051: Unknown criterion names → silent 0.0.** If the LLM hallucinates criterion names (common with real LLMs), `criterion_scores` is empty and `overall` is silently 0.0. No warning, no exception. `compute_verdict` will always FAIL for that judge run with no explanation.
+
+**Core judge functionality is solid.** RubricJudge correctly normalizes all 3 scale types. Weighted scoring is accurate. `compute_verdict` PASS/FAIL/INCONCLUSIVE thresholds work as documented (PASS ≥ 0.65, FAIL ≤ 0.35, INCONCLUSIVE in between with default settings). Markdown-fenced JSON from LLM is stripped correctly. `JudgeVerdict.passed` is False for INCONCLUSIVE (correct). `num_trials=0` raises a clear ValueError.
+
+**One surprising edge case:** `Rubric(criteria=[])` raises `ValidationError` with a clear message — good validation. Rubric correctly enforces `min_length=1` on the criteria list.
+
+**Judge layer marker confirmed working.** Tests marked `@pytest.mark.agent_test(layer="judge")` are correctly included/excluded by `checkagent run --layer judge`.
+
+**Next time I want to try:**
+- Check if `ap_judge` fixture is added (F-049)
+- Check if judge classes appear at top-level (F-048)
+- Check if F-042 (block_unmatched=False) is fixed
+- Check if F-045 (migrate-cassettes v0) is implemented
+- Check if F-038 (AgentRun string input coercion) is fixed
+- Check if F-050/F-051 get error wrapping in judge module
+- Test subclassing `Judge` ABC to write a custom judge

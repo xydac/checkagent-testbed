@@ -553,4 +553,52 @@ Format:
 **Expected:** Upstream tests should use a sleep duration safely above Windows `time.monotonic()` resolution (100ms is safe) or use `time.perf_counter()` which has higher resolution on Windows.
 **Actual:** `TimedCall` uses `time.monotonic()`. On Windows, short sleeps (< ~15ms) return `duration_ms == 0.0`. The upstream test that asserts `>= 5` fails. Third consecutive CI failure, third different root cause.
 **Workaround:** None for users. CI only passes on Linux/macOS. F-043 (em dash) may or may not also still be present.
+**Status:** Fixed in session-019 — upstream CI now passing (latest run: "mark rubric evaluation and statistical verdicts as complete"). Both F-043 and F-047 appear resolved upstream.
+
+---
+
+## F-048: `checkagent.judge` classes not exported from top-level `checkagent`
+**Date:** 2026-04-06
+**Severity:** medium
+**Category:** dx-friction
+**Description:** The new `checkagent.judge` module adds significant functionality: `Judge` (ABC), `RubricJudge`, `Rubric`, `Criterion`, `CriterionScore`, `JudgeScore`, `JudgeVerdict`, `Verdict`, `ScaleType`, and `compute_verdict`. None of these are exported from the top-level `checkagent` namespace. Users must import from the submodule: `from checkagent.judge import RubricJudge, Rubric, Criterion, compute_verdict`. This is the fifth time this pattern has appeared (F-020, F-021, F-026, F-028, now F-048).
+**Expected:** Core judge types (`Judge`, `RubricJudge`, `Rubric`, `Criterion`, `compute_verdict`, `Verdict`) exported at top-level alongside `AgentRun`, `MockLLM`, etc.
+**Actual:** `from checkagent import RubricJudge` → `ImportError`. Same for all other judge classes. `from checkagent.judge import ...` works.
+**Workaround:** `from checkagent.judge import Judge, RubricJudge, Rubric, Criterion, CriterionScore, JudgeScore, JudgeVerdict, Verdict, ScaleType, compute_verdict`
+**Status:** Open
+
+---
+
+## F-049: No `ap_judge` fixture — judge module has no pytest integration
+**Date:** 2026-04-06
+**Severity:** medium
+**Category:** missing-feature
+**Description:** The `checkagent.judge` module has `RubricJudge` and `compute_verdict` but no pytest fixtures. There is no `ap_judge` or `ap_rubric_judge` fixture. Users who want to test their agents with a judge must: (1) import from the submodule manually, (2) write their own async LLM callable, (3) construct `Rubric` and `RubricJudge` from scratch in every test file. This is especially burdensome since judge tests need an async LLM callable that acts as a stand-in for a real LLM — there's no mock-LLM-to-judge bridge. The `ap_mock_llm` fixture (which produces a `MockLLM`) has no adapter to plug into `RubricJudge(llm=callable)` since `MockLLM` is not a plain `async (system, user) -> str` callable.
+**Expected:** An `ap_rubric_judge` fixture (or factory fixture) that creates a `RubricJudge` with a configurable rubric and a mock LLM backend, similar to how `ap_mock_llm` provides a configured `MockLLM`.
+**Actual:** No judge fixtures. `MockLLM` cannot be passed directly to `RubricJudge(llm=...)` since it doesn't have the `(system, user) -> str` signature. Users must write glue code in every test file.
+**Workaround:** Define a local async callable `mock_llm(system, user)` in each test, returning JSON matching the rubric structure.
+**Status:** Open
+
+---
+
+## F-050: `RubricJudge.evaluate()` propagates raw `JSONDecodeError` when LLM returns non-JSON
+**Date:** 2026-04-06
+**Severity:** medium
+**Category:** dx-friction
+**Description:** If the LLM callable passed to `RubricJudge` returns a non-JSON string (which is common when testing with real LLMs that sometimes produce verbose text), `evaluate()` raises a raw `json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)` with no checkagent-specific wrapper. The error message does not tell the user the expected JSON format, does not include the actual LLM response, and doesn't distinguish "bad JSON" from other evaluation failures.
+**Expected:** Either a `JudgeError` or similar checkagent-specific exception with the LLM's actual response and a reminder of the expected JSON format, or graceful fallback handling.
+**Actual:** `await judge.evaluate(run)` when LLM returns plain text → `JSONDecodeError: Expecting value: line 1 column 1 (char 0)`. The raw exception is hard to diagnose without knowing to look at the judge's `_parse_judge_response` function.
+**Workaround:** Wrap `judge.evaluate()` in a try/except for `json.JSONDecodeError` in your tests. Ensure mock LLM callables always return valid JSON.
+**Status:** Open
+
+---
+
+## F-051: Unknown criterion names from LLM silently produce `overall=0.0` with no warning
+**Date:** 2026-04-06
+**Severity:** medium
+**Category:** bug
+**Description:** `RubricJudge._parse_judge_response` silently drops any score item whose `criterion` name doesn't match a criterion in the rubric. If the LLM hallucinates criterion names (or gets the spelling wrong), all criterion scores are dropped and `overall` is computed as `0.0` (due to the `if total_weight == 0: return 0.0` guard). The test or eval pipeline then fails at the judge level, not the LLM level — and the reason is opaque.
+**Expected:** Either a warning when criterion names don't match, or a `JudgeError` with details on what criterion names were expected vs received. Silent 0.0 is always a bug.
+**Actual:** `judge.evaluate(run)` when LLM returns wrong criterion names → `JudgeScore(overall=0.0, criterion_scores=[])`. No exception, no warning. Downstream `compute_verdict` will always return FAIL for this judge.
+**Workaround:** After calling `judge.evaluate()`, check `len(score.criterion_scores) == len(rubric.criteria)` to detect silent drops.
 **Status:** Open

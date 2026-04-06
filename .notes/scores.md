@@ -137,3 +137,10 @@ Rate each feature on:
 | migrate-cassettes v0 support | 1 | 1 | "No migration registered from v0" — the only migration needed is unimplemented (F-045) | 2026-04-06 |
 | Cassette.save()/load() path handling | 3 | 2 | Both require pathlib.Path; str raises AttributeError with confusing 'parent'/'read_text' message; no Path coercion (F-046) | 2026-04-06 |
 | upstream CI (session-018) | 1 | 1 | Still red — new failure: TimedCall.duration_ms == 0.0 on Windows for short sleep (F-047). Third consecutive CI failure, third different root cause | 2026-04-06 |
+| upstream CI (session-019) | 4 | 4 | FIXED — latest run passing. F-047 and F-043 both resolved upstream. Stable for the first time in 3 sessions | 2026-04-06 |
+| checkagent.judge module (overall) | 4 | 3 | Core judge logic solid: RubricJudge, compute_verdict, 3 scale types, weighted criteria, statistical verdicts; not at top-level (F-048); no ap_judge fixture (F-049) | 2026-04-06 |
+| RubricJudge.evaluate() | 4 | 3 | Weighted scoring correct; markdown fence stripping works; bad JSON propagates raw JSONDecodeError (F-050); wrong criterion names silent 0.0 (F-051) | 2026-04-06 |
+| compute_verdict | 5 | 5 | PASS/FAIL/INCONCLUSIVE logic correct; confidence field correct; all trials stored; error propagates; num_trials=0 raises ValueError | 2026-04-06 |
+| Rubric / Criterion | 5 | 5 | Validation correct (empty criteria raises); get_criterion works; all 3 scale types (numeric/binary/categorical) normalize correctly | 2026-04-06 |
+| JudgeScore / JudgeVerdict | 5 | 5 | score_for() lookup/miss; passed property; num_trials; reasoning summary; Verdict str enum values | 2026-04-06 |
+| judge pytest integration | 1 | 1 | No ap_judge fixture; MockLLM incompatible with RubricJudge(llm=) signature; users must write all glue code (F-049) | 2026-04-06 |
