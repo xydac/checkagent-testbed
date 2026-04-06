@@ -423,22 +423,31 @@ def test_f073_inconsistency_get_children_vs_get_runs_by_agent():
 
 @pytest.mark.agent_test
 def test_f074_add_run_returns_none():
-    """F-074: add_run() returns None — cannot chain add_run().add_run().add_handoff()."""
+    """F-074 FIXED: add_run() now returns self — builder chaining works."""
     trace = MultiAgentTrace()
     result = trace.add_run(_make_run("a"))
-    assert result is None, (
-        "F-074: add_run returns None. Builder pattern would return self for chaining."
+    assert result is trace, (
+        "F-074 FIXED: add_run now returns self for builder chaining."
     )
+    # Chaining works
+    trace2 = MultiAgentTrace()
+    trace2.add_run(_make_run("a")).add_run(_make_run("b"))
+    assert len(trace2.runs) == 2
 
 
 @pytest.mark.agent_test
 def test_f074_add_handoff_returns_none():
-    """F-074: add_handoff() returns None — cannot chain builder calls."""
+    """F-074 FIXED: add_handoff() now returns self — builder chaining works."""
     trace = MultiAgentTrace()
     result = trace.add_handoff(Handoff(from_agent_id="a", to_agent_id="b"))
-    assert result is None, (
-        "F-074: add_handoff returns None. Builder pattern would return self for chaining."
+    assert result is trace, (
+        "F-074 FIXED: add_handoff now returns self for builder chaining."
     )
+    # Chaining add_run and add_handoff
+    trace2 = MultiAgentTrace()
+    trace2.add_run(_make_run("a")).add_run(_make_run("b")).add_handoff(Handoff(from_agent_id="a", to_agent_id="b"))
+    assert len(trace2.runs) == 2
+    assert len(trace2.handoffs) == 1
 
 
 @pytest.mark.agent_test
@@ -459,24 +468,22 @@ def test_f074_add_run_still_mutates_correctly():
 
 @pytest.mark.agent_test
 def test_f075_handoff_chain_uses_explicit_handoffs_not_parent_run_id():
-    """F-075/F-076: handoff_chain() uses explicit handoffs; root_runs uses parent_run_id.
+    """F-075: handoff_chain() uses explicit handoffs; root_runs uses parent_run_id.
 
     Two topology representations exist: explicit handoffs list and parent_run_id.
     Methods use different sources:
     - handoff_chain() → uses handoffs list
     - root_runs → uses parent_run_id
-    - detect_handoffs() → uses parent_run_id (AND mutates trace.handoffs! — F-076)
+    - detect_handoffs() → uses parent_run_id (read-only since F-076 fix)
     - get_children() → uses parent_run_id
 
-    NOTE: Do NOT call detect_handoffs() before handoff_chain() in the same trace —
-    detect_handoffs() mutates trace.handoffs as a side effect (F-076).
+    apply_detected_handoffs() bridges the gap (F-076 fix also added this method).
     """
     # Set parent_run_id linkage but NOT explicit handoffs
     run_a = _make_run("a", run_id="run-a")
     run_b = _make_run("b", run_id="run-b", parent_run_id="run-a")
     trace = MultiAgentTrace(runs=[run_a, run_b])
 
-    # Check handoff_chain BEFORE calling detect_handoffs (to avoid F-076 mutation)
     chain_before = trace.handoff_chain()
     assert chain_before == [], (
         "F-075: handoff_chain() returns [] when no explicit handoffs are set, "
@@ -489,37 +496,30 @@ def test_f075_handoff_chain_uses_explicit_handoffs_not_parent_run_id():
 
 @pytest.mark.agent_test
 def test_f076_detect_handoffs_mutates_trace_handoffs():
-    """F-076: detect_handoffs() is NOT read-only — it appends to trace.handoffs as a side effect.
-
-    A method named 'detect' should only inspect/return, not mutate state.
-    Calling detect_handoffs() twice doubles the handoffs list.
-    Calling detect_handoffs() before handoff_chain() causes handoff_chain() to return results.
-    """
+    """F-076 FIXED: detect_handoffs() is now read-only — does NOT mutate trace.handoffs."""
     run_a = _make_run("a", run_id="run-a")
     run_b = _make_run("b", run_id="run-b", parent_run_id="run-a")
     trace = MultiAgentTrace(runs=[run_a, run_b])
 
     assert len(trace.handoffs) == 0, "Should start empty"
 
-    # First call
+    # First call — should return detected handoffs without mutating
     detected1 = trace.detect_handoffs()
     assert len(detected1) == 1
-    # SIDE EFFECT: trace.handoffs was mutated
-    assert len(trace.handoffs) == 1, "F-076: detect_handoffs() mutated trace.handoffs"
+    assert len(trace.handoffs) == 0, "F-076 FIXED: detect_handoffs() no longer mutates trace.handoffs"
 
-    # Second call — doubles the handoffs
+    # Second call — should still return the same result, not double
     detected2 = trace.detect_handoffs()
-    assert len(trace.handoffs) == 2, "F-076: calling detect_handoffs() twice doubles handoffs"
+    assert len(trace.handoffs) == 0, "F-076 FIXED: calling twice still doesn't mutate"
+    assert len(detected2) == 1
 
 
 @pytest.mark.agent_test
 def test_f076_detect_handoffs_poisons_handoff_chain():
-    """F-076: detect_handoffs() mutation causes handoff_chain() to return unexpected results.
+    """F-076 FIXED: detect_handoffs() no longer poisons handoff_chain().
 
-    If a user calls detect_handoffs() to inspect topology, then calls handoff_chain(),
-    they'll get results from the auto-detected handoffs — even though they never added
-    any explicit handoffs. This is confusing because handoff_chain() is documented
-    to use the explicit handoffs list.
+    After the fix, detect_handoffs() is read-only so handoff_chain() remains
+    empty if no explicit handoffs were added.
     """
     run_a = _make_run("a", run_id="run-a")
     run_b = _make_run("b", run_id="run-b", parent_run_id="run-a")
@@ -528,11 +528,11 @@ def test_f076_detect_handoffs_poisons_handoff_chain():
     # Without detect_handoffs: handoff_chain is empty
     assert trace.handoff_chain() == []
 
-    # After detect_handoffs: handoff_chain is non-empty due to mutation
+    # After detect_handoffs: handoff_chain is STILL empty (no longer mutated)
     trace.detect_handoffs()
     chain = trace.handoff_chain()
-    assert chain != [], (
-        "F-076: handoff_chain() is now non-empty after detect_handoffs() mutated trace.handoffs"
+    assert chain == [], (
+        "F-076 FIXED: handoff_chain() stays empty after detect_handoffs() — no mutation"
     )
 
 

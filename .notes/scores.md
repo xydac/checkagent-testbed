@@ -200,3 +200,10 @@ Rate each feature on:
 | MultiAgentTrace.get_runs_by_agent | 5 | 4 | Returns all runs for agent_id; handles multi-run agents correctly | 2026-04-06 |
 | MultiAgentTrace.get_handoffs_from/to | 5 | 4 | Both work correctly from explicit handoffs; use agent_id (consistent with get_runs_by_agent) | 2026-04-06 |
 | upstream CI (session-025) | 5 | 5 | Green for 4 consecutive runs including latest "Fix checkagent init". Very stable | 2026-04-06 |
+| upstream CI (session-026) | 5 | 5 | Green for 5 consecutive runs — "Fix detect_handoffs() mutation bug and add builder chaining" passes. Very stable | 2026-04-06 |
+| MultiAgentTrace.add_run/add_handoff (session-026) | 5 | 5 | F-074 FIXED — both return self; builder chaining now works: .add_run().add_run().add_handoff() | 2026-04-06 |
+| MultiAgentTrace.detect_handoffs (session-026) | 5 | 5 | F-076 FIXED — now read-only; does not mutate trace.handoffs; calling twice still returns same results | 2026-04-06 |
+| apply_detected_handoffs() | 5 | 4 | New method: converts parent_run_id links to explicit handoffs; idempotent; returns applied list; bridges F-075 gap | 2026-04-06 |
+| MultiAgentTrace.handoff_chain() with cycles | 3 | 2 | No crash on cyclic handoffs; returns list with repeated nodes (a→b→c→a → ['a','b','c','a']); no cycle detection or warning (F-077) | 2026-04-06 |
+| MultiAgentTrace JSON serialization | 5 | 5 | model_dump_json/model_validate_json round-trip preserves all fields: runs, handoffs, trace_id, agent_ids, HandoffType enums | 2026-04-06 |
+| assign_blame_ensemble lambda strategies | 3 | 3 | Accepts lambdas as strategies (undocumented); lambdas returning None are silently filtered; must return BlameResult to contribute | 2026-04-06 |

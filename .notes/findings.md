@@ -923,8 +923,8 @@ Format:
 A user who builds topology via `parent_run_id` (common when wrapping real agents) will get `handoff_chain() == []` even though the trace has a real structure. A user who uses explicit `handoffs` will find `root_runs` returning all runs as roots.
 **Expected:** Either a single topology source (explicit handoffs, auto-detected, or merged), or clear documentation that these methods use different sources.
 **Actual:** `parent_run_id`-only trace: `handoff_chain() == []`, `root_runs == [root_only]`. Explicit-handoffs-only trace: `handoff_chain() == [a, b, c]`, `root_runs == [all_runs]`.
-**Workaround:** Set both `parent_run_id` AND explicit `handoffs` for consistent topology, or call `detect_handoffs()` first (but see F-076 about its mutation side effect).
-**Status:** Open
+**Workaround:** Call `apply_detected_handoffs()` after constructing the trace from `parent_run_id` — this bridges the two topology representations and makes `handoff_chain()` consistent with `root_runs`. With F-076 fixed, `apply_detected_handoffs()` is the clean path: it populates the explicit handoffs from `parent_run_id` links and is idempotent.
+**Status:** Partially resolved in session-026 — `apply_detected_handoffs()` added as explicit bridge. The dual-representation design remains (F-075 still applies), but there's now a documented escape hatch. Documentation still doesn't explain which methods use which topology source.
 
 ---
 
@@ -936,4 +936,21 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** `detect_handoffs()` to be pure/read-only: return detected handoffs without mutating `trace.handoffs`. If the intent is to also update the list, the method should be named `apply_detected_handoffs()` or similar.
 **Actual:** `trace.detect_handoffs()` called once → `len(trace.handoffs) == 1`. Called again → `len(trace.handoffs) == 2`. After first call, `trace.handoff_chain()` returns results from the auto-detected handoffs.
 **Workaround:** Only call `detect_handoffs()` once per trace. Never call it before `handoff_chain()` unless you want the detected handoffs to be included in the chain.
+**Status:** Fixed in "Fix detect_handoffs() mutation bug and add builder chaining" (2026-04-06) — `detect_handoffs()` is now read-only. New `apply_detected_handoffs()` method added for explicit mutation, and it's idempotent (calling twice doesn't duplicate).
+
+---
+
+## F-074: `add_run()` and `add_handoff()` return `None` — builder pattern not chainable
+**Status:** Fixed in "Fix detect_handoffs() mutation bug and add builder chaining" (2026-04-06) — both methods now return `self`, enabling full builder chaining: `MultiAgentTrace().add_run(r1).add_run(r2).add_handoff(h)`.
+
+---
+
+## F-077: `handoff_chain()` with cycles produces list with repeated nodes — no cycle detection
+**Date:** 2026-04-06
+**Severity:** low
+**Category:** dx-friction
+**Description:** `MultiAgentTrace.handoff_chain()` does not detect cycles. A trace with a→b→c→a produces `['a', 'b', 'c', 'a']` — the start node appears twice. While this avoids infinite loops (the implementation follows the handoffs list in order rather than doing a graph traversal), it silently produces a result that doesn't represent a valid DAG. Users building multi-agent systems with feedback loops (legitimate use cases) will get surprising chain results.
+**Expected:** Either raise `ValueError("Cycle detected in handoff chain: a → b → c → a")` for cycles, or document that cycles produce repeated nodes. A `has_cycles()` method would also help.
+**Actual:** `handoff_chain()` with a→b→c→a cycle returns `['a', 'b', 'c', 'a']`. No exception, no warning. Two-node cycle (a→b→a) returns `['a', 'b', 'a']`.
+**Workaround:** Detect cycles yourself: `len(trace.handoff_chain()) > len(set(trace.handoff_chain()))` indicates a cycle.
 **Status:** Open

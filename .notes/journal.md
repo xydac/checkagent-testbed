@@ -1187,3 +1187,54 @@ Latest commit message: "Update roadmap: mark multi-judge consensus as complete"
 - Test `handoff_chain()` with cycles — what happens with circular handoffs?
 - Explore whether `blame_ensemble` custom strategies parameter accepts lambdas or only `BlameStrategy` values
 - Check if F-038 (AgentRun string input), F-042 (block_unmatched=False) are fixed — still open since session-015/017
+
+---
+
+## Session 026 — 2026-04-06
+
+**Upgraded from:** "Fix checkagent init to generate tests that pass out of the box" → "Fix detect_handoffs() mutation bug and add builder chaining"
+
+**What I tried:**
+- Upgraded checkagent from git main
+- Checked upstream CI — **passing** for last 5 consecutive runs. Very stable.
+- Re-ran all 1028 previous tests — 4 failures detected in session-025, all expected (F-074/F-076 fix detection tests)
+- Updated session-025 tests to reflect F-074 and F-076 fixes
+- Explored the new `apply_detected_handoffs()` method
+- Tested `handoff_chain()` with cyclic handoff graphs
+- Tested `MultiAgentTrace` JSON serialization round-trip
+- Tested `assign_blame_ensemble` with lambda strategies
+- Wrote 24 new session-026 tests; total now 1052
+
+**What I found:**
+
+**CI green.** 5 consecutive successes. Best stability streak yet.
+
+**F-074 FIXED (add_run/add_handoff builder chaining).** Both methods now return `self`. `MultiAgentTrace().add_run(r1).add_run(r2).add_handoff(h)` works cleanly. The fix came in the same commit as F-076.
+
+**F-076 FIXED (detect_handoffs mutation).** `detect_handoffs()` is now read-only — it returns detected handoffs without mutating `trace.handoffs`. Calling it twice no longer duplicates the handoffs list. The fix also added `apply_detected_handoffs()` as the explicit mutation path.
+
+**F-073 still open (get_children takes run_id).** No change — `get_children('my-agent-id')` still silently returns `[]` while `get_children('run-001')` works. All other topology methods (`get_handoffs_from`, `get_handoffs_to`, `get_runs_by_agent`) use `agent_id`. The inconsistency remains a silent trap.
+
+**New `apply_detected_handoffs()` method.** Added alongside the F-076 fix. Converts `parent_run_id` links into explicit `Handoff` entries in `trace.handoffs`. Key properties:
+- **Idempotent**: calling twice doesn't duplicate handoffs
+- Returns the list of applied `Handoff` objects
+- Bridges F-075 gap: after calling it, `handoff_chain()` and `root_runs` are consistent
+- Works for fan-out topologies (one orchestrator, multiple workers)
+
+**F-075 partially resolved.** The dual-topology representation issue (parent_run_id vs explicit handoffs) isn't fixed architecturally, but `apply_detected_handoffs()` is a clean escape hatch. Users who build traces from wrapped agent runs (using `parent_run_id`) can call `apply_detected_handoffs()` once and then use `handoff_chain()` freely. The docs still don't explain which methods use which topology source.
+
+**F-077 (new, low, dx-friction): `handoff_chain()` with cycles — no detection, repeated nodes.** A trace with cyclic handoffs (a→b→c→a) produces `['a', 'b', 'c', 'a']` without raising or warning. The implementation follows the handoffs list in order rather than doing graph traversal, so it avoids infinite loops — but silently produces a result that doesn't represent a valid DAG. Users building feedback-loop agent systems will see unexpected chain lengths. A simple `len(chain) > len(set(chain))` check detects cycles as a workaround.
+
+**JSON round-trip works cleanly.** `MultiAgentTrace.model_dump_json()` + `model_validate_json()` preserves all fields including `HandoffType` enum values, `parent_run_id` references, and error strings. Blame attribution on round-tripped traces works correctly. This is purely Pydantic — not a checkagent-specific feature, but worth confirming it works end-to-end.
+
+**Lambda strategies in assign_blame_ensemble.** Undocumented: `assign_blame_ensemble(trace, strategies=[my_lambda])` works if the lambda returns a `BlameResult` or `None`. Lambdas returning `None` are filtered. This is a hidden extension point — useful for custom blame strategies without subclassing, but not documented anywhere.
+
+**Builder pattern end-to-end.** With F-074 fixed, complex multi-agent trace construction is now ergonomic: `trace = MultiAgentTrace().add_run(orch).add_run(worker).add_handoff(Handoff(...))`. Tested up to 3-level chains and fan-out topologies.
+
+**Next time I want to try:**
+- Check if F-073 (get_children key type) gets fixed — it's been open two sessions now
+- Try `MultiAgentTrace` with a real use-case: wrap an agent that uses `parent_run_id` and verify `apply_detected_handoffs()` + blame attribution works end-to-end
+- Explore any new modules or features in the next upstream commit
+- Check if F-038 (AgentRun string input), F-042 (block_unmatched=False) are ever fixed
+- Test `handoff_chain()` cycle detection if it gets added
+- Explore the `top_blamed_agent` return type more carefully — it returns `BlameResult` not `str`, which could surprise users (similar to F-029 ambiguity)
