@@ -219,3 +219,8 @@ Rate each feature on:
 | LangChain real agent integration (session-031) | 4 | 3 | LCEL chain + LangChainAdapter + FakeChatModel works cleanly; multi-variable chain fails (F-084 — use prompt.partial() workaround); string final_output ✓ when StrOutputParser used | 2026-04-06 |
 | calculate_run_cost (session-031) | 5 | 5 | Now at top-level checkagent (improvement from F-018 partial fix); API unchanged (pricing_overrides/default_pricing); ProviderPricing/BUILTIN_PRICING still internal | 2026-04-06 |
 | CostTracker/CostBreakdown/CostReport/BudgetExceededError (session-031) | 5 | 5 | All 5 cost classes now at top-level checkagent; was already true in prior sessions but confirmed against d0dd9265 | 2026-04-06 |
+| upstream CI (session-032) | 5 | 5 | Green — 9 consecutive successes. Same commit as session-031 — no new upstream changes | 2026-04-06 |
+| PydanticAI real agent integration (session-032) | 4 | 3 | Works with PydanticAI 1.77.0 via TestModel; final_output correct (string or Pydantic model); tokens extracted; structured output + assert_output_schema works; F-085 (input_text always ''), F-086 (not at top-level), F-087 (deprecated token attrs) | 2026-04-06 |
+| PydanticAIAdapter structured output | 5 | 4 | Pydantic model instance flows through correctly; use model_dump() for assert_output_schema | 2026-04-06 |
+| checkagent[all] extra | 1 | 1 | F-088: No [all] extra — users must manually combine extras and install framework deps separately | 2026-04-06 |
+| LangChain tool-calling agents | 2 | 2 | bind_tools() raises NotImplementedError on GenericFakeChatModel — no clean fake model for tool calling; custom stateful runnable works as workaround but mock layer cannot intercept internal tool calls | 2026-04-06 |

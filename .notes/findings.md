@@ -1039,3 +1039,51 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Workaround:** Use `prompt.partial(context="...")` to pre-fill extra variables before building the chain. This bakes in a fixed value for the lifetime of the adapter.
 **Status:** Open
 
+
+---
+
+## F-085: `Step.input_text` always `''` for PydanticAI steps — content only in `output_text`
+**Date:** 2026-04-06
+**Severity:** low
+**Category:** dx-friction
+**Description:** When using `PydanticAIAdapter`, all steps in the resulting `AgentRun` have `input_text=''`. The actual content (request prompt or response text) is in `output_text`. This means users cannot use `step.input_text` to inspect what the agent received at each step — they must read `output_text` for all content and use `step.metadata['kind']` to distinguish request vs. response steps.
+**Expected:** `input_text` should carry the user query/prompt text for request steps, as it does for GenericAdapter steps.
+**Actual:** `input_text=''` for all PydanticAI steps; `output_text` carries all content (including the full prompt in request steps).
+**Workaround:** Use `step.output_text` and `step.metadata.get('kind')` to identify step content.
+**Status:** Open
+
+---
+
+## F-086: `PydanticAIAdapter` not at top-level `checkagent` namespace
+**Date:** 2026-04-06
+**Severity:** medium
+**Category:** dx-friction
+**Description:** `PydanticAIAdapter` cannot be imported from `checkagent` directly. Must use `checkagent.adapters.pydantic_ai`. It IS re-exported from `checkagent.adapters` (one level better than other adapters like `AnthropicAdapter`), but inconsistent with how core types are at the top-level namespace.
+**Expected:** `from checkagent import PydanticAIAdapter`
+**Actual:** `from checkagent.adapters.pydantic_ai import PydanticAIAdapter`
+**Workaround:** Import from the submodule path.
+**Status:** Open
+
+---
+
+## F-087: `PydanticAIAdapter` reads deprecated `request_tokens`/`response_tokens` — breaks with PydanticAI 1.77+
+**Date:** 2026-04-06
+**Severity:** high
+**Category:** bug
+**Description:** `PydanticAIAdapter._extract_token_usage()` reads `usage_obj.request_tokens` and `usage_obj.response_tokens`. PydanticAI 1.77.0 deprecated these attributes in favor of `input_tokens` and `output_tokens`. Every call to `adapter.run()` emits two `DeprecationWarning`s. Token extraction will silently return `None` when the old attrs are finally removed. Currently tokens are non-zero because the deprecated attrs still exist, but this is a time bomb.
+**Expected:** Adapter uses the current `input_tokens`/`output_tokens` attribute names.
+**Actual:** `DeprecationWarning: 'request_tokens' is deprecated, use 'input_tokens' instead` on every run.
+**Workaround:** None at adapter level. Token counts still work today but will silently break in a future PydanticAI version.
+**Status:** Open
+
+---
+
+## F-088: No `checkagent[all]` extra for power users
+**Date:** 2026-04-06
+**Severity:** low
+**Category:** dx-friction
+**Description:** Available extras: `dev`, `json-schema`, `otel`, `safety-ner`, `structured`. There is no `[all]` extra that installs everything a power user needs (all optional deps in a single command). Users who want structured assertions, JSON schema validation, OTel tracing, and safety NER must install each extra separately. Framework adapters (langchain, anthropic, crewai, pydantic-ai) are not declared as optional extras at all (F-064), making `[all]` even more useful as a concept.
+**Expected:** `pip install checkagent[all]` installs all optional dependencies.
+**Actual:** No `[all]` extra exists; users must manually combine extras.
+**Workaround:** `pip install "checkagent[json-schema,structured,otel]"` and then add framework packages separately.
+**Status:** Open

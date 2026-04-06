@@ -176,25 +176,35 @@ def test_f063_anthropic_adapter_not_at_top_level():
 
 
 def test_anthropic_adapter_raises_on_missing_package():
-    """AnthropicAdapter raises ImportError with helpful message if not installed."""
-    # The actual package is not installed, so importing without mock fails
+    """AnthropicAdapter raises ImportError with helpful message if not installed.
+
+    NOTE: This test requires that the `anthropic` package is NOT installed.
+    It was valid at session-022 time but will fail if anthropic is installed.
+    We mock out the module to simulate the missing-package scenario.
+    """
     import sys
-    # Temporarily hide anthropic from imports
     import importlib
+    import unittest.mock as mock
+
+    # Simulate anthropic not being installed by removing it from sys.modules
+    # and blocking the import
     saved = sys.modules.pop("anthropic", None)
+    saved_adapters = sys.modules.pop("checkagent.adapters.anthropic", None)
     try:
-        # Re-import the module so it re-evaluates _ensure_anthropic
-        import importlib
-        import checkagent.adapters.anthropic as aa
-        try:
-            aa._ensure_anthropic()
-            assert False, "Should have raised ImportError"
-        except ImportError as e:
-            assert "anthropic" in str(e).lower()
-            assert "pip install" in str(e)
+        with mock.patch.dict(sys.modules, {"anthropic": None}):
+            import checkagent.adapters.anthropic as aa
+            importlib.reload(aa)
+            try:
+                aa._ensure_anthropic()
+                assert False, "Should have raised ImportError"
+            except ImportError as e:
+                assert "anthropic" in str(e).lower()
+                assert "pip install" in str(e)
     finally:
         if saved is not None:
             sys.modules["anthropic"] = saved
+        if saved_adapters is not None:
+            sys.modules["checkagent.adapters.anthropic"] = saved_adapters
 
 
 # ---------------------------------------------------------------------------

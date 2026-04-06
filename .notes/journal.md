@@ -1452,3 +1452,70 @@ This same issue likely affected the start of every session — `uv run pytest` w
 - Check if `checkagent[all]` extra exists for power users
 - Investigate whether `assert_output_matches` silently fails on fresh install (F-083 impact)
 - Look for a real GitHub agent to integrate — minimal-dependency, no API key needed
+
+---
+
+## Session-032 — 2026-04-06
+
+**Focus:** PydanticAI real agent integration + LangChain tool calling investigation
+
+**Setup:**
+- `uv pip install --upgrade checkagent@git+...@main` + `uv lock --upgrade-package checkagent` — same commit as session-031 (no upstream changes). 1163 tests passing (1143 + 20 new).
+
+**Upstream CI:** Green — 9 consecutive successes. Stable.
+
+### PydanticAI Real Agent Integration
+
+Installed `pydantic-ai 1.77.0` (not declared as a dep by checkagent — F-064 still open).
+
+Created `agents/pydantic_ai_agent.py` with four helpers:
+- `make_qa_agent(answer)` — basic Q&A using TestModel
+- `make_weather_agent()` — agent with an internal tool (`get_weather`)
+- `make_structured_agent()` — returns a `WeatherResult` Pydantic model
+- `make_error_agent()` — raises RuntimeError on every invocation
+
+**Results — `PydanticAIAdapter` works with PydanticAI 1.77.0:**
+
+1. **String final_output** ✓ — when agent returns text, `final_output` is a string
+2. **Pydantic model final_output** ✓ — structured output flows through as a model instance; `assert_output_schema` works via `model_dump()`
+3. **Token extraction** ✓ — `total_prompt_tokens` / `total_completion_tokens` populated from TestModel's usage info (though via deprecated attrs — F-087)
+4. **Error handling** ✓ — exceptions captured in `AgentRun.error`; `run()` never raises
+5. **Tool-using agents** ✓ — 4 steps captured (request → tool-call response → tool result request → final response)
+6. **AgentInput and string input** ✓ — both coerce correctly
+
+**New findings:**
+
+- **F-085 (low):** `Step.input_text` is always `''` for PydanticAI steps — all content is in `output_text`. Contrasts with GenericAdapter where `input_text` is populated. Low severity because the data is still accessible via `output_text`.
+- **F-086 (medium):** `PydanticAIAdapter` not at top-level `checkagent` — must use `checkagent.adapters.pydantic_ai`. (It IS in `checkagent.adapters`, which is one level better than AnthropicAdapter etc.) 13th instance of this pattern.
+- **F-087 (high):** Adapter reads deprecated `request_tokens`/`response_tokens` — PydanticAI 1.77.0 renamed to `input_tokens`/`output_tokens`. Every run emits 2 DeprecationWarnings. Will silently break token extraction in a future PydanticAI version.
+
+### LangChain Tool Calling Investigation
+
+`GenericFakeChatModel.bind_tools()` raises `NotImplementedError` — no clean way to test tool-calling LCEL chains without a custom fake model. Created a `StatefulFakeLLM` subclass that returns tool-call AIMessages and tracks call count. Wrapped with `LangChainAdapter`.
+
+**Key architectural finding:** `assert_tool_called` and CheckAgent's mock layer only work when the agent explicitly calls through CheckAgent's `MockTool`. For real LangChain/PydanticAI agents with internal tool execution, CheckAgent can only assert on:
+- `final_output` content (string match, schema, dirty_equals)
+- step count
+- error/success
+- token counts and duration
+
+Internal tool calls are invisible to CheckAgent's mock layer.
+
+- **F-088 (low):** No `checkagent[all]` extra. Extras: `dev`, `json-schema`, `otel`, `safety-ner`, `structured`. Framework packages not extras at all (F-064).
+
+Also **fixed a stale testbed test:** `test_anthropic_adapter_raises_on_missing_package` was failing because `anthropic` is now installed. Rewrote to use `mock.patch.dict(sys.modules)` to simulate the missing-package scenario.
+
+### What surprised me
+
+- `PydanticAIAdapter` IS in `checkagent.adapters` (re-exported) — slightly better than other adapters. Still not top-level.
+- PydanticAI's `TestModel` is very clean for testing. `custom_output_text` for string results, `custom_output_args` for structured output — zero boilerplate.
+- The deprecated token attribute issue is a real maintenance risk. If PydanticAI 2.0 drops the old names, all token metrics will silently return None.
+
+**Total tests:** 1163 (up from 1143)
+
+**What I want to try next session:**
+- Fix the stale test isolation: `test_anthropic_adapter_raises_on_missing_package` worked but is fragile — consider module-level mock
+- Test PydanticAI streaming (`run_stream`) via the adapter's `run_stream` path
+- Try a CrewAI agent with a real tool using FakeAgent or similar
+- Investigate whether any framework adapters get added to `[all]` extra if it exists
+- Test `assert_output_matches` on a fresh install to confirm F-083 impact
