@@ -55,7 +55,7 @@ Format:
 **Expected:** Faults fire automatically when mock tools are called
 **Actual:** Manual guard calls required
 **Workaround:** Call `fault.check_tool("name")` explicitly before each tool invocation
-**Status:** Partially resolved in session-004 — FaultInjector now has a complete fluent builder API (`on_tool().timeout()`, `on_tool().rate_limit()`, `on_tool().slow()`, `on_tool().returns_malformed()`, `on_tool().returns_empty()`, `on_tool().intermittent()`, `on_llm().rate_limit()`, `on_llm().context_overflow()`, `on_llm().server_error()`, `on_llm().content_filter()`, `on_llm().partial_response()`). Also has inspection API: `records`, `triggered_records`, `trigger_count`, `was_triggered()`, `has_faults_for()`, `has_llm_faults()`, `reset_records()`, `check_tool_async()`. Integration with MockTool/MockLLM still requires manual guard calls.
+**Status:** FIXED in session-027 — `attach_faults(injector)` method added to both `MockTool` and `MockLLM`. Faults now fire automatically without any manual guard calls. Also added `ap_fault` pytest fixture. See F-078 for a new DX issue discovered during this fix.
 
 ## F-005: `checkagent init` generates broken project — tests fail immediately
 **Date:** 2026-04-05
@@ -953,4 +953,28 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** Either raise `ValueError("Cycle detected in handoff chain: a → b → c → a")` for cycles, or document that cycles produce repeated nodes. A `has_cycles()` method would also help.
 **Actual:** `handoff_chain()` with a→b→c→a cycle returns `['a', 'b', 'c', 'a']`. No exception, no warning. Two-node cycle (a→b→a) returns `['a', 'b', 'a']`.
 **Workaround:** Detect cycles yourself: `len(trace.handoff_chain()) > len(set(trace.handoff_chain()))` indicates a cycle.
+**Status:** Open
+
+---
+
+## F-078: `was_triggered` is a method, not a property — always truthy without `()`
+**Date:** 2026-04-06
+**Severity:** low
+**Category:** dx-friction
+**Description:** `FaultInjector.was_triggered` is a method (`was_triggered(target=None) -> bool`), not a property. This means `if fi.was_triggered:` is always `True` — you're testing truthiness of the bound method object, not the result. The fix is `fi.was_triggered()` (with parens). Similar named APIs in checkagent (`ap_mock_tool.was_called`, etc.) are also methods, but `was_triggered` is particularly easy to misuse in assertions like `assert not ap_fault.was_triggered`.
+**Expected:** Either make `was_triggered` a `@property` (no-arg call → bool), or name it `has_triggered` to signal it's a method.
+**Actual:** `fi.was_triggered` returns `<bound method ...>` which is always truthy. `fi.was_triggered()` returns the correct bool.
+**Workaround:** Always call with parentheses: `fi.was_triggered()`.
+**Status:** Open
+
+---
+
+## F-079: `attach_faults()` second call silently overwrites the first — not additive
+**Date:** 2026-04-06
+**Severity:** low
+**Category:** dx-friction
+**Description:** Calling `mock_tool.attach_faults(fi2)` after `mock_tool.attach_faults(fi1)` replaces `fi1` entirely. The second injector wins, not merges. There is no `FaultInjector.merge()` method and no warning when overwriting. If a user attaches faults in a fixture and also in a test body, the fixture faults will be silently discarded.
+**Expected:** Either raise an error on second attach, merge injectors, or document the overwrite behavior clearly.
+**Actual:** The second `attach_faults()` call replaces the first. The original injector's faults are lost.
+**Workaround:** Create one FaultInjector with all desired faults before calling `attach_faults()` once.
 **Status:** Open

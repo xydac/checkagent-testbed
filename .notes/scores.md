@@ -13,7 +13,7 @@ Rate each feature on:
 | ap_mock_llm | 3 | 2 | Works but no fluent API as documented | 2026-04-05 |
 | ap_mock_tool | 4 | 4 | Schema validation + assertions nice | 2026-04-05 |
 | ap_fault fluent API | 5 | 4 | Complete fluent builder (all fault types), inspection API, async variant; naming inconsistency on returns_empty/returns_malformed (F-007) | 2026-04-05 |
-| ap_fault mock integration | 2 | 2 | Still requires manual check_tool()/check_llm() guards in agent code; not wired into MockTool/MockLLM (F-004) | 2026-04-05 |
+| ap_fault mock integration | 5 | 4 | F-004 FIXED: attach_faults() wires FaultInjector into MockTool/MockLLM; ap_fault fixture added; second attach silently overwrites (F-079); was_triggered DX trap (F-078) | 2026-04-06 |
 | checkagent.yml config | 5 | 5 | Auto-discovered, sensible defaults | 2026-04-05 |
 | assert_tool_called (top-level) | 5 | 5 | Returns ToolCall, kwargs match, StructuredAssertionError on miss | 2026-04-05 |
 | assert_output_schema | 5 | 5 | Pydantic validation, field-level errors, handles JSON strings | 2026-04-05 |

@@ -1238,3 +1238,47 @@ Latest commit message: "Update roadmap: mark multi-judge consensus as complete"
 - Check if F-038 (AgentRun string input), F-042 (block_unmatched=False) are ever fixed
 - Test `handoff_chain()` cycle detection if it gets added
 - Explore the `top_blamed_agent` return type more carefully — it returns `BlameResult` not `str`, which could surprise users (similar to F-029 ambiguity)
+
+---
+
+## Session 027 — 2026-04-06
+
+**What I did:**
+- Upgraded checkagent from git main
+- Checked upstream CI (3 consecutive successes — still stable)
+- Ran full test suite: 1052/1052 passing before new tests
+- Investigated the major new commit: "Wire FaultInjector into MockTool and MockLLM via attach_faults()"
+- Wrote 21 new session-027 tests; total now 1073
+
+**CI status:** Green — 3 consecutive successes. The latest commit "Add Milestone 8 (docs site) and Milestone 9 (launch) to roadmap" suggests the project is approaching launch. Stability is holding.
+
+**F-004 FIXED — the big one.** This was the longest-standing finding (open since session-004): FaultInjector not integrated with MockTool/MockLLM. The fix introduces `attach_faults(injector)` on both MockTool and MockLLM. Once attached, faults fire automatically on every `call()`/`call_sync()`/`complete()`/`complete_sync()` call. No more manual `check_tool()`/`check_llm()` guards.
+
+**New `ap_fault` fixture added.** It was listed in the plugin namespace but not present before. Now it yields a fresh `FaultInjector` instance per test — clean, idiomatic, and what you'd expect. The typical workflow is now:
+
+```python
+def test_resilience(ap_fault, ap_mock_tool):
+    ap_fault.on_tool("search").timeout()
+    ap_mock_tool.register("search", response={}, schema={...})
+    ap_mock_tool.attach_faults(ap_fault)
+    # run agent — fault fires automatically
+```
+
+**`attach_faults()` returns `self` for chaining.** Builder pattern works end-to-end.
+
+**F-016 still applies.** Even via `attach_faults`, the slow fault raises `ToolSlowError` in sync paths instead of sleeping. The error message now says "use async for real delay" which is clearer. But if you use `await tool.call("slow", {})`, the 50ms delay is real and correct.
+
+**Two new DX findings:**
+
+**F-078 (low): `was_triggered` is a method, not a property.** `if fi.was_triggered:` is always `True` because you're checking the bound method object. Must call `fi.was_triggered()`. Easy trap in test assertions: `assert not ap_fault.was_triggered` would always fail.
+
+**F-079 (low): `attach_faults()` second call silently overwrites the first.** Calling `attach_faults(fi2)` after `attach_faults(fi1)` replaces fi1 entirely. Not additive. Can silently discard fixture-level faults when test body attaches a second injector. No warning.
+
+**Score update:** `ap_fault mock integration` raised from 2/2 → 5/4. F-004 fix is a genuine improvement. The 4 on DX reflects the `was_triggered` method trap (F-078) and the overwrite behavior (F-079).
+
+**What I want to try next session:**
+- Check if F-073 (get_children takes run_id not agent_id) gets fixed — it's been open since session-025 with a helpful warning added in session-025
+- Check if F-078/F-079 get addressed (low priority but the was_triggered one could surprise users)
+- Explore the docs site referenced in Milestone 8 if it goes live
+- Try a full end-to-end scenario that uses attach_faults in a realistic multi-step agent test
+- Investigate if there's any progress on F-016 (slow sync raises) — with attach_faults now wiring things in, this issue becomes more visible to users
