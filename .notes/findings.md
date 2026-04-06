@@ -807,3 +807,64 @@ Format:
 **Actual:** `from checkagent import JsonFileImporter` → `ImportError`. `from checkagent import generate_test_cases` → `ImportError`. `'trace_import' in dir(checkagent)` → `False`.
 **Workaround:** `from checkagent.trace_import import JsonFileImporter, OtelJsonImporter, PiiScrubber, generate_test_cases`
 **Status:** Open
+
+---
+
+## F-068: `checkagent.multiagent` module not exported from top-level `checkagent`
+**Date:** 2026-04-06
+**Severity:** medium
+**Category:** dx-friction
+**Description:** All multiagent types (`MultiAgentTrace`, `Handoff`, `BlameStrategy`, `BlameResult`, `assign_blame`, `assign_blame_ensemble`, `top_blamed_agent`) are accessible from `checkagent.multiagent` but none appear in the top-level `checkagent` namespace. `multiagent` is also not listed in `dir(checkagent)`. This is the twelfth instance of the same missing-top-level-export pattern.
+**Expected:** Core multiagent types exported at top-level alongside `AgentRun`, `MockLLM`, etc., or at minimum `multiagent` accessible via `checkagent.multiagent` from `dir(checkagent)`.
+**Actual:** `from checkagent import MultiAgentTrace` → `ImportError`. `from checkagent import assign_blame` → `ImportError`. `'multiagent' in dir(checkagent)` → `False`.
+**Workaround:** `from checkagent.multiagent import MultiAgentTrace, Handoff, BlameStrategy, assign_blame, assign_blame_ensemble, top_blamed_agent`
+**Status:** Open
+
+---
+
+## F-069: `LEAF_ERRORS` blame strategy has inverted leaf detection logic
+**Date:** 2026-04-06
+**Severity:** high
+**Category:** bug
+**Description:** `assign_blame(trace, BlameStrategy.LEAF_ERRORS)` is supposed to blame leaf agents — those with no outgoing handoffs — that errored. The root cause of a multi-agent failure is almost always a leaf agent. Instead, it blames agents that DO have outgoing handoffs (non-leaves). In a chain A → B where B has the actual error, `LEAF_ERRORS` blames A (the orchestrator with a child) and says "Leaf agent error (no children): [error]" — even though A clearly has a child (B) in the handoffs list.
+**Expected:** `LEAF_ERRORS` should blame agent B (no outgoing handoffs → leaf) in an A → B chain.
+**Actual:** `LEAF_ERRORS` blames agent A (has outgoing handoff to B → not a leaf). The "no children" message in the reason is factually wrong.
+**Workaround:** Don't use `LEAF_ERRORS` strategy for actual leaf identification. Use `LAST_AGENT` or `FIRST_ERROR` as more reliable alternatives. Verify blame attribution manually in complex topologies.
+**Status:** Open
+
+---
+
+## F-070: `assign_blame` returns `None` silently when `AgentRun.agent_id` is not set
+**Date:** 2026-04-06
+**Severity:** medium
+**Category:** dx-friction
+**Description:** If an `AgentRun` has no `agent_id` (it defaults to `None`), `assign_blame` returns `None` even when the run clearly has an error. `assign_blame_ensemble` returns an empty list. `top_blamed_agent` returns `None`. There is no warning or error — the failure attribution silently evaporates.
+**Expected:** Either raise `ValueError` ("AgentRun in trace has no agent_id — blame attribution requires agent IDs"), or use `run_id` as a fallback identifier, or at minimum emit a warning.
+**Actual:** `AgentRun(input=..., error="fail")` without `agent_id` → `assign_blame(trace)` → `None`. Users who forget to set `agent_id` get no blame results and no diagnostic.
+**Workaround:** Always set `agent_id` on every `AgentRun` that participates in a `MultiAgentTrace`: `AgentRun(..., agent_id='my-agent')`.
+**Status:** Open
+
+---
+
+## F-071: `HandoffType` not importable from `checkagent.multiagent`
+**Date:** 2026-04-06
+**Severity:** low
+**Category:** dx-friction
+**Description:** `HandoffType` (the enum for `Handoff.handoff_type` with values `delegation`, `relay`, `broadcast`) is not in `checkagent.multiagent.__all__` and cannot be imported from `checkagent.multiagent`. To create a `Handoff` with a non-default type, users must reach into the internal submodule: `from checkagent.multiagent.trace import HandoffType`.
+**Expected:** `HandoffType` exported from `checkagent.multiagent` alongside `Handoff`, since it's the type of `Handoff.handoff_type` and needed to set non-default values.
+**Actual:** `from checkagent.multiagent import HandoffType` → `ImportError`. Must use `from checkagent.multiagent.trace import HandoffType`.
+**Workaround:** `from checkagent.multiagent.trace import HandoffType`
+**Status:** Open
+
+---
+
+## F-072: `MultiAgentTrace` accepts handoff `agent_id`s that don't exist in any run
+**Date:** 2026-04-06
+**Severity:** low
+**Category:** dx-friction
+**Description:** `MultiAgentTrace` does not validate that handoff `from_agent_id` and `to_agent_id` values correspond to `agent_id`s of actual runs in the trace. You can construct a trace with handoffs referencing completely fictional agent IDs and get no error or warning. This makes it easy to silently build structurally invalid traces (e.g., via typos in agent IDs) that produce incorrect blame attribution.
+**Expected:** Either `ValidationError` when a handoff references an agent ID not in the runs list, or a `validate()` method that checks referential integrity.
+**Actual:** `MultiAgentTrace(runs=[run_with_id_A], handoffs=[Handoff(from_agent_id='typo-ghost', to_agent_id='also-ghost')])` → no error. Blame attribution proceeds with a broken handoff graph.
+**Workaround:** Manually verify handoff agent IDs match the `agent_id` of your `AgentRun` objects. Use string constants rather than inline strings to avoid typos.
+**Status:** Open
+**Status:** Open

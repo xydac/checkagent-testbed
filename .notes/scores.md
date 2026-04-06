@@ -174,3 +174,16 @@ Rate each feature on:
 | PiiScrubber | 5 | 5 | Deterministic replacements; 5 built-in patterns (email/phone/SSN/CC/IP); extra_patterns; scrub_value for nested dicts/lists; reset() works correctly | 2026-04-06 |
 | generate_test_cases | 3 | 3 | Works correctly for distinct queries; PII ID collision crashes with raw ValidationError (F-066) — common real-world scenario; not at top-level (F-067) | 2026-04-06 |
 | trace_import top-level exports | N/A | 1 | Eleventh instance of missing-top-level-export pattern (F-067) | 2026-04-06 |
+| checkagent.multiagent (overall) | 3 | 3 | New multi-agent trace + blame attribution module. Core logic works for most strategies; LEAF_ERRORS bug (F-069) makes the most useful strategy unreliable; agent_id silent failure (F-070); not at top-level (F-068) | 2026-04-06 |
+| MultiAgentTrace construction | 5 | 4 | Clean Pydantic model; runs + handoffs + trace_id; defaults to empty lists; no handoff agent_id validation (F-072) | 2026-04-06 |
+| Handoff model | 5 | 4 | All HandoffType values work (delegation/relay/broadcast); optional metadata (latency_ms, input_summary, from/to run_id); HandoffType not in multiagent namespace (F-071) | 2026-04-06 |
+| assign_blame FIRST_ERROR | 5 | 4 | Correctly blames first errored run in list; confidence=0.8; reason includes error message; returns None when no errors | 2026-04-06 |
+| assign_blame LAST_AGENT | 5 | 4 | Correctly blames last errored run in list; confidence=0.6; works symmetrically with FIRST_ERROR | 2026-04-06 |
+| assign_blame MOST_STEPS | 4 | 3 | Correct when steps differ; returns first alphabetically when tied at 0 steps; reports step count in reason | 2026-04-06 |
+| assign_blame HIGHEST_COST | 4 | 3 | Correct when total_prompt_tokens+total_completion_tokens set; returns None without token data (expected but undocumented); uses new split token fields | 2026-04-06 |
+| assign_blame LEAF_ERRORS | 1 | 1 | Inverted logic: blames agents WITH children instead of leaf agents (F-069). Fundamental bug in the strategy most useful for root cause attribution | 2026-04-06 |
+| assign_blame_ensemble | 4 | 4 | Runs all (or custom) strategies; skips None results; returns list of BlameResult; custom strategies list works | 2026-04-06 |
+| top_blamed_agent | 4 | 4 | Returns most-blamed agent across strategies; reason shows "N/M strategies"; tie breaks in favor of first alphabetically; returns None cleanly on empty/no-error trace | 2026-04-06 |
+| BlameResult model | 5 | 4 | agent_id, agent_name, strategy, confidence (0-1), reason, run_id all correct; confidence respects [0,1] bounds per strategy | 2026-04-06 |
+| multiagent top-level exports | N/A | 1 | Twelfth instance of missing-top-level-export pattern (F-068); HandoffType also missing from submodule namespace (F-071) | 2026-04-06 |
+| upstream CI (session-024) | 5 | 5 | Green for 3 consecutive runs including new "mark multi-agent trace and credit assignment as complete". Stable | 2026-04-06 |

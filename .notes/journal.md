@@ -1080,3 +1080,59 @@ Latest commit message: "Update roadmap: mark multi-judge consensus as complete"
 - The CLI has the right shape: auto-detection, good option names, helpful error messages (except for the ID collision case)
 - `OtelJsonImporter` correctly handles the OTLP JSON format including the attribute array structure (`[{key: "k", value: {stringValue: "v"}}]`)
 - `generate_test_cases` correctly uses `AgentRun.tool_calls` (which is a computed property flattening steps) — that was a pleasant surprise
+
+---
+
+## Session 024 — 2026-04-06
+
+**Upgraded from:** "mark production trace import as complete" → "mark multi-agent trace and credit assignment as complete"
+
+**What I tried:**
+- Upgraded checkagent from git main
+- Checked upstream CI — **passing** for last 3 runs. Stable for fourth consecutive session.
+- Re-ran all 954 previous tests — all pass, no regressions
+- Explored the new `checkagent.multiagent` module (new in this release)
+- Tested `MultiAgentTrace`, `Handoff`, `BlameStrategy`, `assign_blame`, `assign_blame_ensemble`, `top_blamed_agent`
+- Checked previous findings F-038, F-042, F-061, F-062, F-066 — all still open
+- Wrote 37 new tests; total now 991
+
+**What I found:**
+
+**CI green.** The upstream "mark multi-agent trace and credit assignment as complete" run passes, along with the two previous runs. Stable.
+
+**New feature: `checkagent.multiagent`.** A multi-agent trace model with blame/credit attribution. The concept is clear: when a pipeline of agents fails, who's responsible? The module provides structured answers. Four main components:
+
+1. **`MultiAgentTrace`** — container with `runs` (list of AgentRun), `handoffs` (list of Handoff), `trace_id`. Handoffs have types (`delegation`, `relay`, `broadcast`) and optional metadata (latency_ms, input_summary, from/to run_id). Clean Pydantic model.
+
+2. **`BlameStrategy`** — 5 strategies: `FIRST_ERROR` (first run in list with error), `LAST_AGENT` (last run with error), `MOST_STEPS` (failed run with most steps), `HIGHEST_COST` (failed run with most tokens), `LEAF_ERRORS` (intended: leaf agents with no children that errored). Good conceptual coverage.
+
+3. **`assign_blame`** — returns a single `BlameResult` (agent_id, strategy, confidence, reason) for a given strategy. Returns `None` when no errors or when the strategy is inapplicable.
+
+4. **`assign_blame_ensemble`** and **`top_blamed_agent`** — run all (or custom) strategies, aggregate, return the agent blamed by most. `top_blamed_agent` provides a consensus result with "Blamed by N/M strategies" in the reason.
+
+**What works well:**
+- `FIRST_ERROR`, `LAST_AGENT`, `HIGHEST_COST`, `MOST_STEPS` all behave correctly
+- `assign_blame_ensemble` cleanly skips None results (e.g. HIGHEST_COST without tokens)
+- `BlameResult.confidence` stays in [0,1] range — different strategies assign appropriate confidence values (FIRST_ERROR=0.8, LAST_AGENT=0.6, LEAF_ERRORS=0.85, etc.)
+- `top_blamed_agent` aggregation is sound — counts votes correctly, returns sensible consensus
+
+**F-069 (new, high, bug): `LEAF_ERRORS` has inverted leaf detection.** The critical strategy for distributed system debugging is broken. `LEAF_ERRORS` is supposed to find agents at the "bottom" of the delegation tree (no outgoing handoffs) that errored — these are typically where root causes live. But in an A → B chain where B errors, it blames A ("Leaf agent error (no children)") even though A is clearly not a leaf. It looks like the leaf detection checks `to_agent_id` (incoming edges) instead of `from_agent_id` (outgoing edges). This makes `LEAF_ERRORS` the opposite of what it claims. In the canonical use case — orchestrator delegates to a worker that fails — it always blames the orchestrator.
+
+**F-070 (new, medium, dx-friction): `assign_blame` silently returns None when `agent_id` is missing.** If you create `AgentRun(input=..., error="fail")` without setting `agent_id`, all blame attribution returns None or empty. No warning, no error. Common mistake since `agent_id` is an optional field with default None. Users who build multi-agent tests without agent IDs will see no blame results and no hint why.
+
+**F-071 (new, low, dx-friction): `HandoffType` missing from `checkagent.multiagent` namespace.** To create a `Handoff` with a non-default type (relay or broadcast), you need `from checkagent.multiagent.trace import HandoffType`. Not in `__all__`. Thirteenth instance of the "type you need isn't where you'd expect it" pattern.
+
+**F-072 (new, low, dx-friction): `MultiAgentTrace` doesn't validate handoff agent IDs.** You can reference nonexistent agent IDs in handoffs without any error. Typos in agent IDs produce silently broken handoff graphs that yield wrong blame attribution with no diagnostic.
+
+**Carryover findings still open:** F-038 (AgentRun string input), F-042 (block_unmatched=False), F-061 (agents/ naming conflict), F-062 (AnthropicAdapter.final_output), F-066 (PII ID collision). None addressed.
+
+**Observation on the module architecture:** The multiagent module is the 12th new module that isn't exported from the top-level `checkagent` namespace (F-068). At this point it's clearly a deliberate architectural choice — but there's still no mechanism for users to opt into a "full import" that includes all submodules. The result is that every session I'm discovering internal paths I have to document. A single `checkagent.full` or `checkagent[all]` namespace would solve this once.
+
+**Next time I want to try:**
+- Check if F-069 (LEAF_ERRORS) is fixed — this is a significant enough bug that it might be addressed quickly
+- Check if F-070 (agent_id silent failure) gets a warning or fallback
+- Check if F-038 (AgentRun string input) is fixed — open since session-015
+- Check if F-042 (block_unmatched=False) is fixed — open since session-017
+- Try building a realistic test with `top_blamed_agent` across a complex agent graph (3+ levels)
+- Explore whether `MultiAgentTrace` has any serialization/deserialization support (save/load)
+- Try using `parent_run_id` on `AgentRun` to see if it integrates with handoff topology
