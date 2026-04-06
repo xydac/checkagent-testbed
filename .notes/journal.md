@@ -883,3 +883,51 @@ Latest commit message: "Update roadmap: mark rubric evaluation and statistical v
 - Check if F-038 (AgentRun string input coercion) is fixed
 - Check if F-050/F-051 get error wrapping in judge module
 - Test subclassing `Judge` ABC to write a custom judge
+
+---
+
+## Session 020 — 2026-04-06
+
+**Upgraded from:** c03b11f → d88d3e7
+
+Latest commit message: "Update roadmap: mark multi-judge consensus as complete"
+
+**What I tried:**
+- Upgraded checkagent from git main (c03b11f → d88d3e7)
+- Checked upstream CI — **still green** for second consecutive session. Stable.
+- Re-ran all 797 previous tests — 2 failures, both "good failures" indicating fixed bugs:
+  - `test_f049_no_ap_judge_fixture` failed because `ap_judge` now exists (F-049 partially fixed)
+  - `test_migrate_cassettes_not_in_cli` failed because the command now exists (stale test from session-016)
+- Updated both stale tests to reflect reality; all 823 tests now pass
+- Explored new `multi_judge_evaluate` + `ConsensusVerdict` APIs (the session's main new feature)
+- Wrote 24 new tests; total now 823
+
+**What I found:**
+
+**CI still green.** Second consecutive passing session. The pattern of "massive regression, then fix" seems to have stabilized.
+
+**F-049 partially fixed.** `ap_judge` factory fixture now exists. It takes `(rubric, llm, model_name='')` and returns a `RubricJudge`. This reduces boilerplate: users no longer need to manually instantiate `RubricJudge` in every test. However, the fixture is still a thin factory — it provides no MockLLM bridge. Users must still write their own async `(system, user) -> str` callable that returns rubric-format JSON (`{"scores": [{"criterion": ..., "value": ..., "reasoning": ...}], "overall_reasoning": ...}`).
+
+**New feature: multi-judge consensus.** `multi_judge_evaluate(judges, run, ...)` runs multiple judges and aggregates via majority vote. Core functionality is solid:
+- Requires ≥ 2 judges (raises ValueError otherwise)
+- Majority vote logic correct (2 PASS + 1 FAIL → PASS)
+- INCONCLUSIVE propagated when pass rate falls in the ambiguous band across multiple trials
+- `concurrent=True` (default) and `concurrent=False` both work
+- `ConsensusVerdict` has `verdict`, `judge_verdicts`, `agreement_rate`, `has_disagreement`, `reasoning` — all fields work
+- `reasoning` field populated with a human-readable summary (e.g. "Consensus: pass from 3 judges. Agreement: 100%.")
+- Tie-breaking (1 PASS + 1 FAIL) defaults to PASS — undocumented behavior
+
+**F-052 (new, high): judge_verdicts key collision.** `multi_judge_evaluate` keys `judge_verdicts` by `f'rubric_judge:{rubric.name}'` — not by `model_name`. In the canonical use case (same rubric, different LLM backends), all judges share the same rubric name → only 1 entry survives in `judge_verdicts`. The verdict math is correct (uses an internal list), but the user-facing dict loses all per-judge traceability. To surface all judges in `judge_verdicts`, you must use distinct rubric names — an ugly workaround that defeats the purpose of a shared rubric.
+
+**F-053 (new, medium): ConsensusVerdict/multi_judge_evaluate not at top-level.** Sixth instance of the same pattern. At this point it feels like a deliberate architectural choice — but it still forces users to memorize submodule paths.
+
+**Interesting edge: JSON response format.** The judge LLM callable must return `{"scores": [...], "overall_reasoning": "..."}` — not `{"criteria": [...]}`. This format is different from what you'd guess from the `Criterion` model's field names. The session-019 `make_llm` helper captures this correctly, but it's not obvious from the public API.
+
+**Next time I want to try:**
+- Check if F-052 (judge_verdicts key collision) is fixed — use model_name as key instead of rubric name
+- Check if F-042 (block_unmatched=False) is fixed
+- Check if F-045 (migrate-cassettes v0) is implemented
+- Check if F-038 (AgentRun string input coercion) is fixed
+- Check if F-050/F-051 get error wrapping in judge module
+- Try subclassing `Judge` ABC to write a custom judge and register it
+- Check if the `ap_cassette` fixture is added for record/replay workflow

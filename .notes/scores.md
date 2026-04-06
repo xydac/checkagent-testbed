@@ -144,3 +144,9 @@ Rate each feature on:
 | Rubric / Criterion | 5 | 5 | Validation correct (empty criteria raises); get_criterion works; all 3 scale types (numeric/binary/categorical) normalize correctly | 2026-04-06 |
 | JudgeScore / JudgeVerdict | 5 | 5 | score_for() lookup/miss; passed property; num_trials; reasoning summary; Verdict str enum values | 2026-04-06 |
 | judge pytest integration | 1 | 1 | No ap_judge fixture; MockLLM incompatible with RubricJudge(llm=) signature; users must write all glue code (F-049) | 2026-04-06 |
+| upstream CI (session-020) | 5 | 5 | Still green — "mark multi-judge consensus as complete" passing. Stable for second consecutive session | 2026-04-06 |
+| ap_judge fixture | 4 | 4 | F-049 partially fixed: factory fixture now exists, accepts (rubric, llm, model_name); reduces boilerplate; MockLLM still can't plug in directly | 2026-04-06 |
+| judge pytest integration (session-020) | 2 | 2 | ap_judge fixture added (improvement) but no MockLLM bridge — still requires custom async callable + rubric-format JSON in every test (F-049 partial) | 2026-04-06 |
+| multi_judge_evaluate | 3 | 3 | Core consensus logic correct: majority vote, PASS/FAIL/INCONCLUSIVE, concurrent=True/False, < 2 judges raises; judge_verdicts key collision when rubric names match (F-052, canonical use case!) | 2026-04-06 |
+| ConsensusVerdict | 4 | 3 | Fields: verdict, judge_verdicts, agreement_rate, has_disagreement, reasoning — all correct; judge_verdicts loses entries on key collision (F-052); not at top-level checkagent (F-053) | 2026-04-06 |
+| multi_judge_evaluate tie-breaking | 3 | 2 | 1 PASS + 1 FAIL → PASS (undocumented PASS bias for ties); agreement_rate=0.5; has_disagreement=True | 2026-04-06 |

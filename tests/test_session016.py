@@ -572,8 +572,10 @@ class TestF039MigrateCassettesCommandMissing:
             warning_msg = str(w[0].message)
             assert "migrate-cassettes" in warning_msg
 
-    def test_migrate_cassettes_not_in_cli(self):
-        """checkagent CLI does not have a migrate-cassettes command."""
+    def test_migrate_cassettes_in_cli(self):
+        """F-039 partially fixed: migrate-cassettes command now exists in checkagent CLI.
+        (v0->v1 migration still unimplemented — see F-045)
+        """
         import subprocess
 
         result = subprocess.run(
@@ -581,7 +583,9 @@ class TestF039MigrateCassettesCommandMissing:
             capture_output=True,
             text=True,
         )
-        assert "migrate-cassettes" not in result.stdout
+        assert "migrate-cassettes" in result.stdout, (
+            "migrate-cassettes command not found in CLI. Was it removed?"
+        )
 
 
 class TestF040CheckagentVersionNotPopulated:

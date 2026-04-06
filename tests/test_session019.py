@@ -68,12 +68,13 @@ def test_f048_judge_not_at_top_level():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.agent_test(layer="judge")
-def test_f049_no_ap_judge_fixture(request):
-    """No ap_judge or ap_rubric_judge fixture registered by the checkagent plugin."""
+def test_f049_ap_judge_fixture_added(request):
+    """F-049 fixed in d88d3e7: ap_judge fixture is now registered by checkagent plugin."""
     fixture_names = request.session._fixturemanager._arg2fixturedefs.keys()
-    # Check specifically for checkagent-style ap_* judge fixtures (not test class names)
     ap_judge_fixtures = [f for f in fixture_names if f in ("ap_judge", "ap_rubric_judge")]
-    assert ap_judge_fixtures == [], f"Unexpected ap_judge fixtures: {ap_judge_fixtures}"
+    assert "ap_judge" in ap_judge_fixtures, (
+        f"ap_judge fixture still not registered. F-049 not yet fixed."
+    )
 
 
 # ---------------------------------------------------------------------------

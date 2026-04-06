@@ -577,7 +577,7 @@ Format:
 **Expected:** An `ap_rubric_judge` fixture (or factory fixture) that creates a `RubricJudge` with a configurable rubric and a mock LLM backend, similar to how `ap_mock_llm` provides a configured `MockLLM`.
 **Actual:** No judge fixtures. `MockLLM` cannot be passed directly to `RubricJudge(llm=...)` since it doesn't have the `(system, user) -> str` signature. Users must write glue code in every test file.
 **Workaround:** Define a local async callable `mock_llm(system, user)` in each test, returning JSON matching the rubric structure.
-**Status:** Open
+**Status:** Partially fixed in d88d3e7 — `ap_judge` factory fixture now exists at `checkagent/core/plugin.py:195`. It accepts `(rubric, llm, model_name='')` and returns a `RubricJudge`. Reduces boilerplate. `MockLLM` still cannot be passed directly — users must still write their own async `(system, user) -> str` callable returning rubric-format JSON.
 
 ---
 
@@ -601,4 +601,28 @@ Format:
 **Expected:** Either a warning when criterion names don't match, or a `JudgeError` with details on what criterion names were expected vs received. Silent 0.0 is always a bug.
 **Actual:** `judge.evaluate(run)` when LLM returns wrong criterion names → `JudgeScore(overall=0.0, criterion_scores=[])`. No exception, no warning. Downstream `compute_verdict` will always return FAIL for this judge.
 **Workaround:** After calling `judge.evaluate()`, check `len(score.criterion_scores) == len(rubric.criteria)` to detect silent drops.
+**Status:** Open
+
+---
+
+## F-052: `multi_judge_evaluate` judge_verdicts uses rubric name as key — collision when judges share rubric
+**Date:** 2026-04-06
+**Severity:** high
+**Category:** bug
+**Description:** `multi_judge_evaluate` stores per-judge verdicts in `ConsensusVerdict.judge_verdicts` keyed by `f'rubric_judge:{rubric.name}'`. In the canonical use case — same rubric evaluated by different LLM backends (GPT-4, Claude, Gemini) — all judges share the same rubric name. Their entries collide and overwrite each other in the dict, leaving only 1 entry regardless of how many judges ran. Users lose all per-judge traceability. The verdict computation itself is correct (uses an internal list), but the exposed `judge_verdicts` dict is misleading.
+**Expected:** `judge_verdicts` keyed by `model_name` (the judge's `model_name` attribute, e.g. `'gpt-4'`, `'claude-3'`) or by a unique combination of rubric+model. With 3 judges, users should see 3 keys.
+**Actual:** `multi_judge_evaluate([judge_gpt4, judge_claude, judge_gemini], run, ...)` where all share `rubric.name='quality'` → `judge_verdicts = {'rubric_judge:quality': <last_judge_verdict>}`. Only 1 key.
+**Workaround:** Give each judge a unique rubric name: `Rubric(name='quality_gpt4')`, `Rubric(name='quality_claude')`, etc. Not ideal since you'd want the same rubric definition.
+**Status:** Open
+
+---
+
+## F-053: `ConsensusVerdict` and `multi_judge_evaluate` not at top-level `checkagent`
+**Date:** 2026-04-06
+**Severity:** medium
+**Category:** dx-friction
+**Description:** The new multi-judge consensus API adds `ConsensusVerdict` and `multi_judge_evaluate` to `checkagent.judge`, but neither appears in the top-level `checkagent` namespace. This is the sixth instance of the same pattern (F-020, F-021, F-026, F-028, F-041, F-048, now F-053). Users who discover `multi_judge_evaluate` in the README must still remember the submodule import path.
+**Expected:** `ConsensusVerdict` and `multi_judge_evaluate` exported from top-level `checkagent` alongside `AgentRun`, `MockLLM`, etc.
+**Actual:** `from checkagent import ConsensusVerdict` → `ImportError`. `from checkagent import multi_judge_evaluate` → `ImportError`. Must use `from checkagent.judge import ConsensusVerdict, multi_judge_evaluate`.
+**Workaround:** `from checkagent.judge import ConsensusVerdict, multi_judge_evaluate`
 **Status:** Open
