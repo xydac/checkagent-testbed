@@ -976,3 +976,54 @@ Latest commit message: "Update roadmap: mark multi-judge consensus as complete"
 - Check if ap_cassette fixture is added
 - Try using LangChainAdapter with a real LangChain chain (LCEL pipeline)
 - Try OpenAIAgentsAdapter once the agents/ naming conflict is resolved
+
+---
+
+## Session 022 — 2026-04-06
+
+**Upgraded from:** 48017850 → latest (commit: "Update roadmap: mark all framework adapters as complete")
+
+**What I tried:**
+- Upgraded checkagent from git main
+- Checked upstream CI — **passing** on all platforms. F-054 fixed.
+- Re-ran all 849 previous tests — all pass, no regressions
+- Explored three new adapters: AnthropicAdapter, CrewAIAdapter, PydanticAIAdapter
+- Explored new checkagent.ci.junit_xml module
+- Checked open findings: F-038, F-042, F-052, F-061 — all still broken
+- Wrote 32 new tests; total now 881
+
+**What I found:**
+
+**F-054 FIXED.** The LangChain adapter now uses `time.perf_counter()` instead of `time.monotonic()`. The upstream CI "mark all framework adapters as complete" run passes on all 12 jobs including Windows Python 3.10/3.11/3.12. This breaks the streak of four consecutive Windows timing failures.
+
+**Three new adapters added.** `AnthropicAdapter`, `CrewAIAdapter`, and `PydanticAIAdapter` all appeared in the latest version. All three follow the same patterns established by the earlier adapters:
+- String input coercion works (all three handle `run("string")`)
+- Error handling works (all three capture exceptions in `AgentRun.error`)
+- All require undeclared deps — `anthropic`, `crewai`, `pydantic-ai` not in `Requires-Dist` and not listed as optional extras (F-064)
+- All absent from top-level `checkagent` namespace (F-063, ninth+ instance)
+
+**F-062 (new, medium): AnthropicAdapter.final_output is the raw message object.** Unlike `CrewAIAdapter` (which correctly sets `final_output=result.raw`, a string) and `PydanticAIAdapter` (which correctly sets `final_output=result.data`), `AnthropicAdapter` sets `final_output=message` — the entire `anthropic.types.Message` object. Users who check `result.final_output == "Paris"` will always get `False`. The extracted text is available at `result.steps[0].output_text`. This is the same class of bug as F-056 (LangChain dict) but worse — an opaque SDK object is less usable than a dict.
+
+**New: checkagent.ci.junit_xml module.** JUnit XML generation is genuinely well implemented:
+- `render_junit_xml([suite])` produces valid XML with correct `testsuites`/`testsuite`/`testcase` structure
+- `from_run_summary(summary, test_details=...)` generates named test cases from RunSummary
+- `from_quality_gate_report(report)` maps gate verdicts to JUnit outcomes (blocked→failure, warned→pass with property, skipped→skipped)
+- `JUnitTestSuite.time_s` correctly aggregates test case times
+- All symbols accessible from `checkagent.ci` namespace (better than F-028 where ci module had broken exports)
+- Not at top-level checkagent (F-065) — lower severity since `checkagent.ci` is the natural home for CI utilities
+
+**Interesting structural point on deps.** There are now 5+ instances of the undeclared-dep pattern (F-008 jsonschema, F-015 dirty-equals, F-055 langchain-core, F-064 anthropic/crewai/pydantic-ai). None are even listed as optional extras. The pattern suggests checkagent intentionally keeps its base install minimal but provides no mechanism for users to install the right extras for their framework.
+
+**F-038, F-042, F-052, F-061 still open.** All four findings from previous sessions remain unaddressed. The `agents/` naming conflict (F-061) is particularly notable since the new adapters all fixed their respective import issues with clear error messages — but OpenAIAgentsAdapter still has the structural package name conflict.
+
+**ap_cassette still missing.** No fixture added for record/replay in this release.
+
+**Next time I want to try:**
+- Check if F-062 (AnthropicAdapter.final_output) is fixed — expect it to match step.output_text
+- Check if F-064 (undeclared deps) is addressed with optional extras
+- Check if F-061 (agents/ conflict) is fixed — maybe they renamed the import or added package conflict detection
+- Check if F-042 (block_unmatched=False) is fixed — has been open since session-017
+- Check if F-038 (AgentRun string input coercion) is fixed
+- Check if ap_cassette fixture is added
+- Try AnthropicAdapter with a real (mocked) streaming response to test run_stream
+- Try CrewAIAdapter with tasks_output to verify step extraction from CrewAI result

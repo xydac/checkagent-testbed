@@ -714,6 +714,7 @@ Format:
 ---
 
 ## F-061: `OpenAIAgentsAdapter` imports `from agents import Runner` — conflicts with common `agents/` directory
+
 **Date:** 2026-04-06
 **Severity:** high
 **Category:** bug
@@ -721,4 +722,64 @@ Format:
 **Expected:** Either the openai-agents SDK should be imported with its canonical package name (`openai_agents`), or the adapter should catch the import error and return it in `result.error` with a helpful message about the name conflict.
 **Actual:** `OpenAIAgentsAdapter(agent).run('test')` → `ImportError: cannot import name 'Runner' from 'agents' (/path/to/agents/__init__.py)`.
 **Workaround:** Rename your local `agents/` directory to avoid shadowing the `agents` package, or avoid `OpenAIAgentsAdapter` entirely until the import is fixed.
+**Status:** Open
+
+---
+
+## F-054: Upstream CI failing — LangChain adapter `duration_ms == 0.0` on Windows (fourth occurrence)
+**Date:** 2026-04-06
+**Severity:** high
+**Category:** bug
+**Description:** Upgrading to 48017850 ("mark LangChain and OpenAI adapters as complete") broke CI again. `tests/adapters/test_langchain.py::TestLangChainAdapterRun::test_error_handling` asserts `result.duration_ms > 0` but gets `0.0` on Windows Python 3.10, 3.11, and 3.12. Python 3.13 on Windows passes (it uses `time.perf_counter()` with higher resolution). This is the fourth consecutive Windows timing regression.
+**Expected:** Adapter tests should use a sleep/sleep-like operation safely above Windows `time.monotonic()` resolution (~15ms), or use `>= 0` instead of `> 0`.
+**Actual:** `test_error_handling` calls a chain that raises `ValueError('bad input')` immediately — no sleep — so `duration_ms` is `0.0` on Windows. The assertion `assert result.duration_ms > 0` fails.
+**Workaround:** None for users. CI only passes on Linux/macOS and Python 3.13 Windows.
+**Status:** Fixed in session-022 — "mark all framework adapters as complete" CI run passes on all platforms including Windows Python 3.10/3.11/3.12. LangChain adapter switched to `time.perf_counter()`.
+
+---
+
+## F-062: `AnthropicAdapter.final_output` is the raw message object — not the extracted text string
+**Date:** 2026-04-06
+**Severity:** medium
+**Category:** dx-friction
+**Description:** `AnthropicAdapter.run()` sets `final_output=message` where `message` is the raw `anthropic.types.Message` object. The adapter correctly extracts text into `step.output_text`, but leaves `final_output` as the entire message object. This means `result.final_output == "Paris"` is `False` even when the LLM responded "Paris" — users must do `result.steps[0].output_text`. Same pattern as F-056 (LangChain returning a dict as final_output), but arguably worse since it's an opaque SDK object.
+**Expected:** `final_output` should be the extracted text string (same as `step.output_text`), or at minimum the `.text` content joined from message blocks.
+**Actual:** `result.final_output` is an `anthropic.types.Message` object. `result.final_output == "some text"` is always `False`. `result.steps[0].output_text` is the string.
+**Workaround:** Use `result.steps[0].output_text` for the text response. Do not use `result.final_output` as a string.
+**Status:** Open
+
+---
+
+## F-063: `AnthropicAdapter`, `CrewAIAdapter`, `PydanticAIAdapter` not at top-level `checkagent`
+**Date:** 2026-04-06
+**Severity:** medium
+**Category:** dx-friction
+**Description:** All three new framework adapters are importable only from their submodule paths. None appear in the top-level `checkagent` namespace. This is the ninth+ instance of the same pattern (F-020, F-021, F-026, F-028, F-041, F-048, F-053, F-057, F-063). Every new module follows the same pattern — top-level adapter exports have simply never been done.
+**Expected:** `AnthropicAdapter`, `CrewAIAdapter`, `PydanticAIAdapter` (and `LangChainAdapter`, `OpenAIAgentsAdapter`) all exported from top-level `checkagent`.
+**Actual:** `from checkagent import AnthropicAdapter` → `ImportError`. Same for CrewAI and PydanticAI adapters.
+**Workaround:** Use submodule imports: `from checkagent.adapters.anthropic import AnthropicAdapter`, etc.
+**Status:** Open
+
+---
+
+## F-064: `anthropic`, `crewai`, `pydantic-ai` are undeclared package dependencies
+**Date:** 2026-04-06
+**Severity:** high
+**Category:** bug
+**Description:** All three new adapters require external packages not declared in checkagent's `Requires-Dist`. `AnthropicAdapter` needs `anthropic`, `CrewAIAdapter` needs `crewai`, `PydanticAIAdapter` needs `pydantic-ai`. On a fresh `pip install checkagent`, none are installed. Each raises `ImportError` at adapter instantiation time with a helpful error message. However, none are listed as optional extras — there is no `checkagent[anthropic]`, `checkagent[crewai]`, or `checkagent[pydantic-ai]`. Fifth time this pattern appears (F-008, F-015, F-055, now F-064).
+**Expected:** Each adapter's required package listed as an optional extra so users can `pip install checkagent[anthropic]` etc.
+**Actual:** No extras declared. Users must manually discover and install each dep.
+**Workaround:** `pip install anthropic` / `pip install crewai` / `pip install pydantic-ai` before using the respective adapters.
+**Status:** Open
+
+---
+
+## F-065: `checkagent.ci.junit_xml` classes not exported from top-level `checkagent`
+**Date:** 2026-04-06
+**Severity:** low
+**Category:** dx-friction
+**Description:** The new `checkagent.ci.junit_xml` module adds `render_junit_xml`, `from_run_summary`, `from_quality_gate_report`, `JUnitTestSuite`, `JUnitTestCase`, `JUnitProperty`. These ARE accessible from `checkagent.ci` (better than some previous modules), but not from top-level `checkagent`. Tenth+ instance of the missing-top-level-export pattern. Lower severity since `checkagent.ci` is a reasonable namespace for CI utilities.
+**Expected:** `render_junit_xml`, `from_run_summary`, `from_quality_gate_report` exported from top-level or prominently documented under `checkagent.ci`.
+**Actual:** `from checkagent import render_junit_xml` → `ImportError`. `from checkagent.ci import render_junit_xml` works correctly.
+**Workaround:** `from checkagent.ci import render_junit_xml, from_run_summary, from_quality_gate_report, JUnitTestSuite, JUnitTestCase`
 **Status:** Open

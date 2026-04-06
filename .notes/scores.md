@@ -157,3 +157,13 @@ Rate each feature on:
 | Custom Judge subclassing | 3 | 2 | Judge ABC works; CriterionScore field names non-intuitive (F-059); no docs on custom judge workflow; JudgeScore has no .passed (F-058) | 2026-04-06 |
 | JudgeScore.passed | 1 | 1 | Doesn't exist — must call compute_verdict() for single-trial pass/fail (F-058) | 2026-04-06 |
 | Criterion default scale for BINARY | 2 | 2 | Defaults to [1,2,3,4,5] regardless of scale_type; BINARY should default to 2-item scale (F-060) | 2026-04-06 |
+| upstream CI (session-022) | 5 | 5 | Green again — "mark all framework adapters as complete" passes all platforms including Windows. F-054 fixed (perf_counter). Stable for third consecutive session | 2026-04-06 |
+| AnthropicAdapter (basic run/error) | 4 | 3 | String input coercion works; error captured in AgentRun.error; duration_ms uses perf_counter; final_output is raw message object not string (F-062); anthropic undeclared dep (F-064) | 2026-04-06 |
+| AnthropicAdapter.final_output | 2 | 2 | Raw Anthropic Message object — not string. Use step.output_text for text. Same pattern as F-056 but worse (opaque SDK object) | 2026-04-06 |
+| CrewAIAdapter (basic run/error) | 4 | 3 | String input coercion works; final_output=result.raw (string — correct!); error captured; crewai undeclared dep (F-064) | 2026-04-06 |
+| PydanticAIAdapter (basic run/error) | 4 | 3 | String input coercion works; final_output=result.data (correct); error captured; pydantic-ai undeclared dep (F-064) | 2026-04-06 |
+| New adapters top-level exports | N/A | 1 | AnthropicAdapter, CrewAIAdapter, PydanticAIAdapter all absent from top-level checkagent (F-063). Ninth+ instance of pattern | 2026-04-06 |
+| Adapter optional extras | 1 | 1 | anthropic/crewai/pydantic-ai not declared as optional extras — users can't pip install checkagent[anthropic] (F-064) | 2026-04-06 |
+| checkagent.ci.junit_xml (JUnit XML) | 5 | 4 | render_junit_xml, from_run_summary, from_quality_gate_report all work; valid XML output; time_s aggregates correctly; gate verdicts map to failures/skipped correctly; accessible from checkagent.ci (good); not at top-level checkagent (F-065) | 2026-04-06 |
+| JUnit XML from_run_summary | 5 | 4 | Synthetic mode creates generic test cases; test_details mode creates named cases with failure/skip support; integrates with RunSummary counts | 2026-04-06 |
+| JUnit XML from_quality_gate_report | 5 | 5 | Blocked → failure, Warned → pass with property, Skipped → skipped; properties attached (actual/threshold/direction); clean mapping | 2026-04-06 |
