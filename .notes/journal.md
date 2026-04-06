@@ -778,3 +778,59 @@ The CI was previously failing due to F-008 (jsonschema missing dep). Now it's fa
 - Check if F-037 (`check_llm_async`) is fixed
 - Write conftest.py wiring evaluate_gates() into pytest sessionfinish
 - Test what `checkagent.yml` quality_gates field does in the CLI
+
+---
+
+## Session 018 — 2026-04-06
+
+**Upgraded from:** c03b11f → (latest main, same 0.0.1a1 version string)
+
+Latest commit message: "Update roadmap: mark cassette migration tooling as complete"
+
+**What I tried:**
+- Upgraded checkagent from git main
+- Checked upstream CI — 3 consecutive failures, now a new root cause
+- Re-ran all 727 tests — all pass, no regressions
+- Explored new `checkagent migrate-cassettes` CLI command
+- Tested `migrate-cassettes` on v0 cassettes, v1 cassettes, empty dirs, nonexistent dirs, nested dirs
+- Tested `Cassette.save()` and `Cassette.load()` with `str` vs `Path` arguments
+- Verified F-039 partial fix (CLI exists now but migration fails)
+- Filed F-045, F-046, F-047
+- Verified open findings F-037, F-038, F-042 still open
+- Wired evaluate_gates() conftest.py integration pattern and confirmed it works
+- Wrote 38 new tests; total now 765
+
+**What I found:**
+
+**No regressions.** All 727 previous tests still pass. New total: 765.
+
+**New: `checkagent migrate-cassettes` CLI added (F-039 partially resolved).**
+The command now exists in the CLI. `checkagent --help` shows it. `checkagent migrate-cassettes --help` explains usage with `--dry-run` and `--no-backup` flags. Default directory is `cassettes/`. Nonexistent directories get exit code 2 with a clear error message. v1 cassettes are correctly skipped. Recursive directory search works.
+
+**F-045: migrate-cassettes always fails for v0 cassettes.**
+The CLI exists but the actual v0→v1 migration path is not registered. Any v0 cassette produces:
+```
+FAIL /path/to/cassette.json: No migration registered from v0. Cannot upgrade to v1.
+```
+The summary shows `Failed: 1`. But the exit code is still 0 — so `checkagent migrate-cassettes && deploy` silently proceeds despite failures. This is both a missing feature (migration not implemented) and a bug (exit code should be non-zero on failure).
+
+**F-046: Cassette.save() and Cassette.load() require pathlib.Path.**
+Passing a plain string raises `AttributeError` with an unhelpful message that exposes internals (`'str' object has no attribute 'parent'`, `'str' object has no attribute 'read_text'`). Standard Python practice is to accept both `str` and `Path` via `Path(path)` coercion. Neither error message tells the user what to do.
+
+**New CI failure (F-047): TimedCall.duration_ms == 0.0 on Windows.**
+The upstream test `test_timing_is_positive_for_slow_ops` asserts `tc.duration_ms >= 5` but gets `0.0` on Windows Python 3.10. `TimedCall` uses `time.monotonic()`, which has ~15ms resolution on Windows. If the sleep is shorter than ~15ms, the result is 0.0. The fix is to use a longer sleep (100ms+) or `time.perf_counter()`. Third consecutive CI failure, third different root cause:
+- Session 016: F-008 (jsonschema missing dep)
+- Session 017: F-043 (em dash Windows encoding)
+- Session 018: F-047 (TimedCall.duration_ms 0.0 on Windows)
+
+**F-037, F-038, F-042 still open.** `check_llm_async()` still doesn't exist. `AgentRun(input="string")` still raises `ValidationError`. `block_unmatched=False` still has no effect.
+
+**evaluate_gates() conftest.py integration confirmed.** The pattern works: compute metrics → `scores_to_dict()` → `evaluate_gates(scores, {name: QualityGateEntry(min=..., on_fail=...)})` → check `report.passed`. Can be wired into a `pytest_sessionfinish` hook to enforce quality gates on the whole suite. `generate_pr_comment()` accepts the gate report cleanly. One footgun: `evaluate_gates()` takes `dict[str, QualityGateEntry]` not a list — this is inconsistent with other collection APIs in the library.
+
+**Next time I want to try:**
+- Watch for `ap_cassette` fixture implementation
+- Check if `block_unmatched=False` is fixed (F-042)
+- Check if v0→v1 migration is implemented (F-045)
+- Check if Cassette.save/load gets str coercion (F-046)
+- Try writing a real conftest.py with sessionfinish gate enforcement
+- Check if F-038 (AgentRun string input coercion) is fixed

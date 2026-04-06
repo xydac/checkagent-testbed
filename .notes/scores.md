@@ -133,3 +133,7 @@ Rate each feature on:
 | TimedCall | 5 | 4 | Context manager; accurate ms timing; reusable; only one field (duration_ms); minimal but functional | 2026-04-05 |
 | upstream CI (c03b11f) | 1 | 1 | Still red — new failure: Windows encoding error in demo-generated test (byte 0x97 em dash, F-043). Previous root cause F-008 may also still apply | 2026-04-05 |
 | @pytest.mark.cassette (session-017) | 2 | 2 | CassetteRecorder+ReplayEngine exist now but still no pytest fixture — marker still no-op; no ap_cassette, no auto record/replay | 2026-04-05 |
+| checkagent migrate-cassettes CLI | 2 | 2 | Command now exists (F-039 partially resolved) but v0→v1 migration not implemented (F-045); always returns exit code 0 even on failure | 2026-04-06 |
+| migrate-cassettes v0 support | 1 | 1 | "No migration registered from v0" — the only migration needed is unimplemented (F-045) | 2026-04-06 |
+| Cassette.save()/load() path handling | 3 | 2 | Both require pathlib.Path; str raises AttributeError with confusing 'parent'/'read_text' message; no Path coercion (F-046) | 2026-04-06 |
+| upstream CI (session-018) | 1 | 1 | Still red — new failure: TimedCall.duration_ms == 0.0 on Windows for short sleep (F-047). Third consecutive CI failure, third different root cause | 2026-04-06 |

@@ -456,7 +456,7 @@ Format:
 **Expected:** Either implement `checkagent migrate-cassettes`, or change the warning to describe what migration means (e.g., "Re-record your cassettes to update to schema v1").
 **Actual:** `Cassette.load()` → `UserWarning: ... Run 'checkagent migrate-cassettes' to upgrade.` → `checkagent migrate-cassettes` → `Error: No such command 'migrate-cassettes'.`
 **Workaround:** Ignore the warning or manually re-save cassettes. No CLI migration is needed yet (schema v1 is the only version).
-**Status:** Open
+**Status:** Partially fixed in session-018 — `checkagent migrate-cassettes` CLI command now exists and is discoverable. However, the v0→v1 migration itself fails with "No migration registered from v0" (see F-045). The warning message now points to a real command, but following it still doesn't solve the problem.
 
 ---
 
@@ -516,4 +516,41 @@ Format:
 **Expected:** SEQUENCE strategy should at minimum warn when incoming `kind` doesn't match recorded `kind`. Users who want unchecked sequence playback should opt in explicitly.
 **Actual:** `RecordedRequest(kind='tool', method='search')` + recorded `llm` interaction → match succeeds silently.
 **Workaround:** After each `match()`, verify that `matched.request.kind == expected_kind`. Or use EXACT strategy which enforces body matching.
+**Status:** Open
+**Status:** Open
+
+---
+
+## F-045: `migrate-cassettes` v0→v1 migration not implemented — CLI exists but always fails
+**Date:** 2026-04-06
+**Severity:** high
+**Category:** bug
+**Description:** `checkagent migrate-cassettes` CLI was added (resolving F-039), but the actual v0→v1 migration path is not implemented. Running `checkagent migrate-cassettes <dir>` on any v0 cassette fails with "No migration registered from v0. Cannot upgrade to v1." Additionally, the command always returns exit code 0 even when migrations fail, making it useless in CI pipelines (`migrate-cassettes && deploy` will silently proceed despite failures).
+**Expected:** `checkagent migrate-cassettes` should be able to upgrade v0 cassettes to v1 schema. The command should also return non-zero exit code when any cassette fails to migrate.
+**Actual:** `checkagent migrate-cassettes /dir/with/v0/cassettes` → "FAIL: No migration registered from v0. Cannot upgrade to v1." with exit code 0. v1 cassettes are correctly skipped.
+**Workaround:** Re-record cassettes by running agents again — there's no migration path. The v0 cassette warning from `Cassette.load()` now correctly points to the real CLI, but the CLI can't actually perform the migration.
+**Status:** Open
+
+---
+
+## F-046: `Cassette.save()` and `Cassette.load()` require `pathlib.Path` — `str` raises `AttributeError`
+**Date:** 2026-04-06
+**Severity:** medium
+**Category:** dx-friction
+**Description:** Both `Cassette.save(path)` and `Cassette.load(path)` require `pathlib.Path` objects. Passing a plain string raises `AttributeError` with a confusing message: `save("dir/file.json")` raises `AttributeError: 'str' object has no attribute 'parent'`; `load("dir/file.json")` raises `AttributeError: 'str' object has no attribute 'read_text'`. Neither error message hints that the fix is to use `Path("dir/file.json")`.
+**Expected:** Either accept both `str` and `Path` via `os.fspath()` or `Path(path)` coercion (standard Python practice), or raise a `TypeError` with a message like "path must be a pathlib.Path, got str".
+**Actual:** `Cassette.save("/tmp/test.json")` → `AttributeError: 'str' object has no attribute 'parent'`. The error message reveals the implementation detail but doesn't help the user fix it.
+**Workaround:** Always use `pathlib.Path`: `cassette.save(Path("/tmp/test.json"))`, `Cassette.load(Path("/tmp/test.json"))`.
+**Status:** Open
+
+---
+
+## F-047: Upstream CI failing — `TimedCall.duration_ms == 0.0` on Windows for short sleeps
+**Date:** 2026-04-06
+**Severity:** high
+**Category:** bug
+**Description:** Upstream CI is now failing (as of the "mark cassette migration tooling as complete" commit) with a new root cause: `test_timing_is_positive_for_slow_ops` in `tests/replay/test_recorder.py:181` asserts `tc.duration_ms >= 5` but gets `0.0` on Windows Python 3.10. The previous root cause was F-043 (em dash encoding in demo-generated file); this is now the blocking failure. The issue is that `time.monotonic()` on Windows has ~15ms resolution — any sleep shorter than ~15ms returns 0.0. The upstream test uses a sleep below this threshold, which passes on Linux/macOS but fails on Windows.
+**Expected:** Upstream tests should use a sleep duration safely above Windows `time.monotonic()` resolution (100ms is safe) or use `time.perf_counter()` which has higher resolution on Windows.
+**Actual:** `TimedCall` uses `time.monotonic()`. On Windows, short sleeps (< ~15ms) return `duration_ms == 0.0`. The upstream test that asserts `>= 5` fails. Third consecutive CI failure, third different root cause.
+**Workaround:** None for users. CI only passes on Linux/macOS. F-043 (em dash) may or may not also still be present.
 **Status:** Open
