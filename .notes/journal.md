@@ -931,3 +931,48 @@ Latest commit message: "Update roadmap: mark multi-judge consensus as complete"
 - Check if F-050/F-051 get error wrapping in judge module
 - Try subclassing `Judge` ABC to write a custom judge and register it
 - Check if the `ap_cassette` fixture is added for record/replay workflow
+
+---
+
+## Session 021 — 2026-04-06
+
+**Upgraded from:** d88d3e7 → 48017850 (commit: "Update roadmap: mark LangChain and OpenAI adapters as complete")
+
+**What I tried:**
+- Upgraded checkagent from git main
+- Checked upstream CI — **failing** (fourth Windows timing regression, F-054)
+- Re-ran all 823 previous tests — all pass, no regressions
+- Fixed one stale test: `test_migrate_cassettes_in_cli` in test_session016.py was using `.venv/bin/checkagent` (old version without migrate-cassettes) instead of the system `checkagent`; fixed to use PATH
+- Explored new LangChain and OpenAI adapters
+- Tested custom `Judge` ABC subclassing
+- Wrote 26 new tests; total now 849
+
+**What I found:**
+
+**CI failing again (F-054).** Windows Python 3.10/3.11/3.12 fail on `test_error_handling` in the LangChain adapter tests — same `duration_ms == 0.0` issue as F-047. Fourth consecutive CI failure of this pattern. F-047 was fixed by using a longer sleep, but the new LangChain adapter tests have a failing chain (no sleep) so duration is 0ms on Windows.
+
+**LangChain adapter works well — with caveats.** `LangChainAdapter(runnable)` wraps any LangChain Runnable and produces an `AgentRun`. Basic run, error handling, custom `input_key`, and streaming all work. Two issues:
+1. `langchain-core` is not declared as a dependency (F-055) — third time this pattern appears
+2. `final_output` is the raw runnable return value (dict when runnable returns dict), while `step.output_text` extracts the `output` key — inconsistency that surprises users (F-056)
+
+**OpenAI Agents adapter (F-061 — new, high severity).** `OpenAIAgentsAdapter` is in `checkagent.adapters.openai_agents` (not `checkagent.adapters.openai`). It works fine when the `agents` SDK is installed. But the adapter does `from agents import Runner` lazily inside `run()` — this conflicts with any project that has a local `agents/` directory on sys.path. The testbed itself has `agents/` which triggers `ImportError: cannot import name 'Runner' from 'agents'` at runtime. The error is also not wrapped — it propagates as a raw `ImportError` rather than being captured in `result.error`. This is a high-severity DX trap for testbed-style users.
+
+**Custom Judge subclassing works — but CriterionScore field names are a gotcha (F-059).** The `Judge` ABC has one abstract method `evaluate(run) -> JudgeScore`. Subclassing it works, but constructing `CriterionScore` is non-intuitive: required fields are `criterion_name`, `raw_value`, `normalized` — not `criterion`, `value`, `scale_type` as you'd guess from the LLM JSON format and Criterion model. No documentation on the custom judge workflow.
+
+**JudgeScore has no .passed (F-058).** Single-trial pass/fail requires `compute_verdict(judge, run, num_trials=1).passed` — can't just check `score.passed`. This is particularly annoying for custom judges.
+
+**Criterion default scale wrong for BINARY (F-060).** All scale_types default to `[1,2,3,4,5]`. Binary should default to 2 items.
+
+**ap_cassette still missing.** No fixture added for record/replay. The `@pytest.mark.cassette` marker remains a no-op.
+
+**One stale test fixed.** `test_session016.py:test_migrate_cassettes_in_cli` was calling `.venv/bin/checkagent` (old install). Fixed to use PATH. This wasn't a checkagent regression — just a test using the wrong binary.
+
+**Next time I want to try:**
+- Check if F-054 (LangChain adapter Windows timing) is fixed
+- Check if F-055 (langchain-core dep) is declared
+- Check if F-061 (agents/ conflict) is fixed — either rename import or catch error in result
+- Check if F-042 (block_unmatched=False) is fixed
+- Check if F-038 (AgentRun string input coercion) is fixed
+- Check if ap_cassette fixture is added
+- Try using LangChainAdapter with a real LangChain chain (LCEL pipeline)
+- Try OpenAIAgentsAdapter once the agents/ naming conflict is resolved

@@ -579,7 +579,7 @@ class TestF039MigrateCassettesCommandMissing:
         import subprocess
 
         result = subprocess.run(
-            [".venv/bin/checkagent", "--help"],
+            ["checkagent", "--help"],
             capture_output=True,
             text=True,
         )

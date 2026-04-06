@@ -626,3 +626,99 @@ Format:
 **Actual:** `from checkagent import ConsensusVerdict` → `ImportError`. `from checkagent import multi_judge_evaluate` → `ImportError`. Must use `from checkagent.judge import ConsensusVerdict, multi_judge_evaluate`.
 **Workaround:** `from checkagent.judge import ConsensusVerdict, multi_judge_evaluate`
 **Status:** Open
+
+---
+
+## F-054: Upstream CI failing — LangChain adapter `duration_ms == 0.0` on Windows (fourth occurrence)
+**Date:** 2026-04-06
+**Severity:** high
+**Category:** bug
+**Description:** Upgrading to 48017850 ("mark LangChain and OpenAI adapters as complete") broke CI again. `tests/adapters/test_langchain.py::TestLangChainAdapterRun::test_error_handling` asserts `result.duration_ms > 0` but gets `0.0` on Windows Python 3.10, 3.11, and 3.12. Python 3.13 on Windows passes (it uses `time.perf_counter()` with higher resolution). This is the fourth consecutive Windows timing regression — F-043 and F-047 followed the same pattern and were fixed, but each new adapter test reintroduces it.
+**Expected:** Adapter tests should use a sleep/sleep-like operation safely above Windows `time.monotonic()` resolution (~15ms), or use `>= 0` instead of `> 0`.
+**Actual:** `test_error_handling` calls a chain that raises `ValueError('bad input')` immediately — no sleep — so `duration_ms` is `0.0` on Windows. The assertion `assert result.duration_ms > 0` fails.
+**Workaround:** None for users. CI only passes on Linux/macOS and Python 3.13 Windows.
+**Status:** Open
+
+---
+
+## F-055: `langchain-core` undeclared dependency for `LangChainAdapter`
+**Date:** 2026-04-06
+**Severity:** high
+**Category:** bug
+**Description:** `LangChainAdapter` requires `langchain-core` at instantiation time but `langchain-core` is not declared in checkagent's package dependencies (`Requires: click, pluggy, pydantic, pytest-asyncio, pytest, pyyaml, rich`). On a fresh `pip install checkagent`, calling `LangChainAdapter(runnable)` raises `ImportError: LangChainAdapter requires langchain-core. Install it with: pip install langchain-core`. This is the third instance of the undeclared-dependency pattern after F-008 (jsonschema) and F-015 (dirty_equals).
+**Expected:** `langchain-core` listed as an optional extra (`checkagent[langchain]`) so users see a clear installation path, or at minimum mentioned in adapter docs.
+**Actual:** `pip install checkagent` → `from checkagent.adapters.langchain import LangChainAdapter; LangChainAdapter(runnable)` → `ImportError`.
+**Workaround:** Manually run `pip install langchain-core` before using `LangChainAdapter`.
+**Status:** Open
+
+---
+
+## F-056: `LangChainAdapter.run()` sets `final_output` to raw runnable return — inconsistent with `step.output_text`
+**Date:** 2026-04-06
+**Severity:** medium
+**Category:** dx-friction
+**Description:** When a LangChain runnable returns a dict (e.g. `{'output': 'hello', 'metadata': {...}}`), `result.final_output` is the entire dict. But `result.steps[0].output_text` correctly extracts the `output` key. This inconsistency means `assert_output_matches(result, 'hello')` passes (dict contains 'hello' as substring?), but standard string comparison `result.final_output == 'hello'` fails. Additionally, when the dict has no `output` key, `step.output_text` extracts the first dict value — an undocumented heuristic. When the runnable returns a plain string, both `final_output` and `step.output_text` agree correctly.
+**Expected:** Either `final_output` always extracts the `output` key from dict results (consistent with `step.output_text`), or the extraction heuristic is documented prominently.
+**Actual:** `final_output={'output': 'hello', 'meta': {...}}` (full dict); `step.output_text='hello'` (extracted value). First dict value used as fallback when no `output` key.
+**Workaround:** If you need a string final_output, have your runnable return a plain string, not a dict.
+**Status:** Open
+
+---
+
+## F-057: `LangChainAdapter` and `OpenAIAgentsAdapter` not at top-level `checkagent`
+**Date:** 2026-04-06
+**Severity:** medium
+**Category:** dx-friction
+**Description:** Both new adapters are importable only from their submodule paths: `from checkagent.adapters.langchain import LangChainAdapter` and `from checkagent.adapters.openai_agents import OpenAIAgentsAdapter`. Neither is in the top-level `checkagent` namespace. This is the seventh+ instance of the same pattern (F-020, F-021, F-026, F-028, F-041, F-048, F-053, now F-057).
+**Expected:** `LangChainAdapter` and `OpenAIAgentsAdapter` exported from top-level alongside `GenericAdapter`.
+**Actual:** `from checkagent import LangChainAdapter` → `ImportError`.
+**Workaround:** Use submodule imports: `from checkagent.adapters.langchain import LangChainAdapter`, `from checkagent.adapters.openai_agents import OpenAIAgentsAdapter`.
+**Status:** Open
+
+---
+
+## F-058: `JudgeScore` has no `.passed` property — forces `compute_verdict()` for single-trial checks
+**Date:** 2026-04-06
+**Severity:** low
+**Category:** dx-friction
+**Description:** `judge.evaluate(run)` returns a `JudgeScore` with `overall` (float) but no `.passed` (bool). To check if an evaluation passed, users must call `compute_verdict(judge, run, num_trials=1)` to get a `JudgeVerdict` that has `.passed`. This adds friction for simple single-evaluation tests where you just want `assert score.passed`. `JudgeVerdict.passed` exists (as a property returning `verdict == Verdict.PASS`), but `JudgeScore` has no equivalent.
+**Expected:** `JudgeScore.passed` property returning `overall >= 0.5` (or a configurable threshold), mirroring `Score.passed` in the eval metrics module.
+**Actual:** `score = await judge.evaluate(run); score.passed` → `AttributeError: 'JudgeScore' object has no attribute 'passed'`.
+**Workaround:** Use `compute_verdict(judge, run, num_trials=1).passed` for a single-trial pass/fail check.
+**Status:** Open
+
+---
+
+## F-059: Custom `Judge` subclassing: `CriterionScore` field names undocumented and non-intuitive
+**Date:** 2026-04-06
+**Severity:** medium
+**Category:** dx-friction
+**Description:** When subclassing `Judge` to write a custom judge, users must construct `CriterionScore` objects manually. The required field names (`criterion_name`, `raw_value`, `normalized`) are non-intuitive — users guess `criterion`, `value`, `scale_type`, `weight`, `weighted_score` (by analogy with `Criterion` fields and the dict keys in the LLM response format `{"criterion": ..., "value": ...}`). The Pydantic `ValidationError` gives the correct field names but there's no documentation on the custom-judge workflow.
+**Expected:** Documentation or a factory method for constructing `JudgeScore` from custom judges. Field names that align with the JSON format the LLM produces (`criterion`, `value`) would also help.
+**Actual:** `CriterionScore(criterion='quality', value=0.8)` → `ValidationError: Field required [criterion_name, raw_value, normalized]`. The correct usage: `CriterionScore(criterion_name='quality', raw_value=4, normalized=0.8)`.
+**Workaround:** Use `CriterionScore(criterion_name=..., raw_value=..., normalized=..., reasoning=...)`.
+**Status:** Open
+
+---
+
+## F-060: `Criterion.scale` defaults to `[1,2,3,4,5]` regardless of `scale_type=BINARY`
+**Date:** 2026-04-06
+**Severity:** low
+**Category:** dx-friction
+**Description:** `Criterion` has a `scale` field (`list[Any]`, default `[1, 2, 3, 4, 5]`) and a `scale_type` field. When `scale_type=ScaleType.BINARY` is set without an explicit `scale`, the default `[1, 2, 3, 4, 5]` is used — a 5-point numeric scale that is inappropriate for binary judgments. Binary criteria should default to `["fail", "pass"]` or `[0, 1]`. Users who create `Criterion(name='safe', description='...', scale_type=ScaleType.BINARY)` without specifying scale get unexpected normalization behavior.
+**Expected:** Default `scale` should respect `scale_type`: `BINARY` → `["fail", "pass"]`, `NUMERIC` → `[1, 2, 3, 4, 5]`, `CATEGORICAL` → explicit (no default).
+**Actual:** All three scale types default to `[1, 2, 3, 4, 5]`.
+**Workaround:** Always specify `scale` explicitly: `Criterion(..., scale_type=ScaleType.BINARY, scale=["fail", "pass"])`.
+**Status:** Open
+
+---
+
+## F-061: `OpenAIAgentsAdapter` imports `from agents import Runner` — conflicts with common `agents/` directory
+**Date:** 2026-04-06
+**Severity:** high
+**Category:** bug
+**Description:** `OpenAIAgentsAdapter.run()` lazily imports `from agents import Runner` (the openai-agents SDK package). Any project that has a local `agents/` directory on `sys.path` (common in testbed-style projects like this one) will get `ImportError: cannot import name 'Runner' from 'agents' (<local agents/__init__.py>)`. The import is lazy (inside `run()`), so it succeeds at class-level but fails at runtime — and it raises `ImportError` directly rather than returning an error in `result.error`. The testbed itself has `agents/` which triggers this conflict.
+**Expected:** Either the openai-agents SDK should be imported with its canonical package name (`openai_agents`), or the adapter should catch the import error and return it in `result.error` with a helpful message about the name conflict.
+**Actual:** `OpenAIAgentsAdapter(agent).run('test')` → `ImportError: cannot import name 'Runner' from 'agents' (/path/to/agents/__init__.py)`.
+**Workaround:** Rename your local `agents/` directory to avoid shadowing the `agents` package, or avoid `OpenAIAgentsAdapter` entirely until the import is fixed.
+**Status:** Open

@@ -150,3 +150,10 @@ Rate each feature on:
 | multi_judge_evaluate | 3 | 3 | Core consensus logic correct: majority vote, PASS/FAIL/INCONCLUSIVE, concurrent=True/False, < 2 judges raises; judge_verdicts key collision when rubric names match (F-052, canonical use case!) | 2026-04-06 |
 | ConsensusVerdict | 4 | 3 | Fields: verdict, judge_verdicts, agreement_rate, has_disagreement, reasoning — all correct; judge_verdicts loses entries on key collision (F-052); not at top-level checkagent (F-053) | 2026-04-06 |
 | multi_judge_evaluate tie-breaking | 3 | 2 | 1 PASS + 1 FAIL → PASS (undocumented PASS bias for ties); agreement_rate=0.5; has_disagreement=True | 2026-04-06 |
+| LangChainAdapter (basic run/error/stream) | 4 | 3 | Core functionality solid; dict final_output inconsistency (F-056); string input coercion works; stream events correct; langchain-core undeclared dep (F-055) | 2026-04-06 |
+| LangChainAdapter not at top-level | N/A | 1 | Seventh+ instance of missing top-level export pattern (F-057) | 2026-04-06 |
+| OpenAIAgentsAdapter | 1 | 1 | Imports from 'agents' package which conflicts with common project dir names (F-061); lazy import raises ImportError at run() not at instantiation | 2026-04-06 |
+| upstream CI (session-021) | 1 | 1 | Failing again — fourth Windows timing regression. LangChain adapter test_error_handling duration_ms==0.0 on Windows 3.10/3.11/3.12 (F-054) | 2026-04-06 |
+| Custom Judge subclassing | 3 | 2 | Judge ABC works; CriterionScore field names non-intuitive (F-059); no docs on custom judge workflow; JudgeScore has no .passed (F-058) | 2026-04-06 |
+| JudgeScore.passed | 1 | 1 | Doesn't exist — must call compute_verdict() for single-trial pass/fail (F-058) | 2026-04-06 |
+| Criterion default scale for BINARY | 2 | 2 | Defaults to [1,2,3,4,5] regardless of scale_type; BINARY should default to 2-item scale (F-060) | 2026-04-06 |
