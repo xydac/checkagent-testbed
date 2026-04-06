@@ -120,7 +120,7 @@ Rate each feature on:
 | @pytest.mark.cassette (with replay module) | 3 | 2 | Data model exists now; marker still has no record/replay behavior; F-039/F-040/F-041 all open | 2026-04-05 |
 | upstream CI (3 consecutive failures) | 1 | 1 | CI red for all 3 latest runs — F-008 (jsonschema undeclared dep) breaks checkagent's own test suite | 2026-04-05 |
 | FaultInjector.check_tool_async() | 5 | 4 | Real latency simulation: 80ms slow fault → 80ms actual sleep; no exception unlike sync; records in was_triggered/trigger_count; other fault types still raise | 2026-04-05 |
-| FaultInjector async LLM faults | 1 | 1 | check_llm_async() does not exist — no async LLM fault simulation (F-037). Only check_llm() sync available | 2026-04-05 |
+| FaultInjector async LLM faults | 5 | 5 | F-037 FIXED (session-030): check_llm_async() added alongside F-082 fix; intermittent and slow both work via async path; real sleep for slow, raises LLMIntermittentError for intermittent | 2026-04-06 |
 | FaultInjector.intermittent() fail_rate | 5 | 4 | fail_rate=1.0 always raises; fail_rate=0.0 never raises; seed param for deterministic results; async works same as sync | 2026-04-05 |
 | AgentRun.input strict typing | 3 | 2 | Requires AgentInput (or dict coercion); plain string raises ValidationError with unhelpful message — doesn't hint at AgentInput(query=...) fix (F-038) | 2026-04-05 |
 | CassetteRecorder | 5 | 4 | record_llm_call/record_tool_call work correctly; tokens/duration/status/redact all captured; finalize() → Cassette with correct metadata; not at top-level (F-041) | 2026-04-05 |
@@ -212,6 +212,6 @@ Rate each feature on:
 | upstream CI (session-028) | 5 | 5 | Green — 6 consecutive successes. "Add framework overhead benchmarks for RQ4 paper data" passes all platforms | 2026-04-06 |
 | MockLLM.with_usage() (session-029) | 5 | 5 | F-080 FIXED (docstring now correct), F-081 FIXED (ValueError on conflict), F-078 partial fix (triggered property added) | 2026-04-06 |
 | FaultInjector.triggered property | 5 | 5 | New @property returning bool; trigger_count and triggered_records also added; was_triggered(target) still works | 2026-04-06 |
-| on_llm() fault methods | 4 | 3 | content_filter/context_overflow/partial_response/rate_limit/server_error all work correctly; missing intermittent+slow vs tool fault parity (F-082) | 2026-04-06 |
+| on_llm() fault methods | 5 | 5 | F-082 FIXED (session-030): all 7 types now work — content_filter/context_overflow/partial_response/rate_limit/server_error/intermittent/slow; full parity with tool fault builder; LLMIntermittentError/LLMSlowError importable from checkagent.mock.fault | 2026-04-06 |
 | assert_json_schema (session-029) | 2 | 3 | F-008 partial fix: jsonschema now under [json-schema] extra; still not default dep. dirty-equals/deepdiff also only under [structured] (F-083) | 2026-04-06 |
 | upstream CI (session-029) | 5 | 5 | Green — 7 consecutive successes. "Fix DX issues: jsonschema dep, triggered property, with_usage validation" passes all platforms | 2026-04-06 |

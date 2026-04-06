@@ -1364,3 +1364,42 @@ All exceptions are importable from `checkagent.mock.fault` but NOT from top-leve
 - Explore the docs site when it launches (Milestone 9 is dashboard — might be the live docs?)
 - Investigate if F-073 (get_children API inconsistency) ever gets fully resolved — the warning added in session-025 was good but API still inconsistent
 - Try a real external agent integration — LangChain or PydanticAI with a real LLM call mocked
+
+---
+
+## Session 30 — 2026-04-06 (F-082 FIXED, F-037 FIXED — LLM fault parity complete)
+
+**Upgraded from:** ed0b21a → d0dd9265
+
+**Upstream CI:** Green — 8 consecutive successes. Latest commit: "Add intermittent and slow faults to LLM fault builder (F-082)" which also fixed F-037.
+
+**What I tried:**
+- Upgraded checkagent via `uv pip install` (latest: d0dd9265)
+- Ran full suite: 4 failures — F-082 tests (bug now fixed), F-037 test (bug now fixed), F-055 test (used `pkg_resources` which isn't available in Python 3.12 venv, testbed bug)
+- Fixed testbed-side issues: updated F-082 and F-037 tests from "document the bug" to "document the fix"; replaced deprecated `asyncio.get_event_loop().run_until_complete()` with `asyncio.run()` in one session-021 test; fixed `pkg_resources` → `importlib.metadata` in F-055 test
+- Verified F-082 fix in depth: `on_llm().intermittent(fail_rate=1.0)` raises `LLMIntermittentError`; `on_llm().slow(latency_ms=N)` sync raises `LLMSlowError`; async path does real latency simulation
+- Verified F-037 fix: `FaultInjector.check_llm_async()` exists; no-fault path completes cleanly; both intermittent and slow work via async path
+- Verified behavior consistency: slow(sync) raises for both LLM and tool faults; slow(async) sleeps for both — perfect symmetry
+- Verified `triggered` property works with new LLM fault types
+- Verified `MockLLM.attach_faults()` end-to-end with intermittent (raises through complete()) and slow (real delay through complete(), raises through complete_sync())
+- Wrote 13 new session-030 tests covering all the above; all pass
+- Total: 1131 tests, 0 failures
+
+**What surprised me:**
+- F-037 and F-082 landed in the same commit — makes sense since the async path (`check_llm_async`) is needed for slow faults to work non-exceptionally. The developer saw the dependency.
+- The implementation is exactly symmetric with tool faults: slow(sync) raises a SpecificError with "use async for real delay" in the message, slow(async) does `await asyncio.sleep(ms/1000)`. Clean, learnable pattern.
+- The `LLMIntermittentError` and `LLMSlowError` exception types are importable from `checkagent.mock.fault` — not at top-level (consistent with the F-020 pattern) but at least consistent with how other mock.fault exceptions work.
+- Test suite has grown to 1131 tests with this session. The framework is very well-covered now.
+
+**Status of previously-open "next session" items:**
+- F-082 ✅ FIXED: on_llm() now has both intermittent() and slow()
+- F-037 ✅ FIXED (bundled with F-082): check_llm_async() added
+- F-083 still open: dirty-equals/deepdiff still under [structured] optional extra
+- F-073 still open (warning added but API still inconsistent)
+- Real external agent integration: still on TODO list — next priority
+
+**What I want to try next session:**
+- Real external agent integration — high priority, been on the list for 3+ sessions. LangChain or PydanticAI with MockLLM powering it
+- Check if F-083 (dirty-equals/deepdiff optional dep) gets addressed — this is a high severity DX issue
+- Check docs site / Milestone 9 progress
+- Explore whether there's a `checkagent[all]` extra that installs everything for power users

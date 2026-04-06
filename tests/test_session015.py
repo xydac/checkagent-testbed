@@ -172,12 +172,18 @@ async def test_check_tool_async_rate_limit_still_raises():
 # ---------------------------------------------------------------------------
 
 
-def test_no_check_llm_async_method():
-    """FaultInjector does NOT have check_llm_async — only check_tool_async."""
+def test_f037_fixed_check_llm_async_exists():
+    """F-037 FIXED: FaultInjector now has check_llm_async for async LLM fault simulation."""
     fault = FaultInjector()
-    assert not hasattr(fault, "check_llm_async"), (
-        "check_llm_async was added — update xfail and findings"
-    )
+    assert hasattr(fault, "check_llm_async"), "check_llm_async should exist"
+    import asyncio
+
+    async def run():
+        # With no faults set, should complete without raising
+        fi = FaultInjector()
+        await fi.check_llm_async()
+
+    asyncio.run(run())
 
 
 def test_check_llm_sync_works_for_llm_faults():

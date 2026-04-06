@@ -76,13 +76,9 @@ def test_f055_langchain_core_not_in_declared_deps():
     and then try to use LangChainAdapter get: ImportError: LangChainAdapter requires
     langchain-core. Install it with: pip install langchain-core.
     """
-    import pkg_resources
-    import warnings
+    import importlib.metadata
 
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        dist = pkg_resources.get_distribution("checkagent")
-        declared = [str(r).lower() for r in (dist.requires() or [])]
+    declared = [str(r).lower() for r in (importlib.metadata.requires("checkagent") or [])]
 
     has_langchain = any("langchain" in d for d in declared)
     assert not has_langchain, "langchain-core is now declared — update F-055 status to Fixed"
@@ -603,4 +599,4 @@ def test_f052_judge_verdicts_key_collision_still_present():
             "F-052 FIXED: judge_verdicts now has separate keys — update status"
         )
 
-    asyncio.get_event_loop().run_until_complete(_test())
+    asyncio.run(_test())

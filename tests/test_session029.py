@@ -199,31 +199,51 @@ async def test_llm_fault_server_error_custom_message():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.agent_test
-def test_f082_llm_fault_builder_lacks_intermittent():
+def test_f082_fixed_llm_fault_builder_has_intermittent():
     """
-    F-082: on_llm() builder has no .intermittent() method.
-    Tool faults support intermittent() for probabilistic failures,
-    but LLM faults don't. Users can't simulate 'LLM fails 30% of the time'.
+    F-082 FIXED: on_llm() now has .intermittent() method.
+    Verify it raises LLMIntermittentError at fail_rate=1.0.
     """
+    from checkagent.mock.fault import LLMIntermittentError
+
     fi = FaultInjector()
-    builder = fi.on_llm()
-    assert not hasattr(builder, "intermittent"), (
-        "F-082 FIXED: on_llm() now has intermittent() — update this test"
-    )
+    fi.on_llm().intermittent(fail_rate=1.0, seed=42)
+
+    with pytest.raises(LLMIntermittentError):
+        fi.check_llm()
 
 
 @pytest.mark.agent_test
-def test_f082_llm_fault_builder_lacks_slow():
+def test_f082_fixed_llm_fault_builder_has_slow():
     """
-    F-082: on_llm() builder has no .slow() method.
-    Tool faults support slow(latency_ms=N) for latency simulation,
-    but LLM faults don't. Users can't simulate slow LLM responses.
+    F-082 FIXED: on_llm() now has .slow() method.
+    Sync check_llm() raises LLMSlowError (consistent with tool slow() sync behavior).
     """
+    from checkagent.mock.fault import LLMSlowError
+
     fi = FaultInjector()
-    builder = fi.on_llm()
-    assert not hasattr(builder, "slow"), (
-        "F-082 FIXED: on_llm() now has slow() — update this test"
-    )
+    fi.on_llm().slow(latency_ms=50)
+
+    with pytest.raises(LLMSlowError):
+        fi.check_llm()
+
+
+@pytest.mark.agent_test
+async def test_f082_fixed_llm_slow_async_real_delay():
+    """
+    F-082 FIXED: on_llm().slow() with check_llm_async() does real latency simulation.
+    No exception — just a real sleep (same behavior as on_tool().slow() async).
+    """
+    import time
+
+    fi = FaultInjector()
+    fi.on_llm().slow(latency_ms=60)
+
+    t0 = time.perf_counter()
+    await fi.check_llm_async()
+    elapsed_ms = (time.perf_counter() - t0) * 1000
+
+    assert elapsed_ms >= 50, f"Expected >=50ms delay, got {elapsed_ms:.0f}ms"
 
 
 @pytest.mark.agent_test

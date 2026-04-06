@@ -432,7 +432,7 @@ Format:
 **Expected:** `check_llm_async()` parallel to `check_tool_async()`, enabling async agent code to trigger LLM faults without mixing sync/async.
 **Actual:** `hasattr(fault, 'check_llm_async')` → `False`. The method simply doesn't exist. Users must call sync `check_llm()` inside async agent code.
 **Workaround:** Call `fault.check_llm()` (sync) from within async agent code. No async LLM fault simulation available.
-**Status:** Open
+**Status:** Fixed in d0dd9265 (session-030) — `check_llm_async()` added alongside F-082 fix. Verified: exists, no-fault path completes cleanly, intermittent and slow both work via async path.
 
 ---
 
@@ -1013,7 +1013,7 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** `on_llm().intermittent(fail_rate=0.3)` and `on_llm().slow(latency_ms=N)` matching tool fault parity
 **Actual:** `AttributeError` — neither method exists on LLM fault builder
 **Workaround:** None — cannot test LLM latency or intermittent LLM failures with FaultInjector
-**Status:** Open
+**Status:** Fixed in d0dd9265 (session-030) — both `intermittent()` and `slow()` added to `on_llm()` builder. Raises `LLMIntermittentError` and `LLMSlowError` respectively. Async path (`check_llm_async()`) does real sleep for slow faults, consistent with tool fault behavior.
 
 ---
 
