@@ -1132,3 +1132,63 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Category:** bug (fixed)
 **Description:** In 0.1.1, `checkagent.__version__` was `'0.1.0'` while `importlib.metadata.version('checkagent')` returned `'0.1.1'`. Both now return `'0.1.2'` in the current release.
 **Status:** Fixed in 0.1.2
+
+---
+
+## F-093: `analyze-prompt` Rich markup strips `[bracket]` placeholders in recommendations
+**Date:** 2026-04-11
+**Severity:** medium
+**Category:** bug
+**Description:** The `checkagent analyze-prompt` command renders recommendations using Rich, which interprets `[bracket text]` as markup tags and strips the content. Recommendations that include template placeholders like `[your domain]` or `[support channel]` appear with those strings missing in the terminal output. For example: "Only help with [your domain]. Decline..." becomes "Only help with . Decline...". The `--json` flag output correctly preserves the bracket text.
+**Expected:** Recommendation text with `[your domain]` or `[support channel]` should display as-is in the terminal, with bracket content visible.
+**Actual:** Rich parses `[your domain]` as a markup tag, finds no matching tag, and silently drops the content: "Only help with . Decline requests outside this scope."
+**Workaround:** Use `--json` flag to see full recommendation text.
+**Status:** Open
+
+---
+
+## F-094: Non-existent file path silently analyzed as literal string in `analyze-prompt`
+**Date:** 2026-04-11
+**Severity:** medium
+**Category:** bug
+**Description:** When a user passes a path to a non-existent file to `checkagent analyze-prompt`, the command does not report a file-not-found error. Instead, it analyzes the path string itself as prompt text, scores it 0/8, and exits 1 — giving the impression that the command ran correctly but the "prompt" failed all security checks. A user who makes a typo in the file path will not realize their file was never read.
+**Expected:** Clear error: "File not found: /path/to/prompt.txt" with non-zero exit code.
+**Actual:** Scores 0/8 treating the literal path string as a prompt; no error message.
+**Workaround:** Verify file exists before passing path, or check if the score seems implausibly low.
+**Status:** Open
+
+---
+
+## F-095: `PromptAnalyzer`, `PromptCheck`, `PromptAnalysisResult` not at top-level `checkagent`
+**Date:** 2026-04-11
+**Severity:** low
+**Category:** dx-friction
+**Description:** The programmatic API for `analyze-prompt` — `PromptAnalyzer`, `PromptCheck`, and `PromptAnalysisResult` — is in `checkagent.safety.prompt_analyzer` and re-exported from `checkagent.safety`, but NOT from the top-level `checkagent` namespace. Users who want to use the analyzer in their own code must know to import from `checkagent.safety`, which is not discoverable from `import checkagent; dir(checkagent)`.
+**Expected:** `from checkagent import PromptAnalyzer`
+**Actual:** `from checkagent.safety import PromptAnalyzer`
+**Workaround:** Import from `checkagent.safety`.
+**Status:** Open
+
+---
+
+## F-096: `evaluate_output` lives in `checkagent.cli.scan` (private), not public API
+**Date:** 2026-04-11
+**Severity:** low
+**Category:** dx-friction
+**Description:** The CI commit "Add --agent-description flag and make evaluate_output public" moved `evaluate_output` somewhere — but it's in `checkagent.cli.scan`, which is a private internal CLI module. It is not importable from `checkagent` or `checkagent.safety`. Users who find it via `from checkagent.cli.scan import evaluate_output` are using a private import path that can change without notice.
+**Expected:** `from checkagent import evaluate_output` or `from checkagent.safety import evaluate_output`
+**Actual:** `from checkagent.cli.scan import evaluate_output` — CLI-internal private module.
+**Workaround:** Import from `checkagent.cli.scan` but accept the fragility.
+**Status:** Open
+
+---
+
+## F-097: CI failing ALL platforms — ruff lint errors in `analyze-prompt` commit
+**Date:** 2026-04-11
+**Severity:** high
+**Category:** bug
+**Description:** The latest commit "Add checkagent analyze-prompt for static system prompt security analysis" fails ruff lint on all 12 platform/version combinations (Python 3.10-3.13 on ubuntu/macos/windows). Errors: I001 (import block un-sorted, 3 instances) and E501 (line too long: 110 > 99 chars). The previous commit "Add --agent-description flag and make evaluate_output public" was green. This breaks the 9-session green streak that ended in session-033.
+**Expected:** Lint passes before merging any commit; CI stays green.
+**Actual:** All platforms fail at "Lint with ruff" step; tests never run.
+**Workaround:** The installed package (0.1.2) works correctly — ruff is a CI-only dev tool, not a runtime dependency. Tests in the testbed still pass.
+**Status:** Open

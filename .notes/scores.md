@@ -231,3 +231,12 @@ Rate each feature on:
 | PydanticAI adapter streaming | 5 | 5 | run_stream() emits RUN_START/TEXT_DELTA/RUN_END; StreamCollector works correctly; aggregated_text correct; time_to_first_token populated | 2026-04-11 |
 | ResilienceProfile | 4 | 4 | from_scores() and from_runs() both work; to_dict() complete except best_scenario (F-090); worst_scenario/weakest_metric correct; overall capped at [0,1] | 2026-04-11 |
 | version consistency (0.1.2) | 5 | 5 | __version__ and importlib.metadata both return '0.1.2'. Version inconsistency bug from 0.1.1 fixed. | 2026-04-11 |
+| upstream CI (session-034) | 1 | 1 | Red — ALL platforms failing. Latest commit "Add checkagent analyze-prompt" breaks ruff lint (I001 unsorted imports x3, E501 line too long). Previous commit was green. | 2026-04-11 |
+| checkagent analyze-prompt CLI | 3 | 3 | New: 8-check static analysis (no LLM needed); exit 0/1 based on HIGH checks; --json output; file reading works; F-093 (Rich markup strips [brackets]), F-094 (nonexistent file silent), exit code behavior undocumented | 2026-04-11 |
+| PromptAnalyzer Python API | 4 | 3 | analyze() returns PromptAnalysisResult with score/check_results; solid pattern matching; in checkagent.safety not top-level (F-095); CheckResult.evidence populated on pass, None on fail | 2026-04-11 |
+| data_enumeration scan category | 4 | 3 | New 5th category; 20 probes (HIGH+CRITICAL); correct category metadata; echo agents get false positives (expected); DataEnumerationDetector/probes_data_enumeration not at top-level | 2026-04-11 |
+| class-based agent scan | 4 | 4 | module:ClassName auto-instantiates class; correct probe execution; refusal class agent scores 1.0 on injection; clean JSON output | 2026-04-11 |
+| EvalCase top-level export | 4 | 4 | At top-level checkagent; id+input+expected_tools/output_contains/output_equals/max_steps/tags/context/metadata; still str-only input (same as TestCase) | 2026-04-11 |
+| SafetyFinding/SafetyResult/SafetyEvaluator top-level | 5 | 4 | All 3 at top-level; SafetyEvaluator.evaluate_run() returns SafetyResult correctly; evaluate() for direct output text; clean API | 2026-04-11 |
+| ScenarioResult top-level export | 5 | 5 | At top-level; scenario/scores/degradation/resilience fields all correct | 2026-04-11 |
+| TestRunSummary | 5 | 4 | Alias for CI RunSummary with better name; same pass_rate/total/passed/failed; resolves F-029 naming confusion partially | 2026-04-11 |

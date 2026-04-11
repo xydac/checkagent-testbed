@@ -1590,3 +1590,69 @@ This is the biggest single quality jump since the framework started. Every major
 - Test `ResilienceProfile` in a real fault scenario: `FaultInjector` + `from_runs()`
 - Check if F-064 (undeclared adapter deps) is still open
 - Check if `checkagent scan` has any rate-limiting or retry behavior
+
+---
+
+## Session 034 — 2026-04-11
+
+### What I Did
+
+**Upgraded:** `pip install --upgrade checkagent@git+...@main` — still 0.1.2 (no new PyPI release). 
+
+**CI Status:** RED — failing on all 12 platform/version combinations. Latest commit "Add checkagent analyze-prompt" breaks `ruff check` with I001 (unsorted imports, 3 files) and E501 (line too long: 110 > 99). Previous commit "Add --agent-description flag and make evaluate_output public" was green. This is F-097.
+
+**Re-ran all tests:** 1272 passed, 3 xfailed — clean.
+
+**New features explored:**
+
+1. **`checkagent analyze-prompt` CLI** — New command that statically analyzes a system prompt for 8 security controls (injection guard, scope boundary, confidentiality, refusal behavior, PII handling, data scope, role clarity, escalation path). No LLM required. Exit 0 when all HIGH-severity checks pass; exit 1 otherwise. `--json` flag outputs complete machine-readable results. Reads from file or inline string. Clean terminal table output.
+
+2. **`PromptAnalyzer` Python API** — `PromptAnalyzer().analyze(text)` returns a `PromptAnalysisResult` with `score`, `passed_count`, `total_count`, and `check_results`. Each `CheckResult` has `check` (the `PromptCheck` definition), `passed`, and `evidence`. Lives in `checkagent.safety` (not top-level — F-095).
+
+3. **`data_enumeration` scan category** — 5th category added to `checkagent scan`. 20 probes covering bulk data disclosure requests (dump-database, list-all-users, export-knowledge-base, etc.). Both HIGH and CRITICAL severity probes. Not at top-level (another instance of the pattern).
+
+4. **Class-based agent scan** — `checkagent scan module:ClassName` now works. The scanner auto-instantiates the class and calls it with each probe. Tested with a `SupportBot(__call__)` class — correctly scanned, refusal bots score 1.0 on injection.
+
+5. **New top-level exports** — `EvalCase`, `SafetyEvaluator`, `SafetyFinding`, `SafetyResult`, `ScenarioResult`, `TestRunSummary` all confirmed at top-level. `TestRunSummary` is exactly `checkagent.ci.RunSummary` under a better name.
+
+6. **`evaluate_output` location** — CI commit said "make evaluate_output public" but it's in `checkagent.cli.scan` (private). Not at top-level. F-096.
+
+### New Findings
+
+- **F-093 (medium):** `analyze-prompt` Rich markup bug — `[your domain]`, `[support channel]` etc. stripped from recommendations in terminal output. JSON output correct.
+- **F-094 (medium):** Non-existent file analyzed as literal string — no error, scores 0/8.
+- **F-095 (low):** `PromptAnalyzer`/`PromptCheck`/`PromptAnalysisResult` not at top-level `checkagent`.
+- **F-096 (low):** `evaluate_output` in `checkagent.cli.scan` (private), not public API.
+- **F-097 (high):** CI failing ALL platforms — ruff lint in `analyze-prompt` commit.
+
+### New Tests Written
+
+**test_session035.py** — 48 tests (46 pass, 2 xfail):
+- `analyze-prompt` CLI: exit codes, 8 checks, JSON output, file reading, static check, F-093/F-094 as xfail
+- `PromptAnalyzer` Python API: analyze(), results, evidence, F-095 as assertion
+- `data_enumeration` category: 20 probes, severity mix, category correctness, false positives on echo
+- Class-based agent scan: instantiation, refusal bot scores 1.0
+- New top-level exports: EvalCase, SafetyFinding, SafetyResult, SafetyEvaluator, ScenarioResult, TestRunSummary
+- `evaluate_output` location (F-096)
+
+### What Surprised Me
+
+- All analyze-prompt recommendations with template placeholders (`[your domain]`, `[support channel]`) are silently stripped by Rich markup parsing. The JSON output is fine. Classic framework API misuse — brackets are Rich markup.
+- The `analyze-prompt` exit code logic is entirely undocumented: exits 0 only when ALL HIGH-severity checks pass, exits 1 otherwise. This is actually great CI behavior but users have to discover it empirically.
+- `TestRunSummary` at top-level is literally `TestRunSummary = RunSummary` from `checkagent.ci` — same class, better alias. Smart fix for the F-029 naming confusion without breaking existing code.
+- `data_enumeration` echo agent false positives: an agent that echoes user input will fail bulk-query probes because it echoes back "list all records" which contains the detection pattern. Real agents with scope guardrails score much better. This is expected static analysis behavior.
+- `python3 -m checkagent` doesn't work — no `__main__.py`. Must use the `checkagent` binary directly. The existing test_session034.py works around this with `uv run checkagent`.
+
+### Total Tests
+
+1272 passed, 3 xfailed (up from 1226)
+
+### What I Want to Try Next Session
+
+- Test `checkagent scan --url` with a local FastAPI agent
+- Check if F-097 (ruff lint) is fixed and CI goes green again
+- Check if F-087 (deprecated PydanticAI token attrs) is fixed
+- Test `analyze-prompt --json` recommendation text integrity more thoroughly
+- Test PromptAnalyzer with edge cases: empty string, very long prompt, Unicode
+- Check if any new features appeared (the upstream has been very active)
+- Try `EvalCase` in a parametrized test scenario
