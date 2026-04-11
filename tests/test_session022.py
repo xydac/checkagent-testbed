@@ -167,12 +167,10 @@ def test_f064_anthropic_not_declared_as_dependency():
     )
 
 
-def test_f063_anthropic_adapter_not_at_top_level():
-    """F-063: AnthropicAdapter not importable from top-level checkagent."""
+def test_f063_anthropic_adapter_at_top_level():
+    """F-063 FIXED: AnthropicAdapter now importable from top-level checkagent."""
     import checkagent
-    assert not hasattr(checkagent, "AnthropicAdapter"), (
-        "F-063 may be fixed: AnthropicAdapter now at top-level"
-    )
+    assert hasattr(checkagent, "AnthropicAdapter"), "AnthropicAdapter should be at top-level"
 
 
 def test_anthropic_adapter_raises_on_missing_package():
@@ -273,12 +271,10 @@ def test_f064_crewai_not_declared_as_dependency():
     assert not crewai_in_base, "F-064 may be fixed: crewai is now a base dep"
 
 
-def test_f063_crewai_adapter_not_at_top_level():
-    """F-063: CrewAIAdapter not importable from top-level checkagent."""
+def test_f063_crewai_adapter_at_top_level():
+    """F-063 FIXED: CrewAIAdapter now importable from top-level checkagent."""
     import checkagent
-    assert not hasattr(checkagent, "CrewAIAdapter"), (
-        "F-063 may be fixed: CrewAIAdapter now at top-level"
-    )
+    assert hasattr(checkagent, "CrewAIAdapter"), "CrewAIAdapter should be at top-level"
 
 
 # ---------------------------------------------------------------------------
@@ -348,12 +344,10 @@ def test_f064_pydantic_ai_not_declared_as_dependency():
     assert not pai_in_base, "F-064 may be fixed: pydantic-ai is now a base dep"
 
 
-def test_f063_pydantic_ai_adapter_not_at_top_level():
-    """F-063: PydanticAIAdapter not importable from top-level checkagent."""
+def test_f063_pydantic_ai_adapter_at_top_level():
+    """F-063 FIXED: PydanticAIAdapter now importable from top-level checkagent."""
     import checkagent
-    assert not hasattr(checkagent, "PydanticAIAdapter"), (
-        "F-063 may be fixed: PydanticAIAdapter now at top-level"
-    )
+    assert hasattr(checkagent, "PydanticAIAdapter"), "PydanticAIAdapter should be at top-level"
 
 
 # ---------------------------------------------------------------------------
@@ -544,8 +538,8 @@ def test_f061_openai_agents_adapter_still_broken():
 # ---------------------------------------------------------------------------
 
 
-def test_f042_block_unmatched_false_still_broken():
-    """F-042: ReplayEngine(block_unmatched=False) still raises CassetteMismatchError."""
+def test_f042_block_unmatched_false_fixed():
+    """F-042 FIXED: ReplayEngine(block_unmatched=False) returns None for unmatched."""
     from checkagent.replay import ReplayEngine, MatchStrategy
     from checkagent.replay.cassette import Cassette, Interaction
     from checkagent.replay.recorder import RecordedRequest, RecordedResponse
@@ -561,23 +555,18 @@ def test_f042_block_unmatched_false_still_broken():
     )
     cassette.interactions.append(interaction)
     engine = ReplayEngine(cassette, strategy=MatchStrategy.EXACT, block_unmatched=False)
-    try:
-        engine.match(RecordedRequest(kind="llm", method="complete", body={"text": "different"}))
-        pytest.fail("F-042: Expected CassetteMismatchError but got no exception")
-    except Exception as e:
-        # Should raise — this confirms the bug is still present
-        assert "CassetteMismatchError" in type(e).__name__, f"Unexpected exception: {e}"
+    result = engine.match(RecordedRequest(kind="llm", method="complete", body={"text": "different"}))
+    assert result is None, "F-042 FIXED: block_unmatched=False returns None for unmatched"
 
 
-def test_f038_agent_run_string_input_still_fails():
-    """F-038: AgentRun(input='string') still raises ValidationError."""
-    with pytest.raises(Exception) as exc_info:
-        AgentRun(input="plain string", final_output="result")
-    assert "AgentInput" in str(exc_info.value) or "valid dictionary" in str(exc_info.value)
+def test_f038_agent_run_string_input_fixed():
+    """F-038 FIXED: AgentRun(input='string') now coerces string to AgentInput."""
+    run = AgentRun(input="plain string", final_output="result")
+    assert run.input.query == "plain string"
 
 
-def test_f052_judge_verdicts_key_collision_still_present():
-    """F-052: multi_judge_evaluate still keys judge_verdicts by rubric name."""
+def test_f052_judge_verdicts_key_collision_fixed():
+    """F-052 FIXED: multi_judge_evaluate keys judge_verdicts by 'rubric:model' now."""
     async def _inner():
         from checkagent.judge import multi_judge_evaluate, RubricJudge, Rubric, Criterion
         rubric = Rubric(
@@ -593,10 +582,10 @@ def test_f052_judge_verdicts_key_collision_still_present():
         j2 = RubricJudge(rubric=rubric, llm=llm, model_name="model-b")
         run = make_run()
         verdict = await multi_judge_evaluate([j1, j2], run)
-        # Bug: only 1 entry instead of 2 because key = f'rubric_judge:{rubric.name}'
+        # F-052 FIXED: key is now 'rubric_judge:{rubric}:{model}' — 2 separate entries
         return len(verdict.judge_verdicts)
 
     count = asyncio.run(_inner())
-    assert count == 1, (
-        f"F-052: Expected 1 (collision) but got {count} — may be fixed"
+    assert count == 2, (
+        f"F-052 FIXED: Expected 2 (one per judge with model key), got {count}"
     )

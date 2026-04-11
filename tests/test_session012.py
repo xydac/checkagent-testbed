@@ -216,11 +216,16 @@ def test_filter_severity_enum_object():
     assert len(critical) >= 1
 
 
-def test_filter_severity_uppercase_string_returns_empty():
-    """Filter with uppercase severity string returns nothing — filter is case-sensitive."""
-    result = jailbreak.all_probes.filter(severity="CRITICAL")
-    # This documents the DX gotcha: uppercase doesn't match
-    assert len(result) == 0
+def test_filter_severity_uppercase_string_now_works():
+    """F-FIXED: ProbeSet.filter() is now case-insensitive for severity strings.
+
+    Previously, filter(severity='CRITICAL') returned 0 probes (case mismatch).
+    Now 'CRITICAL' and 'critical' both work correctly.
+    """
+    result_upper = jailbreak.all_probes.filter(severity="CRITICAL")
+    result_lower = jailbreak.all_probes.filter(severity="critical")
+    assert len(result_upper) > 0, "CRITICAL filter should return probes now"
+    assert len(result_upper) == len(result_lower), "Case-insensitive: same results"
 
 
 def test_filter_tags_or_logic():
@@ -323,29 +328,32 @@ def test_task_completion_list_with_error_run():
 # ---------------------------------------------------------------------------
 
 
-def test_agentrun_silently_drops_output_field():
-    """AgentRun(output=...) is silently discarded — correct field is final_output."""
-    run = AgentRun(input=AgentInput(query="test"), output="silently lost")
-    # No ValueError raised — silent drop
-    assert run.final_output is None
+def test_agentrun_extra_field_raises_validation_error():
+    """F-027 FIXED: AgentRun(output=...) now raises ValidationError (was silent drop)."""
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError, match="Extra inputs"):
+        AgentRun(input=AgentInput(query="test"), output="wrong field name")
 
 
-def test_agentrun_silently_drops_unknown_fields():
-    """AgentRun accepts any unknown field without raising ValueError."""
-    run = AgentRun(input=AgentInput(query="test"), totally_made_up="value")
-    assert not hasattr(run, "totally_made_up")
+def test_agentrun_unknown_field_raises_validation_error():
+    """F-027 FIXED: AgentRun(totally_made_up=...) now raises ValidationError."""
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError, match="Extra inputs"):
+        AgentRun(input=AgentInput(query="test"), totally_made_up="value")
 
 
-def test_step_silently_drops_output_field():
-    """Step(output=...) is silently discarded — correct field is output_text."""
-    step = Step(output="silently lost")
-    assert step.output_text is None
+def test_step_extra_output_field_raises_validation_error():
+    """F-027 FIXED: Step(output=...) now raises ValidationError (was silent drop)."""
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError, match="Extra inputs"):
+        Step(output="wrong field name")
 
 
-def test_step_silently_drops_input_field():
-    """Step(input=...) is silently discarded — correct field is input_text."""
-    step = Step(input="silently lost")
-    assert step.input_text is None
+def test_step_extra_input_field_raises_validation_error():
+    """F-027 FIXED: Step(input=...) now raises ValidationError (was silent drop)."""
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError, match="Extra inputs"):
+        Step(input="wrong field name")
 
 
 def test_agentrun_correct_field_names():
@@ -399,19 +407,17 @@ def _make_path_run(path_value: str) -> AgentRun:
     return AgentRun(input=AgentInput(query="read file"), steps=[step])
 
 
-def test_f024_path_prefix_confusion_still_open():
-    """F-024: /dataextra/file.txt passes /data boundary — still a bug."""
+def test_f024_path_prefix_confusion_fixed():
+    """F-024 FIXED: /dataextra/file.txt now correctly fails /data boundary check."""
     boundary = ToolBoundary(allowed_paths=["/data"])
     validator = ToolCallBoundaryValidator(boundary)
     result = validator.evaluate_run(_make_path_run("/dataextra/file.txt"))
-    # BUG: this passes when it should fail
-    assert result.passed is True  # documents the bug
+    assert result.passed is False, "/dataextra should not match /data boundary"
 
 
-def test_f025_path_traversal_still_open():
-    """F-025: /data/../etc/passwd passes /data boundary — still a bug."""
+def test_f025_path_traversal_fixed():
+    """F-025 FIXED: /data/../etc/passwd now correctly fails /data boundary check."""
     boundary = ToolBoundary(allowed_paths=["/data"])
     validator = ToolCallBoundaryValidator(boundary)
     result = validator.evaluate_run(_make_path_run("/data/../etc/passwd"))
-    # BUG: this passes when it should fail
-    assert result.passed is True  # documents the bug
+    assert result.passed is False, "path traversal should not match /data boundary"

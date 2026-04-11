@@ -216,16 +216,19 @@ def test_f082_fixed_llm_fault_builder_has_intermittent():
 @pytest.mark.agent_test
 def test_f082_fixed_llm_fault_builder_has_slow():
     """
-    F-082 FIXED: on_llm() now has .slow() method.
-    Sync check_llm() raises LLMSlowError (consistent with tool slow() sync behavior).
+    F-082 FIXED: on_llm() has .slow() method.
+    F-016 ALSO FIXED: sync check_llm() now sleeps instead of raising LLMSlowError.
     """
-    from checkagent.mock.fault import LLMSlowError
+    import time
 
     fi = FaultInjector()
     fi.on_llm().slow(latency_ms=50)
 
-    with pytest.raises(LLMSlowError):
-        fi.check_llm()
+    t0 = time.perf_counter()
+    fi.check_llm()  # No longer raises — sleeps instead
+    elapsed_ms = (time.perf_counter() - t0) * 1000
+    assert elapsed_ms >= 40, f"Expected ~50ms sleep, got {elapsed_ms:.0f}ms"
+    assert fi.triggered
 
 
 @pytest.mark.agent_test

@@ -1519,3 +1519,74 @@ Also **fixed a stale testbed test:** `test_anthropic_adapter_raises_on_missing_p
 - Try a CrewAI agent with a real tool using FakeAgent or similar
 - Investigate whether any framework adapters get added to `[all]` extra if it exists
 - Test `assert_output_matches` on a fresh install to confirm F-083 impact
+
+---
+
+## Session 033 — 2026-04-11
+
+### Upgrade: 0.1.1 → 0.1.2
+
+Ran `uv sync --upgrade-package checkagent` and got `checkagent==0.1.2` (commit 29caad2).
+
+### Upstream CI
+
+Latest run ("Add ci-init command and fix silent LLM judge failure on bad API key") is **red** — breaks a 9-session green streak. Failure is Windows-only on the new `ci-init` command test (`test_github_is_default_platform`): the success message uses OS path separators, so `.github/workflows/checkagent.yml` appears as `\.github\workflows\checkagent.yml` on Windows. This is F-091. All macOS and Linux jobs pass. Second Windows CI failure seen in the test suite (previous was F-043/F-047/F-054, all eventually fixed).
+
+### Existing Tests
+
+Ran full suite: **1 failing test** — `test_version_string_inconsistency` in test_session033.py. This test was written to document a bug in 0.1.1 where `checkagent.__version__` returned `'0.1.0'` but metadata said `'0.1.1'`. In 0.1.2 both return `'0.1.2'`, so the bug is fixed and the test needed updating. Fixed by rewriting the test to assert both versions are equal.
+
+### What Changed in 0.1.2
+
+**Massive top-level export fix:** 11 open findings closed in one release:
+- F-020 (eval exports), F-021 (safety exports), F-026 (Probe/ProbeSet), F-030 (QualityGateEntry), F-032 (.all() returns ProbeSet), F-048 (judge exports), F-053 (multi_judge), F-057 (LangChainAdapter), F-063 (Anthropic/Crew adapters), F-068 (multiagent), F-086 (PydanticAIAdapter)
+
+This is the biggest single quality jump since the framework started. Every major type is now importable from `checkagent` directly.
+
+**New CLI commands:**
+- `checkagent scan` — full agent safety scanner. Supports Python callables and HTTP endpoints. All 4 categories (injection/jailbreak/pii/scope). JSON output (`--json`), SVG badge (`--badge`), test file generation (`--generate-tests`), async agents handled correctly.
+- `checkagent ci-init` — CI/CD config scaffolder. Generates GitHub and GitLab workflows. Works correctly on Linux/Mac.
+
+**New API:**
+- `ResilienceProfile` — top-level class for comparing baseline vs faulted performance. `from_scores()` and `from_runs()` both work. `to_dict()` missing `best_scenario` (F-090 — minor).
+
+### New Findings
+
+- **F-089 (low):** `--generate-tests` embeds private API imports (`_resolve_callable`, `_evaluate_output`) in generated files. Generated tests will break on checkagent upgrades if these internals change.
+- **F-090 (low):** `ResilienceProfile.to_dict()` omits `best_scenario` despite `profile.best_scenario` being a valid attribute.
+- **F-091 (medium):** `ci-init` uses OS path separator in success message — Windows backslashes break expected path string in checkagent's own tests.
+- **F-092 (closed):** Version inconsistency (0.1.0 vs 0.1.1) fixed in 0.1.2.
+
+### New Tests Written
+
+**test_session033.py** — fixed `test_version_string_inconsistency` → `test_version_string_consistent`.
+
+**test_session034.py** — 29 new tests:
+- `checkagent scan`: safe agent, echo agent, JSON schema, finding schema, invalid module, async agent, all/filtered categories
+- `checkagent scan --badge`: SVG generation for safe and failing agents
+- `checkagent scan --generate-tests`: file creation, private API detection (F-089), syntax validity
+- `checkagent ci-init`: GitHub workflow, YAML validity, step content, GitLab, both platforms, --force, custom target
+- PydanticAI streaming: events, StreamCollector, ordering, TEXT_DELTA data
+- ResilienceProfile: from_scores, from_runs, to_dict, F-090 documentation
+
+### What Surprised Me
+
+- 11 top-level export findings closed in one commit — the developer clearly did a sweep of all the DX friction we reported.
+- The `scan` command works on async agents out of the box (returns coroutine → awaits it internally). No special handling needed.
+- The generated test file has a `pii_leakage` test even when `--category injection` is specified. This is because the finding category is determined by what PATTERN was triggered in the output, not by the probe's category. The email address in the probe text triggers PII detection. Subtle but sensible behavior.
+- `ci-init` generates valid YAML but `on:` becomes boolean `True` in PyYAML (YAML 1.1 behavior). Not a checkagent bug, but a gotcha for test authors checking for `"on"` in parsed YAML.
+- `ResilienceProfile.to_dict()` output uses `'overall_resilience'` not `'overall'` as the key — different from the attribute name `profile.overall`. Consistent with the full name convention, but worth noting.
+
+### Total Tests
+
+1226 passed, 1 xfailed (up from 1163)
+
+### What I Want to Try Next Session
+
+- Test `checkagent scan --url` with a local HTTP agent (FastAPI or Flask)
+- Test `ci-init --platform both` output quality for GitLab
+- Test LLM judge mode for scan (`--llm-judge`) — requires API key
+- Investigate whether F-087 (deprecated PydanticAI token attrs) is fixed in 0.1.2
+- Test `ResilienceProfile` in a real fault scenario: `FaultInjector` + `from_runs()`
+- Check if F-064 (undeclared adapter deps) is still open
+- Check if `checkagent scan` has any rate-limiting or retry behavior

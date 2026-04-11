@@ -69,19 +69,13 @@ def test_f054_upstream_ci_failing():
 
 
 def test_f055_langchain_core_not_in_declared_deps():
-    """F-055: LangChainAdapter requires langchain-core but it's not declared.
-
-    checkagent's package metadata lists: click, pluggy, pydantic, pytest-asyncio,
-    pytest, pyyaml, rich. langchain-core is absent. Users who do 'pip install checkagent'
-    and then try to use LangChainAdapter get: ImportError: LangChainAdapter requires
-    langchain-core. Install it with: pip install langchain-core.
-    """
+    """F-055 FIXED: langchain-core IS now declared as a dependency of checkagent."""
     import importlib.metadata
 
     declared = [str(r).lower() for r in (importlib.metadata.requires("checkagent") or [])]
 
     has_langchain = any("langchain" in d for d in declared)
-    assert not has_langchain, "langchain-core is now declared — update F-055 status to Fixed"
+    assert has_langchain, "langchain-core should be a declared dependency — F-055 FIXED"
 
 
 def test_f055_langchain_adapter_raises_importerror_without_package(monkeypatch):
@@ -178,26 +172,16 @@ async def test_f056_langchain_adapter_dict_output_first_value_heuristic():
 # ---------------------------------------------------------------------------
 
 
-def test_f057_langchain_adapter_not_at_top_level():
-    """F-057: LangChainAdapter is not importable from top-level checkagent.
-
-    Seventh+ instance of the pattern where new adapters/classes are not exported
-    from the top-level namespace.
-    """
+def test_f057_langchain_adapter_at_top_level():
+    """F-057 FIXED: LangChainAdapter is now importable from top-level checkagent."""
     import checkagent
-
-    assert not hasattr(checkagent, "LangChainAdapter"), (
-        "LangChainAdapter is now at top-level — update F-057 status to Fixed"
-    )
+    assert hasattr(checkagent, "LangChainAdapter"), "LangChainAdapter should be at top-level"
 
 
-def test_f057_openai_agents_adapter_not_at_top_level():
-    """F-057: OpenAIAgentsAdapter is not importable from top-level checkagent."""
+def test_f057_openai_agents_adapter_at_top_level():
+    """F-057 FIXED: OpenAIAgentsAdapter now importable from top-level checkagent."""
     import checkagent
-
-    assert not hasattr(checkagent, "OpenAIAgentsAdapter"), (
-        "OpenAIAgentsAdapter is now at top-level — update F-057 status to Fixed"
-    )
+    assert hasattr(checkagent, "OpenAIAgentsAdapter"), "OpenAIAgentsAdapter should be at top-level"
 
 
 def test_f057_langchain_adapter_importable_from_submodule():
@@ -233,11 +217,9 @@ async def test_f058_judge_score_has_no_passed_property():
     score = await judge.evaluate(make_run())
 
     assert isinstance(score, JudgeScore)
-    # JudgeScore has no .passed
-    assert not hasattr(score, "passed"), (
-        "JudgeScore now has .passed — update F-058 status to Fixed"
-    )
-    # Must go through compute_verdict to get passed
+    # F-058 FIXED: JudgeScore now has .passed
+    assert hasattr(score, "passed"), "JudgeScore should have .passed property"
+    # compute_verdict also works
     verdict = await compute_verdict(judge, make_run(), num_trials=1)
     assert hasattr(verdict, "passed")
 
@@ -339,20 +321,17 @@ async def test_f059_custom_judge_with_compute_verdict():
 # ---------------------------------------------------------------------------
 
 
-def test_f060_binary_criterion_default_scale_is_wrong():
-    """F-060: Criterion(scale_type=BINARY) defaults to scale=[1,2,3,4,5], not [0,1].
+def test_f060_binary_criterion_default_scale_is_correct():
+    """F-060 FIXED: Criterion(scale_type=BINARY) defaults to ['pass', 'fail'] scale.
 
-    A binary criterion should have exactly 2 options. The default [1,2,3,4,5]
-    is the numeric 5-point scale, which doesn't apply to binary judgments.
-    Users who create a binary criterion without specifying scale get confusing
-    normalization behavior.
+    Binary criterion now correctly defaults to a 2-item scale instead of [1,2,3,4,5].
     """
     c = Criterion(name="test", description="binary test", scale_type=ScaleType.BINARY)
-    # Default is [1,2,3,4,5] — wrong for binary
-    assert c.scale == [1, 2, 3, 4, 5], (
-        f"Default scale changed for BINARY: {c.scale} — update F-060"
+    assert len(c.scale) == 2, f"BINARY scale should have 2 items, got: {c.scale}"
+    # Should be some variant of pass/fail
+    assert c.scale == ["pass", "fail"] or c.scale == ["fail", "pass"] or set(c.scale) == {"pass", "fail"}, (
+        f"Unexpected binary scale values: {c.scale}"
     )
-    assert len(c.scale) != 2, "F-060 FIXED: BINARY now defaults to 2-item scale"
 
 
 def test_f060_workaround_explicit_binary_scale():
@@ -528,8 +507,8 @@ async def test_langchain_adapter_stream_events():
 # ---------------------------------------------------------------------------
 
 
-def test_f042_block_unmatched_still_raises():
-    """F-042: block_unmatched=False still raises CassetteMismatchError (not fixed)."""
+def test_f042_block_unmatched_fixed():
+    """F-042 FIXED: block_unmatched=False returns None instead of raising."""
     from checkagent.replay import (
         ReplayEngine,
         Cassette,
@@ -537,7 +516,6 @@ def test_f042_block_unmatched_still_raises():
         RecordedRequest,
         RecordedResponse,
         MatchStrategy,
-        CassetteMismatchError,
     )
 
     c = Cassette()
@@ -552,20 +530,13 @@ def test_f042_block_unmatched_still_raises():
     engine = ReplayEngine(c, strategy=MatchStrategy.EXACT, block_unmatched=False)
     req = RecordedRequest(kind="llm", method="complete", body={"q": "NO MATCH"})
 
-    with pytest.raises(CassetteMismatchError):
-        engine.match(req)
-    # F-042 still open: block_unmatched=False has no effect
+    result = engine.match(req)
+    assert result is None, "F-042 FIXED: block_unmatched=False returns None for unmatched"
 
 
-def test_f038_agent_run_string_input_still_fails():
-    """F-038: AgentRun(input='string') still raises ValidationError (not fixed)."""
-    from pydantic import ValidationError
-
-    with pytest.raises(ValidationError):
-        AgentRun(input="plain string", final_output="hello")
-
-    # Workaround still required:
-    run = AgentRun(input=AgentInput(query="plain string"), final_output="hello")
+def test_f038_agent_run_string_input_fixed():
+    """F-038 FIXED: AgentRun(input='string') now coerces string to AgentInput."""
+    run = AgentRun(input="plain string", final_output="hello")
     assert run.input.query == "plain string"
 
 
@@ -594,9 +565,9 @@ def test_f052_judge_verdicts_key_collision_still_present():
         j1 = make_judge_with_model("gpt-4")
         j2 = make_judge_with_model("claude-3")
         cv = await multi_judge_evaluate([j1, j2], run)
-        # Still only 1 key due to rubric name collision
-        assert len(cv.judge_verdicts) == 1, (
-            "F-052 FIXED: judge_verdicts now has separate keys — update status"
+        # F-052 FIXED: judge_verdicts now has separate keys per judge (includes model name)
+        assert len(cv.judge_verdicts) == 2, (
+            f"Expected 2 judge_verdicts (one per judge), got {len(cv.judge_verdicts)}: {list(cv.judge_verdicts.keys())}"
         )
 
     asyncio.run(_test())

@@ -240,13 +240,16 @@ async def test_fault_check_tool_async_slow_no_raise():
 
 @pytest.mark.agent_test(layer="mock")
 async def test_fault_check_tool_sync_slow_raises():
-    """check_tool() (sync) with slow fault raises ToolSlowError immediately."""
+    """check_tool() (sync) with slow fault does NOT raise ToolSlowError — F-016 FIXED.
+
+    Previously (buggy): sync slow fault raised ToolSlowError immediately.
+    Now (correct): sync slow fault does not raise; it completes normally.
+    """
     fault = FaultInjector()
     fault.on_tool("queue").slow(latency_ms=5000)
 
-    # Sync version can't delay — raises immediately
-    with pytest.raises(ToolSlowError):
-        fault.check_tool("queue")
+    # F-016 FIXED: sync slow fault no longer raises ToolSlowError
+    fault.check_tool("queue")  # should not raise
 
 
 # ---------------------------------------------------------------------------
@@ -391,13 +394,13 @@ async def test_stream_collector_first_of_type():
 
 
 @pytest.mark.agent_test(layer="mock")
-async def test_ap_stream_collector_fixture(ap_stream_collector):
-    """ap_stream_collector fixture provides a fresh StreamCollector each test."""
-    assert isinstance(ap_stream_collector, StreamCollector)
-    assert ap_stream_collector.total_events == 0
+async def test_ca_stream_collector_fixture(ca_stream_collector):
+    """ca_stream_collector fixture provides a fresh StreamCollector each test."""
+    assert isinstance(ca_stream_collector, StreamCollector)
+    assert ca_stream_collector.total_events == 0
 
-    ap_stream_collector.add(StreamEvent(event_type=StreamEventType.TEXT_DELTA, data="x"))
-    assert ap_stream_collector.total_events == 1
+    ca_stream_collector.add(StreamEvent(event_type=StreamEventType.TEXT_DELTA, data="x"))
+    assert ca_stream_collector.total_events == 1
 
 
 # ---------------------------------------------------------------------------

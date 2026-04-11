@@ -522,10 +522,9 @@ class TestTaskCompletionEquals:
         assert r.passed is False
 
     def test_none_output_falsely_equals_empty_string(self):
-        """F-031: task_completion treats None output as '' — None == '' returns True."""
+        """F-031 FIXED: None != '' now correctly treated as False."""
         r = task_completion(self._run(None), expected_output_equals="")
-        # This is a bug: None != '' but task_completion returns passed=True
-        assert r.passed is True  # documents the current (buggy) behavior
+        assert r.passed is False
 
     def test_none_output_does_not_equal_nonempty_string(self):
         r = task_completion(self._run(None), expected_output_equals="hello")

@@ -105,7 +105,7 @@ Format:
 **Expected:** A method named `was_called_with` suggests "was this LLM called with a message containing this text" — i.e., substring matching.
 **Actual:** Exact match only. `llm.was_called_with("France")` → `False` even after calling with `"What is the capital of France?"`.
 **Workaround:** Use `llm.get_calls_matching("France")` for substring matching. Use `was_called_with` only when you know the exact input string.
-**Status:** Open
+**Status:** Fixed in v0.1.1
 
 ## F-010: `MockTool.assert_tool_called` returns None — inconsistent with top-level `assert_tool_called`
 **Date:** 2026-04-05
@@ -115,7 +115,7 @@ Format:
 **Expected:** `MockTool.assert_tool_called` to return the `ToolCallRecord` so call arguments can be inspected inline.
 **Actual:** Returns `None`. Must use `tool.last_call` or `tool.calls[n]` to inspect call details.
 **Workaround:** Use `tool.last_call` or `tool.calls` for call inspection after asserting.
-**Status:** Open
+**Status:** Fixed in v0.1.1
 
 ## F-011: `MockMCPServer` uses `handle_message` for dict input — not `handle`
 **Date:** 2026-04-05
@@ -181,7 +181,7 @@ Format:
 **Expected:** `slow()` should simulate latency — either sleep synchronously or be clearly documented as async-only. The current behavior converts a latency simulation into an exception that aborts the tool call.
 **Actual:** Synchronous `check_tool()` raises `ToolSlowError`. Only `check_tool_async()` produces real latency simulation.
 **Workaround:** Use `await fault.check_tool_async("x")` for slow fault simulation. Never use `check_tool()` for slow faults.
-**Status:** Open
+**Status:** Fixed in v0.1.1
 
 ---
 
@@ -229,7 +229,7 @@ Format:
 **Expected:** Eval metrics and aggregate helpers exported at top-level alongside the assertion functions (`assert_tool_called`, `assert_output_schema`, etc.) that ARE already there. At minimum `Evaluator` and `EvaluatorRegistry` should be top-level since they are the primary extension point.
 **Actual:** `from checkagent import step_efficiency` → `ImportError`. Same for all other eval classes.
 **Workaround:** Use internal imports from submodules.
-**Status:** Open
+**Status:** Fixed in v0.1.1
 
 ---
 
@@ -241,7 +241,7 @@ Format:
 **Expected:** Safety evaluator classes and supporting types exported at top-level, or at least from `checkagent.safety` as a clean public namespace (which it does provide, but is undiscoverable from `import checkagent`).
 **Actual:** `from checkagent import PromptInjectionDetector` → `ImportError`. `from checkagent import SafetyResult` → `ImportError`.
 **Workaround:** Use `from checkagent.safety import PromptInjectionDetector, PIILeakageScanner, ...` — these do work as a public subpackage import.
-**Status:** Open
+**Status:** Fixed in v0.1.1
 
 ---
 
@@ -253,7 +253,7 @@ Format:
 **Expected:** Either raise `NotImplementedError` (with a message directing to `evaluate_run`), or emit a warning. Silent no-op is misleading.
 **Actual:** `validator.evaluate("call dangerous tool now")` → `SafetyResult(passed=True)`. The user has no idea they used the wrong method.
 **Workaround:** Always use `evaluate_run(run)` for `ToolCallBoundaryValidator`. Never use `evaluate(text)`.
-**Status:** Open
+**Status:** Fixed in 0.1.2
 
 ---
 
@@ -265,7 +265,7 @@ Format:
 **Expected:** Either integer values for ordered comparison (`LOW=1`, `MEDIUM=2`, `HIGH=3`, `CRITICAL=4`) or implement `__lt__`/`__le__` on the enum so `Severity.HIGH > Severity.LOW` works naturally.
 **Actual:** `Severity.HIGH.value >= 3` → `TypeError: '>=' not supported between instances of 'str' and 'int'`. Must compare enum members directly (`severity in {Severity.HIGH, Severity.CRITICAL}`).
 **Workaround:** Compare enum members directly: `f.severity in {Severity.HIGH, Severity.CRITICAL}` or use the internal `SEVERITY_ORDER[severity]` for numeric comparison.
-**Status:** Open
+**Status:** Fixed in 0.1.2
 
 ---
 
@@ -301,7 +301,7 @@ Format:
 **Expected:** `Probe` and `ProbeSet` at top-level (or at least documented with the other safety exports). `probes.injection` is a namespace that naturally lives under `checkagent.safety.probes`, so not top-level there, but the README/docs should prominently feature it.
 **Actual:** `from checkagent import probes` → `ImportError`. `from checkagent import Probe` → `ImportError`. Must use `from checkagent.safety import probes`.
 **Workaround:** `from checkagent.safety import probes`, then `probes.injection.direct.all()` for parametrize.
-**Status:** Open
+**Status:** Fixed in v0.1.1
 
 ---
 
@@ -324,7 +324,7 @@ Format:
 **Expected:** CI gate classes exported at top-level alongside `CostTracker`, `Score`, etc. At minimum `evaluate_gates`, `generate_pr_comment`, and `QualityGateEntry` should be in `checkagent.ci.__all__`.
 **Actual:** `from checkagent import evaluate_gates` → `ImportError`. `from checkagent.ci import QualityGateEntry` → `ImportError` (not in `__all__`). Must use `from checkagent.ci.quality_gate import QualityGateEntry`.
 **Workaround:** `from checkagent import ci` works as a module import. `from checkagent.ci.quality_gate import QualityGateEntry` for the entry config type.
-**Status:** Open
+**Status:** Fixed in 0.1.2
 
 ---
 
@@ -348,7 +348,7 @@ Format:
 **Expected:** `QualityGateEntry` in `checkagent.ci.__all__` alongside `evaluate_gates` and `evaluate_gate`.
 **Actual:** `from checkagent.ci import QualityGateEntry` → `ImportError`. Must use `from checkagent.ci.quality_gate import QualityGateEntry`.
 **Workaround:** `from checkagent.ci.quality_gate import QualityGateEntry`
-**Status:** Open
+**Status:** Fixed in 0.1.2
 
 ---
 
@@ -360,7 +360,7 @@ Format:
 **Expected:** `task_completion` with `expected_output_equals=''` should only pass when `final_output` is actually `''`, not when it is `None`.
 **Actual:** `AgentRun(input=..., final_output=None)` + `expected_output_equals=''` → `Score(value=1.0, passed=True)`. Silently masks agents that produced no output when an empty string was expected.
 **Workaround:** Always check `run.final_output is not None` before calling `task_completion`, or use `check_no_error=True` + a non-empty `expected_output_contains` to avoid the empty-string trap.
-**Status:** Open
+**Status:** Fixed in v0.1.1
 
 ---
 
@@ -372,7 +372,7 @@ Format:
 **Expected:** `.all()` and `.all_probes` to return the same type (ProbeSet), or for `.all()` to return a ProbeSet so it can be composed with `+`.
 **Actual:** `type(injection.direct.all())` → `list`. `type(injection.direct.all_probes)` → N/A (`.all()` is the method; attribute access differs by module). Use `injection.all_probes` (module attribute, not method) for ProbeSet operations.
 **Workaround:** Use module-level `all_probes` attribute: `injection.all_probes + jailbreak.all_probes`. Avoid calling `.all()` when you need ProbeSet composition.
-**Status:** Open
+**Status:** Fixed in v0.1.1
 
 ---
 
@@ -384,7 +384,7 @@ Format:
 **Expected:** A way to surface regression results (metric drops vs baseline) in the PR comment — either via an `eval_summary` parameter or a dedicated regressions section.
 **Actual:** `generate_pr_comment(eval_summary=...)` → `TypeError: unexpected keyword argument`. Regressions detected by `detect_regressions()` can only be printed manually; they have no place in the automated PR reporter.
 **Workaround:** Append regression info to the comment manually, or translate regressions into quality gate failures and pass via `gate_report`.
-**Status:** Open
+**Status:** Fixed in 0.1.2
 
 ---
 
@@ -408,7 +408,7 @@ Format:
 **Expected:** `RunSummary.load()` to restore all fields that `save()` serializes, including `regressions`.
 **Actual:** `summary.save(path); loaded = RunSummary.load(path); loaded.regressions` → `[]`. The regressions are in the JSON file but are never read.
 **Workaround:** Recompute regressions after loading: `regressions = detect_regressions(loaded.aggregates, baseline.aggregates)`. Do not rely on round-tripped regressions.
-**Status:** Open
+**Status:** Fixed in v0.1.1
 
 ---
 
@@ -480,7 +480,7 @@ Format:
 **Expected:** Core cassette types (`Cassette`, `Interaction`, `RecordedRequest`, `RecordedResponse`) exported at top-level alongside `AgentRun`, `MockLLM`, etc.
 **Actual:** `from checkagent import Cassette` → `ImportError`. Must use `from checkagent.replay import Cassette`.
 **Workaround:** `from checkagent.replay import Cassette, Interaction, RecordedRequest, RecordedResponse, redact_dict`
-**Status:** Open
+**Status:** Partially fixed in v0.1.1 — Cassette and ReplayEngine now at top-level; CassetteMeta/CassetteMismatchError/CassetteRecorder still not exported
 
 ---
 
@@ -565,7 +565,7 @@ Format:
 **Expected:** Core judge types (`Judge`, `RubricJudge`, `Rubric`, `Criterion`, `compute_verdict`, `Verdict`) exported at top-level alongside `AgentRun`, `MockLLM`, etc.
 **Actual:** `from checkagent import RubricJudge` → `ImportError`. Same for all other judge classes. `from checkagent.judge import ...` works.
 **Workaround:** `from checkagent.judge import Judge, RubricJudge, Rubric, Criterion, CriterionScore, JudgeScore, JudgeVerdict, Verdict, ScaleType, compute_verdict`
-**Status:** Open
+**Status:** Fixed in v0.1.1
 
 ---
 
@@ -589,7 +589,7 @@ Format:
 **Expected:** Either a `JudgeError` or similar checkagent-specific exception with the LLM's actual response and a reminder of the expected JSON format, or graceful fallback handling.
 **Actual:** `await judge.evaluate(run)` when LLM returns plain text → `JSONDecodeError: Expecting value: line 1 column 1 (char 0)`. The raw exception is hard to diagnose without knowing to look at the judge's `_parse_judge_response` function.
 **Workaround:** Wrap `judge.evaluate()` in a try/except for `json.JSONDecodeError` in your tests. Ensure mock LLM callables always return valid JSON.
-**Status:** Open
+**Status:** Fixed in 0.1.2
 
 ---
 
@@ -625,7 +625,7 @@ Format:
 **Expected:** `ConsensusVerdict` and `multi_judge_evaluate` exported from top-level `checkagent` alongside `AgentRun`, `MockLLM`, etc.
 **Actual:** `from checkagent import ConsensusVerdict` → `ImportError`. `from checkagent import multi_judge_evaluate` → `ImportError`. Must use `from checkagent.judge import ConsensusVerdict, multi_judge_evaluate`.
 **Workaround:** `from checkagent.judge import ConsensusVerdict, multi_judge_evaluate`
-**Status:** Open
+**Status:** Fixed in v0.1.1
 
 ---
 
@@ -637,7 +637,7 @@ Format:
 **Expected:** Adapter tests should use a sleep/sleep-like operation safely above Windows `time.monotonic()` resolution (~15ms), or use `>= 0` instead of `> 0`.
 **Actual:** `test_error_handling` calls a chain that raises `ValueError('bad input')` immediately — no sleep — so `duration_ms` is `0.0` on Windows. The assertion `assert result.duration_ms > 0` fails.
 **Workaround:** None for users. CI only passes on Linux/macOS and Python 3.13 Windows.
-**Status:** Open
+**Status:** Fixed in 0.1.2
 
 ---
 
@@ -649,7 +649,7 @@ Format:
 **Expected:** `langchain-core` listed as an optional extra (`checkagent[langchain]`) so users see a clear installation path, or at minimum mentioned in adapter docs.
 **Actual:** `pip install checkagent` → `from checkagent.adapters.langchain import LangChainAdapter; LangChainAdapter(runnable)` → `ImportError`.
 **Workaround:** Manually run `pip install langchain-core` before using `LangChainAdapter`.
-**Status:** Open
+**Status:** Fixed in v0.1.1
 
 ---
 
@@ -673,7 +673,7 @@ Format:
 **Expected:** `LangChainAdapter` and `OpenAIAgentsAdapter` exported from top-level alongside `GenericAdapter`.
 **Actual:** `from checkagent import LangChainAdapter` → `ImportError`.
 **Workaround:** Use submodule imports: `from checkagent.adapters.langchain import LangChainAdapter`, `from checkagent.adapters.openai_agents import OpenAIAgentsAdapter`.
-**Status:** Open
+**Status:** Fixed in v0.1.1
 
 ---
 
@@ -685,7 +685,7 @@ Format:
 **Expected:** `JudgeScore.passed` property returning `overall >= 0.5` (or a configurable threshold), mirroring `Score.passed` in the eval metrics module.
 **Actual:** `score = await judge.evaluate(run); score.passed` → `AttributeError: 'JudgeScore' object has no attribute 'passed'`.
 **Workaround:** Use `compute_verdict(judge, run, num_trials=1).passed` for a single-trial pass/fail check.
-**Status:** Open
+**Status:** Fixed in 0.1.2
 
 ---
 
@@ -758,7 +758,7 @@ Format:
 **Expected:** `AnthropicAdapter`, `CrewAIAdapter`, `PydanticAIAdapter` (and `LangChainAdapter`, `OpenAIAgentsAdapter`) all exported from top-level `checkagent`.
 **Actual:** `from checkagent import AnthropicAdapter` → `ImportError`. Same for CrewAI and PydanticAI adapters.
 **Workaround:** Use submodule imports: `from checkagent.adapters.anthropic import AnthropicAdapter`, etc.
-**Status:** Open
+**Status:** Fixed in v0.1.1
 
 ---
 
@@ -770,7 +770,7 @@ Format:
 **Expected:** Each adapter's required package listed as an optional extra so users can `pip install checkagent[anthropic]` etc.
 **Actual:** No extras declared. Users must manually discover and install each dep.
 **Workaround:** `pip install anthropic` / `pip install crewai` / `pip install pydantic-ai` before using the respective adapters.
-**Status:** Open
+**Status:** Fixed in v0.1.1
 
 ---
 
@@ -782,7 +782,7 @@ Format:
 **Expected:** `render_junit_xml`, `from_run_summary`, `from_quality_gate_report` exported from top-level or prominently documented under `checkagent.ci`.
 **Actual:** `from checkagent import render_junit_xml` → `ImportError`. `from checkagent.ci import render_junit_xml` works correctly.
 **Workaround:** `from checkagent.ci import render_junit_xml, from_run_summary, from_quality_gate_report, JUnitTestSuite, JUnitTestCase`
-**Status:** Open
+**Status:** Fixed in 0.1.2
 
 ---
 
@@ -818,7 +818,7 @@ Format:
 **Expected:** Core multiagent types exported at top-level alongside `AgentRun`, `MockLLM`, etc., or at minimum `multiagent` accessible via `checkagent.multiagent` from `dir(checkagent)`.
 **Actual:** `from checkagent import MultiAgentTrace` → `ImportError`. `from checkagent import assign_blame` → `ImportError`. `'multiagent' in dir(checkagent)` → `False`.
 **Workaround:** `from checkagent.multiagent import MultiAgentTrace, Handoff, BlameStrategy, assign_blame, assign_blame_ensemble, top_blamed_agent`
-**Status:** Open
+**Status:** Partially fixed in v0.1.1 — MultiAgentTrace and HandoffType now at top-level; blame functions and Handoff model still not exported
 
 ---
 
@@ -830,7 +830,7 @@ Format:
 **Expected:** `LEAF_ERRORS` should blame agent B (no outgoing handoffs → leaf) in an A → B chain.
 **Actual:** `LEAF_ERRORS` blames agent A (has outgoing handoff to B → not a leaf). The "no children" message in the reason is factually wrong.
 **Workaround:** Don't use `LEAF_ERRORS` strategy for actual leaf identification. Use `LAST_AGENT` or `FIRST_ERROR` as more reliable alternatives. Verify blame attribution manually in complex topologies.
-**Status:** Open
+**Status:** Fixed in 0.1.2
 
 ---
 
@@ -1062,7 +1062,7 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** `from checkagent import PydanticAIAdapter`
 **Actual:** `from checkagent.adapters.pydantic_ai import PydanticAIAdapter`
 **Workaround:** Import from the submodule path.
-**Status:** Open
+**Status:** Fixed in 0.1.2
 
 ---
 
@@ -1087,3 +1087,48 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Actual:** No `[all]` extra exists; users must manually combine extras.
 **Workaround:** `pip install "checkagent[json-schema,structured,otel]"` and then add framework packages separately.
 **Status:** Open
+
+---
+
+## F-089: `--generate-tests` uses private API (_resolve_callable, _evaluate_output)
+**Date:** 2026-04-11
+**Severity:** low
+**Category:** dx-friction
+**Description:** `checkagent scan --generate-tests <file>` generates a pytest file that imports `_resolve_callable` and `_evaluate_output` from `checkagent.cli.scan`. These are private functions (underscore prefix convention) that can change or be removed in any release. Generated test files become fragile — a checkagent upgrade can silently break them.
+**Expected:** Generated tests use stable public API only (e.g., import the agent callable directly, use `PromptInjectionDetector` or other public evaluators).
+**Actual:** `from checkagent.cli.scan import _resolve_callable, _evaluate_output` in every generated file.
+**Workaround:** Manually edit generated tests to avoid private imports. Or don't upgrade checkagent without re-generating the tests.
+**Status:** Open
+
+---
+
+## F-090: `ResilienceProfile.to_dict()` omits `best_scenario`
+**Date:** 2026-04-11
+**Severity:** low
+**Category:** bug
+**Description:** `ResilienceProfile` has a `best_scenario` attribute, but `to_dict()` does not include it in the serialized output. The returned dict has `worst_scenario` and `weakest_metric` but not `best_scenario`. This makes `to_dict()` an incomplete serialization of the profile — users relying on `to_dict()` for logging/reporting lose the best-scenario information.
+**Expected:** `to_dict()` includes all profile attributes: `overall_resilience`, `baseline`, `worst_scenario`, `best_scenario`, `weakest_metric`, `scenarios`.
+**Actual:** `"best_scenario"` key is absent from `to_dict()` output.
+**Workaround:** Access `profile.best_scenario` directly on the object; don't rely on `to_dict()` for this field.
+**Status:** Open
+
+---
+
+## F-091: ci-init path separator bug on Windows (upstream CI regression)
+**Date:** 2026-04-11
+**Severity:** medium
+**Category:** bug
+**Description:** Upstream CI is failing on all Windows jobs for the commit "Add ci-init command and fix silent LLM judge failure on bad API key". Test `TestCiInitCommand::test_github_is_default_platform` fails because the output contains a Windows-style path with backslashes, but the test checks for `.github/workflows/checkagent.yml` (forward slash). The success message uses the OS path separator instead of a normalized forward-slash form.
+**Expected:** ci-init output message shows `.github/workflows/checkagent.yml` (forward slashes) on all platforms.
+**Actual:** On Windows: `\.github\workflows\checkagent.yml` (backslashes) in output message, causing substring check to fail.
+**Workaround:** On Linux/Mac (where we test), ci-init works correctly.
+**Status:** Open (upstream CI red for this commit on all Windows jobs)
+
+---
+
+## F-092: Version inconsistency FIXED in 0.1.2
+**Date:** 2026-04-11
+**Severity:** N/A (closed)
+**Category:** bug (fixed)
+**Description:** In 0.1.1, `checkagent.__version__` was `'0.1.0'` while `importlib.metadata.version('checkagent')` returned `'0.1.1'`. Both now return `'0.1.2'` in the current release.
+**Status:** Fixed in 0.1.2

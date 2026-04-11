@@ -30,7 +30,7 @@ class TestF036Fixed:
     def test_datasets_importable(self):
         from checkagent.datasets import (
             GoldenDataset,
-            TestCase,
+            EvalCase,  # TestCase renamed to EvalCase
             load_dataset,
             load_cases,
             parametrize_cases,
@@ -135,16 +135,15 @@ class TestCIStatusFinding:
 class TestCassetteImports:
     """F-041: Cassette types not exported from top-level checkagent."""
 
-    def test_cassette_not_at_top_level(self):
-        """F-041: Cassette and friends absent from top-level checkagent namespace."""
+    def test_cassette_partial_top_level(self):
+        """F-041 PARTIALLY FIXED: Cassette now at top-level; others still internal."""
         import checkagent
 
-        assert not hasattr(checkagent, "Cassette")
+        assert hasattr(checkagent, "Cassette"), "Cassette should be at top-level now"
+        # Still not at top-level:
         assert not hasattr(checkagent, "CassetteMeta")
         assert not hasattr(checkagent, "Interaction")
         assert not hasattr(checkagent, "RecordedRequest")
-        assert not hasattr(checkagent, "RecordedResponse")
-        assert not hasattr(checkagent, "redact_dict")
 
     def test_replay_submodule_accessible(self):
         """checkagent.replay is accessible as a submodule (not top-level)."""

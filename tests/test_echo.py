@@ -6,7 +6,7 @@ from agents.echo_agent import echo_agent
 
 
 @pytest.mark.agent_test(layer="mock")
-async def test_echo_basic(ap_mock_llm):
+async def test_echo_basic(ca_mock_llm):
     """Echo agent should return uppercased input."""
     result = await echo_agent.run("hello world")
 
@@ -15,7 +15,7 @@ async def test_echo_basic(ap_mock_llm):
 
 
 @pytest.mark.agent_test(layer="mock")
-async def test_echo_preserves_input(ap_mock_llm):
+async def test_echo_preserves_input(ca_mock_llm):
     """The run should record what was sent in."""
     result = await echo_agent.run("test input")
 
@@ -24,7 +24,7 @@ async def test_echo_preserves_input(ap_mock_llm):
 
 
 @pytest.mark.agent_test(layer="mock")
-async def test_echo_empty_string(ap_mock_llm):
+async def test_echo_empty_string(ca_mock_llm):
     """Edge case: empty string."""
     result = await echo_agent.run("")
 

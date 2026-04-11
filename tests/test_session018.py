@@ -261,13 +261,13 @@ class TestMigrateCassettesV0Failure:
 class TestCassetteStrVsPath:
     """Cassette.save() and Cassette.load() raise AttributeError on str input."""
 
-    def test_save_with_str_raises_attribute_error(self):
-        """Cassette.save(str_path) raises AttributeError — expects pathlib.Path."""
+    def test_save_with_str_works_now(self):
+        """F-046 FIXED: Cassette.save(str_path) now works (str accepted)."""
         with tempfile.TemporaryDirectory() as tmpdir:
             cassette = Cassette(meta=CassetteMeta(test_id="test"), interactions=[])
             str_path = tmpdir + "/test.json"
-            with pytest.raises(AttributeError):
-                cassette.save(str_path)
+            cassette.save(str_path)  # Should not raise
+            assert Path(str_path).exists()
 
     def test_save_with_path_works(self):
         """Cassette.save(Path) works correctly."""
@@ -276,14 +276,14 @@ class TestCassetteStrVsPath:
             cassette.save(Path(tmpdir) / "test.json")
             assert (Path(tmpdir) / "test.json").exists()
 
-    def test_load_with_str_raises_attribute_error(self):
-        """Cassette.load(str_path) raises AttributeError — expects pathlib.Path."""
+    def test_load_with_str_works_now(self):
+        """F-046 FIXED: Cassette.load(str_path) now works (str accepted)."""
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "test.json"
             cassette = Cassette(meta=CassetteMeta(test_id="test"), interactions=[])
             cassette.save(path)
-            with pytest.raises(AttributeError):
-                Cassette.load(str(path))
+            loaded = Cassette.load(str(path))
+            assert loaded.meta.test_id == "test"
 
     def test_load_with_path_works(self):
         """Cassette.load(Path) works correctly and restores all data."""
@@ -294,31 +294,14 @@ class TestCassetteStrVsPath:
             loaded = Cassette.load(path)
             assert loaded.meta.test_id == "test_load"
 
-    def test_save_str_error_message_not_helpful(self):
-        """AttributeError from save(str) doesn't hint at Path requirement — DX gap."""
+    def test_save_and_load_str_round_trip(self):
+        """F-046 FIXED: save(str) + load(str) round-trip works correctly."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            cassette = Cassette(meta=CassetteMeta(test_id="test"), interactions=[])
-            try:
-                cassette.save(tmpdir + "/test.json")
-                pytest.fail("Expected AttributeError")
-            except AttributeError as e:
-                # The error message mentions 'parent' attribute — not helpful
-                # Users who see this won't know to use Path()
-                assert "parent" in str(e)
-                assert "Path" not in str(e)  # no hint about the fix
-
-    def test_load_str_error_message_not_helpful(self):
-        """AttributeError from load(str) doesn't hint at Path requirement — DX gap."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            path = Path(tmpdir) / "test.json"
-            Cassette(meta=CassetteMeta(test_id="test"), interactions=[]).save(path)
-            try:
-                Cassette.load(str(path))
-                pytest.fail("Expected AttributeError")
-            except AttributeError as e:
-                # The error message mentions 'read_text' attribute — not helpful
-                assert "read_text" in str(e)
-                assert "Path" not in str(e)
+            str_path = tmpdir + "/roundtrip.json"
+            cassette = Cassette(meta=CassetteMeta(test_id="roundtrip"), interactions=[])
+            cassette.save(str_path)
+            loaded = Cassette.load(str_path)
+            assert loaded.meta.test_id == "roundtrip"
 
 
 # ---------------------------------------------------------------------------

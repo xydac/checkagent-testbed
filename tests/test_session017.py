@@ -389,34 +389,36 @@ class TestReplayEngineSubset:
 # ---------------------------------------------------------------------------
 
 
-class TestF042BlockUnmatchedHasNoEffect:
-    """F-042: block_unmatched=False never suppresses CassetteMismatchError."""
+class TestF042BlockUnmatchedFixed:
+    """F-042 FIXED: block_unmatched=False now returns None for unmatched (passthrough)."""
 
-    def test_block_unmatched_false_exact_still_raises_on_mismatch(self):
+    def test_block_unmatched_false_exact_returns_none_on_mismatch(self):
+        """F-042 FIXED: EXACT + block_unmatched=False returns None on mismatch."""
         recorder = CassetteRecorder()
         recorder.record_llm_call("complete", {"content": "hello"}, "world")
         cassette = recorder.finalize()
         engine = ReplayEngine(cassette, strategy=MatchStrategy.EXACT, block_unmatched=False)
         req = RecordedRequest(kind="llm", method="complete", body={"content": "different"})
-        # block_unmatched=False should return None or allow passthrough
-        # but it still raises — this is a bug
-        with pytest.raises(CassetteMismatchError):
-            engine.match(req)
+        # F-042 FIXED: returns None instead of raising
+        result = engine.match(req)
+        assert result is None, "block_unmatched=False should return None for unmatched"
 
-    def test_block_unmatched_false_sequence_still_raises_when_exhausted(self):
+    def test_block_unmatched_false_sequence_returns_none_when_exhausted(self):
+        """F-042 FIXED: SEQUENCE + block_unmatched=False returns None when exhausted."""
         cassette = make_simple_cassette(n_llm=1)
         engine = ReplayEngine(cassette, strategy=MatchStrategy.SEQUENCE, block_unmatched=False)
         req = RecordedRequest(kind="llm", method="complete")
         engine.match(req)  # consume
-        # Expected: returns None (passthrough). Actual: still raises
-        with pytest.raises(CassetteMismatchError):
-            engine.match(req)
+        # F-042 FIXED: returns None instead of raising
+        result = engine.match(req)
+        assert result is None, "Exhausted cassette with block_unmatched=False should return None"
 
-    def test_block_unmatched_false_subset_still_raises_on_wrong_kind(self):
+    def test_block_unmatched_true_still_raises(self):
+        """block_unmatched=True (default) still raises CassetteMismatchError on mismatch."""
         cassette = make_simple_cassette(n_llm=1)
-        engine = ReplayEngine(cassette, strategy=MatchStrategy.SUBSET, block_unmatched=False)
-        # Wrong kind — should passthrough when block_unmatched=False
-        req = RecordedRequest(kind="tool", method="search", body={})
+        engine = ReplayEngine(cassette, strategy=MatchStrategy.SEQUENCE, block_unmatched=True)
+        req = RecordedRequest(kind="llm", method="complete")
+        engine.match(req)  # consume
         with pytest.raises(CassetteMismatchError):
             engine.match(req)
 

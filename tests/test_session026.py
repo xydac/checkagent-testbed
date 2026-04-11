@@ -278,8 +278,8 @@ def test_f073_api_inconsistency_with_other_methods():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.agent_test
-def test_handoff_chain_simple_cycle_no_crash():
-    """handoff_chain() with a 2-node cycle doesn't crash — returns a list with repeated node."""
+def test_handoff_chain_simple_cycle_raises_value_error():
+    """F-077 FIXED: handoff_chain() now raises ValueError on 2-node cycle."""
     run_a = _make_run("a", run_id="run-a")
     run_b = _make_run("b", run_id="run-b")
     trace = MultiAgentTrace(
@@ -289,14 +289,28 @@ def test_handoff_chain_simple_cycle_no_crash():
             Handoff(from_agent_id="b", to_agent_id="a"),
         ],
     )
-    # Should not raise
-    chain = trace.handoff_chain()
-    assert isinstance(chain, list), "handoff_chain() must return a list even with cycles"
+    with pytest.raises(ValueError, match="Cycle detected"):
+        trace.handoff_chain()
 
 
 @pytest.mark.agent_test
-def test_handoff_chain_three_node_cycle():
-    """handoff_chain() with a 3-node cycle: a→b→c→a returns list without infinite loop."""
+def test_has_cycles_detects_two_node_cycle():
+    """F-077 FIXED: has_cycles() returns True for 2-node cycle."""
+    run_a = _make_run("a", run_id="run-a")
+    run_b = _make_run("b", run_id="run-b")
+    trace = MultiAgentTrace(
+        runs=[run_a, run_b],
+        handoffs=[
+            Handoff(from_agent_id="a", to_agent_id="b"),
+            Handoff(from_agent_id="b", to_agent_id="a"),
+        ],
+    )
+    assert trace.has_cycles() is True
+
+
+@pytest.mark.agent_test
+def test_handoff_chain_three_node_cycle_raises():
+    """F-077 FIXED: handoff_chain() raises ValueError on 3-node cycle."""
     run_a = _make_run("a", run_id="run-a")
     run_b = _make_run("b", run_id="run-b")
     run_c = _make_run("c", run_id="run-c")
@@ -308,11 +322,26 @@ def test_handoff_chain_three_node_cycle():
             Handoff(from_agent_id="c", to_agent_id="a"),
         ],
     )
+    with pytest.raises(ValueError, match="Cycle detected"):
+        trace.handoff_chain()
+
+
+@pytest.mark.agent_test
+def test_has_cycles_false_for_dag():
+    """has_cycles() returns False for a linear/acyclic handoff chain."""
+    run_a = _make_run("a", run_id="run-a")
+    run_b = _make_run("b", run_id="run-b")
+    run_c = _make_run("c", run_id="run-c")
+    trace = MultiAgentTrace(
+        runs=[run_a, run_b, run_c],
+        handoffs=[
+            Handoff(from_agent_id="a", to_agent_id="b"),
+            Handoff(from_agent_id="b", to_agent_id="c"),
+        ],
+    )
+    assert trace.has_cycles() is False
     chain = trace.handoff_chain()
-    # Implementation follows handoffs in order without infinite recursion
-    assert isinstance(chain, list)
-    assert len(chain) >= 3, "Should include at least all agents in the cycle"
-    assert "a" in chain and "b" in chain and "c" in chain
+    assert chain == ["a", "b", "c"]
 
 
 # ---------------------------------------------------------------------------

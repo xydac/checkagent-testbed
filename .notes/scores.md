@@ -224,3 +224,10 @@ Rate each feature on:
 | PydanticAIAdapter structured output | 5 | 4 | Pydantic model instance flows through correctly; use model_dump() for assert_output_schema | 2026-04-06 |
 | checkagent[all] extra | 1 | 1 | F-088: No [all] extra — users must manually combine extras and install framework deps separately | 2026-04-06 |
 | LangChain tool-calling agents | 2 | 2 | bind_tools() raises NotImplementedError on GenericFakeChatModel — no clean fake model for tool calling; custom stateful runnable works as workaround but mock layer cannot intercept internal tool calls | 2026-04-06 |
+| upstream CI (session-033) | 2 | 2 | Red — Windows-only failure on new ci-init command (F-091 path separator). Breaks 9-session green streak. All non-Windows platforms passing. | 2026-04-11 |
+| top-level exports (0.1.2 batch fix) | 5 | 5 | F-020/F-021/F-026/F-030/F-032/F-048/F-053/F-057/F-063/F-068/F-086 ALL FIXED — 11 findings resolved in one release. Every adapter, eval, safety, judge, multiagent class now at top-level checkagent. | 2026-04-11 |
+| checkagent scan CLI | 4 | 4 | New in 0.1.2: scans Python callables + HTTP endpoints; all 4 categories (injection/jailbreak/pii/scope); JSON output, badge SVG, --generate-tests; async agents handled correctly; F-089 (private API in generated tests) | 2026-04-11 |
+| checkagent ci-init CLI | 4 | 4 | New in 0.1.2: scaffolds GitHub/GitLab CI configs; valid YAML; custom scan targets; --force overwrite; clean UX; F-091 (Windows path separator in output message) | 2026-04-11 |
+| PydanticAI adapter streaming | 5 | 5 | run_stream() emits RUN_START/TEXT_DELTA/RUN_END; StreamCollector works correctly; aggregated_text correct; time_to_first_token populated | 2026-04-11 |
+| ResilienceProfile | 4 | 4 | from_scores() and from_runs() both work; to_dict() complete except best_scenario (F-090); worst_scenario/weakest_metric correct; overall capped at [0,1] | 2026-04-11 |
+| version consistency (0.1.2) | 5 | 5 | __version__ and importlib.metadata both return '0.1.2'. Version inconsistency bug from 0.1.1 fixed. | 2026-04-11 |

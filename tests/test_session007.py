@@ -24,12 +24,14 @@ from checkagent import (
     assert_tool_called,
 )
 from checkagent.datasets import (
+    EvalCase,
     GoldenDataset,
-    TestCase,
     load_cases,
     load_dataset,
     parametrize_cases,
 )
+# TestCase was renamed to EvalCase — alias for session-007 tests
+TestCase = EvalCase
 from dirty_equals import AnyThing, IsStr
 
 # ---------------------------------------------------------------------------
@@ -199,7 +201,7 @@ cases:
 
 
 def test_load_dataset_yaml_integer_version_raises():
-    """YAML with unquoted integer version field raises ValidationError — F-012."""
+    """YAML with unquoted integer version no longer raises — F-012 FIXED."""
     yaml_content = """
 name: yaml-dataset
 version: 2
@@ -211,11 +213,10 @@ cases:
         f.write(yaml_content)
         tmppath = f.name
     try:
-        # This SHOULD work: version 2 is semantically valid, but pydantic rejects
-        # int because GoldenDataset.version is typed as str with no coercion.
-        # Filed as F-012.
-        with pytest.raises(Exception):
-            load_dataset(tmppath)
+        # F-012 FIXED: integer version is now coerced to str, no exception raised
+        ds = load_dataset(tmppath)
+        assert ds.name == "yaml-dataset"
+        assert len(ds.cases) == 1
     finally:
         os.unlink(tmppath)
 

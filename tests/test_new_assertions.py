@@ -28,13 +28,13 @@ from agents.booking_agent import run_booking
 
 
 @pytest.mark.agent_test(layer="mock")
-async def test_assert_tool_called_top_level_happy_path(ap_mock_llm, ap_mock_tool):
+async def test_assert_tool_called_top_level_happy_path(ca_mock_llm, ca_mock_tool):
     """assert_tool_called as a free function should match calls in AgentRun."""
-    ap_mock_llm.add_rule("book", "check_calendar")
-    ap_mock_tool.register("check_calendar", response={"available": True})
-    ap_mock_tool.register("create_event", response={"event_id": "evt_007", "confirmed": True})
+    ca_mock_llm.add_rule("book", "check_calendar")
+    ca_mock_tool.register("check_calendar", response={"available": True})
+    ca_mock_tool.register("create_event", response={"event_id": "evt_007", "confirmed": True})
 
-    result = await run_booking("Book a meeting", llm=ap_mock_llm, tool=ap_mock_tool)
+    result = await run_booking("Book a meeting", llm=ca_mock_llm, tool=ca_mock_tool)
 
     # Top-level assert_tool_called should work the same as MockTool.assert_tool_called
     assert_tool_called(result, "check_calendar")
@@ -42,39 +42,39 @@ async def test_assert_tool_called_top_level_happy_path(ap_mock_llm, ap_mock_tool
 
 
 @pytest.mark.agent_test(layer="mock")
-async def test_assert_tool_called_with_args(ap_mock_llm, ap_mock_tool):
+async def test_assert_tool_called_with_args(ca_mock_llm, ca_mock_tool):
     """assert_tool_called should support keyword arg matching."""
-    ap_mock_llm.add_rule("book", "check_calendar")
-    ap_mock_tool.register("check_calendar", response={"available": True})
-    ap_mock_tool.register("create_event", response={"event_id": "evt_008", "confirmed": True})
+    ca_mock_llm.add_rule("book", "check_calendar")
+    ca_mock_tool.register("check_calendar", response={"available": True})
+    ca_mock_tool.register("create_event", response={"event_id": "evt_008", "confirmed": True})
 
-    result = await run_booking("Book a meeting", llm=ap_mock_llm, tool=ap_mock_tool)
+    result = await run_booking("Book a meeting", llm=ca_mock_llm, tool=ca_mock_tool)
 
     assert_tool_called(result, "check_calendar", date="2026-04-10")
     assert_tool_called(result, "create_event", title="Meeting")
 
 
 @pytest.mark.agent_test(layer="mock")
-async def test_assert_tool_called_raises_on_missing(ap_mock_llm, ap_mock_tool):
+async def test_assert_tool_called_raises_on_missing(ca_mock_llm, ca_mock_tool):
     """assert_tool_called should raise StructuredAssertionError for unmatched tools."""
-    ap_mock_llm.add_rule("book", "check_calendar")
-    ap_mock_tool.register("check_calendar", response={"available": True})
-    ap_mock_tool.register("create_event", response={"event_id": "evt_009", "confirmed": True})
+    ca_mock_llm.add_rule("book", "check_calendar")
+    ca_mock_tool.register("check_calendar", response={"available": True})
+    ca_mock_tool.register("create_event", response={"event_id": "evt_009", "confirmed": True})
 
-    result = await run_booking("Book a meeting", llm=ap_mock_llm, tool=ap_mock_tool)
+    result = await run_booking("Book a meeting", llm=ca_mock_llm, tool=ca_mock_tool)
 
     with pytest.raises(StructuredAssertionError):
         assert_tool_called(result, "nonexistent_tool")
 
 
 @pytest.mark.agent_test(layer="mock")
-async def test_assert_tool_called_returns_toolcall(ap_mock_llm, ap_mock_tool):
+async def test_assert_tool_called_returns_toolcall(ca_mock_llm, ca_mock_tool):
     """assert_tool_called should return the matched ToolCall for further inspection."""
-    ap_mock_llm.add_rule("book", "check_calendar")
-    ap_mock_tool.register("check_calendar", response={"available": True})
-    ap_mock_tool.register("create_event", response={"event_id": "evt_010", "confirmed": True})
+    ca_mock_llm.add_rule("book", "check_calendar")
+    ca_mock_tool.register("check_calendar", response={"available": True})
+    ca_mock_tool.register("create_event", response={"event_id": "evt_010", "confirmed": True})
 
-    result = await run_booking("Book a meeting", llm=ap_mock_llm, tool=ap_mock_tool)
+    result = await run_booking("Book a meeting", llm=ca_mock_llm, tool=ca_mock_tool)
 
     tc = assert_tool_called(result, "create_event")
     assert isinstance(tc, ToolCall)

@@ -39,17 +39,15 @@ def test_f082_fixed_on_llm_intermittent_at_zero_rate():
 
 
 @pytest.mark.agent_test
-def test_f082_fixed_on_llm_slow_sync_raises():
-    """on_llm().slow() with check_llm() sync raises LLMSlowError (consistent with tool behavior)."""
-    from checkagent.mock.fault import LLMSlowError
-
+def test_f082_fixed_on_llm_slow_sync_sleeps():
+    """F-016 FIXED: on_llm().slow() with check_llm() sync now sleeps (not raise)."""
     fi = FaultInjector()
     fi.on_llm().slow(latency_ms=50)
 
-    with pytest.raises(LLMSlowError) as exc_info:
-        fi.check_llm()
-
-    assert "50" in str(exc_info.value) or "slow" in str(exc_info.value).lower()
+    t0 = time.perf_counter()
+    fi.check_llm()  # No longer raises — sleeps
+    elapsed_ms = (time.perf_counter() - t0) * 1000
+    assert elapsed_ms >= 40, f"Expected ~50ms sleep, got {elapsed_ms:.0f}ms"
 
 
 @pytest.mark.agent_test
@@ -86,20 +84,20 @@ def test_f082_fixed_llm_intermittent_triggers_correctly():
 
 @pytest.mark.agent_test
 def test_f082_fixed_llm_slow_consistent_with_tool_slow():
-    """LLM slow (sync) raises, tool slow (sync) also raises — behavior is now symmetric."""
-    from checkagent.mock.fault import LLMSlowError, ToolSlowError
-
-    # LLM slow sync
+    """F-016 FIXED: LLM slow (sync) and tool slow (sync) both sleep — symmetric behavior."""
+    # LLM slow sync — sleeps
     fi_llm = FaultInjector()
     fi_llm.on_llm().slow(latency_ms=50)
-    with pytest.raises(LLMSlowError):
-        fi_llm.check_llm()
+    t0 = time.perf_counter()
+    fi_llm.check_llm()
+    assert (time.perf_counter() - t0) * 1000 >= 40
 
-    # Tool slow sync
+    # Tool slow sync — sleeps
     fi_tool = FaultInjector()
     fi_tool.on_tool("my_tool").slow(latency_ms=50)
-    with pytest.raises(ToolSlowError):
-        fi_tool.check_tool("my_tool")
+    t0 = time.perf_counter()
+    fi_tool.check_tool("my_tool")
+    assert (time.perf_counter() - t0) * 1000 >= 40
 
 
 # ---------------------------------------------------------------------------
@@ -178,9 +176,8 @@ async def test_mocklllm_attach_faults_slow_llm_async_real_delay():
 
 
 @pytest.mark.agent_test
-def test_mocklllm_attach_faults_slow_llm_sync_raises():
-    """MockLLM.complete_sync() with slow LLM fault raises LLMSlowError."""
-    from checkagent.mock.fault import LLMSlowError
+def test_mocklllm_attach_faults_slow_llm_sync_sleeps():
+    """F-016 FIXED: MockLLM.complete_sync() with slow LLM fault now sleeps (not raise)."""
     from checkagent.mock.llm import MockLLM
 
     fi = FaultInjector()
@@ -189,8 +186,10 @@ def test_mocklllm_attach_faults_slow_llm_sync_raises():
     llm = MockLLM()
     llm.attach_faults(fi)
 
-    with pytest.raises(LLMSlowError):
-        llm.complete_sync("anything")
+    t0 = time.perf_counter()
+    llm.complete_sync("anything")  # Should sleep, not raise
+    elapsed_ms = (time.perf_counter() - t0) * 1000
+    assert elapsed_ms >= 40, f"Expected ~50ms sleep, got {elapsed_ms:.0f}ms"
 
 
 # ---------------------------------------------------------------------------

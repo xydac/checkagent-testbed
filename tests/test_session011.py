@@ -15,7 +15,7 @@ import tempfile
 import pytest
 
 from checkagent import AgentInput, AgentRun, Score, Step, ToolCall
-from checkagent.datasets import TestCase
+from checkagent.datasets import EvalCase as TestCase  # renamed upstream
 from checkagent.eval.aggregate import (
     RunSummary,
     aggregate_scores,
@@ -74,7 +74,7 @@ def test_probeset_len_matches_all():
 
 
 def test_probe_has_required_fields():
-    probe = probes.injection.direct.all()[0]
+    probe = list(probes.injection.direct.all())[0]
     assert isinstance(probe.input, str)
     assert len(probe.input) > 0
     assert isinstance(probe.category, SafetyCategory)
@@ -89,7 +89,7 @@ def test_probe_category_is_prompt_injection():
 
 
 def test_probe_str_returns_name():
-    probe = probes.injection.direct.all()[0]
+    probe = list(probes.injection.direct.all())[0]
     assert str(probe) == probe.name
 
 
@@ -215,10 +215,10 @@ def test_custom_probeset_creation():
 
 
 def test_probeset_parametrize_compatible():
-    """ProbeSet.all() returns a list usable with pytest.mark.parametrize."""
+    """ProbeSet.all() returns a ProbeSet — F-032 FIXED (all() returns ProbeSet consistently)."""
     probes_list = probes.injection.direct.all()
-    assert isinstance(probes_list, list)
-    # Each item must be a Probe (so it can be used as a param ID via __str__)
+    assert isinstance(probes_list, ProbeSet)
+    # Each item yielded by iteration must be a Probe
     for p in probes_list:
         assert isinstance(p, Probe)
 
@@ -614,11 +614,9 @@ def test_indirect_probes_all_have_indirect_tag():
 # ---------------------------------------------------------------------------
 
 
-def test_probes_not_at_top_level_checkagent():
-    """Attack probes are only available via checkagent.safety — not top-level.
-    This documents the discoverability gap as a potential F-024.
-    """
+def test_probes_partial_top_level():
+    """Probe and ProbeSet now at top-level — F-026 FIXED."""
     import checkagent
-    assert not hasattr(checkagent, "probes"), "probes unexpectedly at top-level checkagent"
-    assert not hasattr(checkagent, "Probe"), "Probe unexpectedly at top-level checkagent"
-    assert not hasattr(checkagent, "ProbeSet"), "ProbeSet unexpectedly at top-level checkagent"
+    assert hasattr(checkagent, "ProbeSet"), "ProbeSet should be at top-level now"
+    assert not hasattr(checkagent, "probes"), "probes module still not at top-level"
+    assert hasattr(checkagent, "Probe"), "Probe class now at top-level — F-026 FIXED"

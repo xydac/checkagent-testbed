@@ -46,8 +46,8 @@ def test_regression_datasets_golddataset():
     from checkagent.datasets import GoldenDataset  # noqa: F401
 
 
-def test_regression_datasets_testcase():
-    from checkagent.datasets import TestCase  # noqa: F401
+def test_regression_datasets_evalcase():
+    from checkagent.datasets import EvalCase  # TestCase renamed to EvalCase  # noqa: F401
 
 
 def test_regression_eval_metrics():
@@ -111,13 +111,16 @@ async def test_check_tool_async_slow_does_not_raise():
 
 
 @pytest.mark.agent_test(layer="mock")
-def test_check_tool_sync_slow_raises_tool_slow_error():
-    """sync check_tool() raises ToolSlowError for slow fault (confirmed regression vs async)."""
+def test_check_tool_sync_slow_now_sleeps():
+    """F-016 FIXED: sync check_tool() now sleeps for slow fault instead of raising."""
+    import time
     fault = FaultInjector()
-    fault.on_tool("api").slow(latency_ms=20)
+    fault.on_tool("api").slow(latency_ms=50)
 
-    with pytest.raises(ToolSlowError):
-        fault.check_tool("api")
+    t0 = time.perf_counter()
+    fault.check_tool("api")  # No longer raises ToolSlowError
+    elapsed_ms = (time.perf_counter() - t0) * 1000
+    assert elapsed_ms >= 40, f"Expected ~50ms, got {elapsed_ms:.0f}ms"
 
 
 @pytest.mark.agent_test(layer="mock")
@@ -273,12 +276,10 @@ def test_intermittent_with_seed_is_deterministic():
 # ---------------------------------------------------------------------------
 
 
-def test_agentrun_input_requires_agentinput():
-    """AgentRun.input is typed AgentInput — plain str raises ValidationError."""
-    from pydantic import ValidationError
-
-    with pytest.raises(ValidationError):
-        AgentRun(input="find cats", final_output="result")
+def test_agentrun_input_coerces_plain_str():
+    """F-038 FIXED: AgentRun.input now coerces plain str to AgentInput(query=...)."""
+    run = AgentRun(input="find cats", final_output="result")
+    assert run.input.query == "find cats"
 
 
 def test_agentrun_input_accepts_agentinput():

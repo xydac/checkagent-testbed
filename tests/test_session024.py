@@ -83,19 +83,20 @@ def _make_three_agent_trace(
 # ---------------------------------------------------------------------------
 
 @pytest.mark.agent_test
-def test_f068_multiagent_not_at_top_level():
-    """F-068: multiagent module not exported from top-level checkagent namespace."""
+def test_f068_multiagent_partial_fix():
+    """F-068 PARTIALLY FIXED: MultiAgentTrace and HandoffType now at top-level.
+
+    Still missing: Handoff, assign_blame, BlameStrategy, top_blamed_agent.
+    """
     import checkagent
-    assert not hasattr(checkagent, "MultiAgentTrace"), \
-        "F-068 FIXED: MultiAgentTrace is now at top-level checkagent"
-    assert not hasattr(checkagent, "Handoff"), \
-        "F-068 FIXED: Handoff is now at top-level checkagent"
-    assert not hasattr(checkagent, "assign_blame"), \
-        "F-068 FIXED: assign_blame is now at top-level checkagent"
-    assert not hasattr(checkagent, "BlameStrategy"), \
-        "F-068 FIXED: BlameStrategy is now at top-level checkagent"
-    assert not hasattr(checkagent, "top_blamed_agent"), \
-        "F-068 FIXED: top_blamed_agent is now at top-level checkagent"
+    # These are now fixed:
+    assert hasattr(checkagent, "MultiAgentTrace"), "MultiAgentTrace should be at top-level"
+    assert hasattr(checkagent, "HandoffType"), "HandoffType should be at top-level"
+    # These still require checkagent.multiagent import:
+    assert not hasattr(checkagent, "Handoff"), "Handoff still not at top-level"
+    assert not hasattr(checkagent, "assign_blame"), "assign_blame still not at top-level"
+    assert not hasattr(checkagent, "BlameStrategy"), "BlameStrategy still not at top-level"
+    assert not hasattr(checkagent, "top_blamed_agent"), "top_blamed_agent still not at top-level"
 
 
 @pytest.mark.agent_test

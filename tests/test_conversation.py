@@ -2,7 +2,7 @@
 Tests for multi-turn Conversation API and remaining session-003 items.
 
 Covers:
-- Conversation / ap_conversation fixture (session-003 new feature)
+- Conversation / ca_conversation fixture (session-003 new feature)
 - assert_json_schema with real JSON Schema dicts
 - assert_tool_called call_index parameter
 - StructuredAssertionError message quality
@@ -50,20 +50,20 @@ async def counter_agent(inp: AgentInput) -> AgentRun:
 
 
 # ---------------------------------------------------------------------------
-# ap_conversation fixture tests
+# ca_conversation fixture tests
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.agent_test(layer="mock")
-async def test_ap_conversation_is_conversation_factory(ap_conversation):
-    """ap_conversation fixture should return the Conversation class itself."""
-    assert ap_conversation is Conversation
+async def test_ca_conversation_is_conversation_factory(ca_conversation):
+    """ca_conversation fixture should return the Conversation class itself."""
+    assert ca_conversation is Conversation
 
 
 @pytest.mark.agent_test(layer="mock")
-async def test_conversation_single_turn(ap_conversation):
+async def test_conversation_single_turn(ca_conversation):
     """A single turn should record the result and increment total_turns."""
-    conv = ap_conversation(history_aware_agent)
+    conv = ca_conversation(history_aware_agent)
     result = await conv.say("hello")
 
     assert conv.total_turns == 1
@@ -72,9 +72,9 @@ async def test_conversation_single_turn(ap_conversation):
 
 
 @pytest.mark.agent_test(layer="mock")
-async def test_conversation_two_turns_history_passed(ap_conversation):
+async def test_conversation_two_turns_history_passed(ca_conversation):
     """Second turn should receive history from the first turn."""
-    conv = ap_conversation(history_aware_agent)
+    conv = ca_conversation(history_aware_agent)
 
     await conv.say("first message")
     r2 = await conv.say("second message")
@@ -85,9 +85,9 @@ async def test_conversation_two_turns_history_passed(ap_conversation):
 
 
 @pytest.mark.agent_test(layer="mock")
-async def test_conversation_context_references(ap_conversation):
+async def test_conversation_context_references(ca_conversation):
     """conv.context_references(1, 0) should return True when turn 1 echoes turn 0."""
-    conv = ap_conversation(history_aware_agent)
+    conv = ca_conversation(history_aware_agent)
 
     await conv.say("hello world")
     await conv.say("what did I say?")
@@ -96,9 +96,9 @@ async def test_conversation_context_references(ap_conversation):
 
 
 @pytest.mark.agent_test(layer="mock")
-async def test_conversation_total_turns_counting(ap_conversation):
+async def test_conversation_total_turns_counting(ca_conversation):
     """total_turns, last_turn, and last_result should stay consistent."""
-    conv = ap_conversation(counter_agent)
+    conv = ca_conversation(counter_agent)
 
     await conv.say("a")
     await conv.say("b")
@@ -110,9 +110,9 @@ async def test_conversation_total_turns_counting(ap_conversation):
 
 
 @pytest.mark.agent_test(layer="mock")
-async def test_conversation_get_turn_by_index(ap_conversation):
+async def test_conversation_get_turn_by_index(ca_conversation):
     """get_turn(n) should return the n-th turn."""
-    conv = ap_conversation(counter_agent)
+    conv = ca_conversation(counter_agent)
 
     await conv.say("first")
     await conv.say("second")
@@ -127,9 +127,9 @@ async def test_conversation_get_turn_by_index(ap_conversation):
 
 
 @pytest.mark.agent_test(layer="mock")
-async def test_conversation_get_turn_out_of_range(ap_conversation):
+async def test_conversation_get_turn_out_of_range(ca_conversation):
     """get_turn with out-of-range index should raise IndexError."""
-    conv = ap_conversation(counter_agent)
+    conv = ca_conversation(counter_agent)
     await conv.say("only one turn")
 
     with pytest.raises(IndexError):
@@ -137,9 +137,9 @@ async def test_conversation_get_turn_out_of_range(ap_conversation):
 
 
 @pytest.mark.agent_test(layer="mock")
-async def test_conversation_reset(ap_conversation):
+async def test_conversation_reset(ca_conversation):
     """reset() should clear all turns and start fresh."""
-    conv = ap_conversation(counter_agent)
+    conv = ca_conversation(counter_agent)
 
     await conv.say("turn 1")
     await conv.say("turn 2")
@@ -157,9 +157,9 @@ async def test_conversation_reset(ap_conversation):
 
 
 @pytest.mark.agent_test(layer="mock")
-async def test_conversation_turns_property_is_copy(ap_conversation):
+async def test_conversation_turns_property_is_copy(ca_conversation):
     """conv.turns should return a copy, not the internal list."""
-    conv = ap_conversation(counter_agent)
+    conv = ca_conversation(counter_agent)
     await conv.say("a")
 
     turns = conv.turns
@@ -169,7 +169,7 @@ async def test_conversation_turns_property_is_copy(ap_conversation):
 
 
 @pytest.mark.agent_test(layer="mock")
-async def test_conversation_tool_was_called_across_turns(ap_conversation):
+async def test_conversation_tool_was_called_across_turns(ca_conversation):
     """tool_was_called should aggregate across all turns."""
 
     async def tool_calling_agent(inp: AgentInput) -> AgentRun:
@@ -182,7 +182,7 @@ async def test_conversation_tool_was_called_across_turns(ap_conversation):
         )
         return AgentRun(input=inp, steps=[step], final_output="searched")
 
-    conv = ap_conversation(tool_calling_agent)
+    conv = ca_conversation(tool_calling_agent)
 
     await conv.say("first query")
     await conv.say("second query")
@@ -194,7 +194,7 @@ async def test_conversation_tool_was_called_across_turns(ap_conversation):
 
 
 @pytest.mark.agent_test(layer="mock")
-async def test_conversation_tool_was_called_in_turn(ap_conversation):
+async def test_conversation_tool_was_called_in_turn(ca_conversation):
     """tool_was_called_in_turn checks a specific turn only."""
 
     call_count = [0]
@@ -218,7 +218,7 @@ async def test_conversation_tool_was_called_in_turn(ap_conversation):
             )
         return AgentRun(input=inp, steps=[step], final_output="done")
 
-    conv = ap_conversation(sometimes_calls_tool)
+    conv = ca_conversation(sometimes_calls_tool)
 
     await conv.say("first")   # calls lookup
     await conv.say("second")  # no tool

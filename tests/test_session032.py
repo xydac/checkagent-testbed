@@ -232,16 +232,8 @@ async def test_pydantic_ai_error_no_exception_raised():
 # ---------------------------------------------------------------------------
 
 def test_pydantic_ai_adapter_not_at_top_level():
-    """F-086: PydanticAIAdapter is not importable from top-level checkagent.
-
-    Must be imported from checkagent.adapters.pydantic_ai instead.
-    This is the same pattern as F-057 (LangChain) and F-063 (other adapters).
-    """
-    try:
-        from checkagent import PydanticAIAdapter as _  # noqa: F401
-        pytest.fail("F-086 appears fixed — PydanticAIAdapter now at top-level checkagent")
-    except ImportError:
-        pass  # expected — F-086 still open
+    """F-086 FIXED: PydanticAIAdapter is now importable from top-level checkagent."""
+    from checkagent import PydanticAIAdapter as _  # noqa: F401
 
 
 def test_pydantic_ai_adapter_in_adapters_init():
@@ -254,12 +246,11 @@ def test_pydantic_ai_adapter_in_adapters_init():
 
 
 @pytest.mark.asyncio
-async def test_pydantic_ai_deprecated_token_attrs():
-    """F-087: PydanticAIAdapter uses deprecated request_tokens/response_tokens attributes.
+async def test_pydantic_ai_no_deprecated_token_attrs():
+    """F-087 FIXED: PydanticAIAdapter no longer uses deprecated request_tokens/response_tokens.
 
-    PydanticAI 1.77.0 renamed these to input_tokens/output_tokens.
-    The adapter still reads the old names, triggering DeprecationWarning on every run.
-    This will break silently when PydanticAI removes the deprecated attrs.
+    PydanticAI 1.78.0 — adapter updated to use input_tokens/output_tokens.
+    No DeprecationWarnings should be emitted.
     """
     import warnings
     from pydantic_ai import Agent
@@ -275,9 +266,8 @@ async def test_pydantic_ai_deprecated_token_attrs():
 
     messages = [str(d.message) for d in deprecation_warnings]
     token_warnings = [m for m in messages if "tokens" in m.lower()]
-    assert len(token_warnings) >= 2, (
-        f"F-087: Expected deprecation warnings for request_tokens/response_tokens "
-        f"but got: {messages}"
+    assert len(token_warnings) == 0, (
+        f"F-087: Unexpected token deprecation warnings: {token_warnings}"
     )
 
 

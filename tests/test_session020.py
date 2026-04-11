@@ -1,4 +1,4 @@
-"""Session-020 tests: multi-judge consensus, ap_judge fixture, F-049 fix verification."""
+"""Session-020 tests: multi-judge consensus, ca_judge fixture, F-049 fix verification."""
 
 import json
 
@@ -54,49 +54,49 @@ def make_rubric(name: str = "quality", criterion_name: str = "accuracy") -> Rubr
 
 
 # ---------------------------------------------------------------------------
-# F-049: ap_judge fixture now exists (fixed in d88d3e7)
+# F-049: ca_judge fixture now exists (fixed in d88d3e7)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.agent_test(layer="judge")
-def test_f049_ap_judge_fixture_exists(ap_judge):
-    """ap_judge fixture is now available — F-049 resolved."""
-    assert ap_judge is not None
-    assert callable(ap_judge)
+def test_f049_ca_judge_fixture_exists(ca_judge):
+    """ca_judge fixture is now available — F-049 resolved."""
+    assert ca_judge is not None
+    assert callable(ca_judge)
 
 
 @pytest.mark.agent_test(layer="judge")
-def test_f049_ap_judge_factory_creates_rubric_judge(ap_judge):
-    """ap_judge fixture is a factory that accepts (rubric, llm) and returns RubricJudge."""
+def test_f049_ca_judge_factory_creates_rubric_judge(ca_judge):
+    """ca_judge fixture is a factory that accepts (rubric, llm) and returns RubricJudge."""
     rubric = make_rubric()
     llm = make_llm({"accuracy": 5})
-    judge = ap_judge(rubric, llm)
+    judge = ca_judge(rubric, llm)
     assert isinstance(judge, RubricJudge)
 
 
 @pytest.mark.agent_test(layer="judge")
-async def test_f049_ap_judge_factory_judge_evaluates(ap_judge):
-    """ap_judge-created judge evaluates a run correctly."""
+async def test_f049_ca_judge_factory_judge_evaluates(ca_judge):
+    """ca_judge-created judge evaluates a run correctly."""
     rubric = make_rubric()
-    judge = ap_judge(rubric, make_llm({"accuracy": 5}))
+    judge = ca_judge(rubric, make_llm({"accuracy": 5}))
     score = await judge.evaluate(make_run())
     assert score.overall == 1.0
     assert len(score.criterion_scores) == 1
 
 
 @pytest.mark.agent_test(layer="judge")
-def test_f049_ap_judge_accepts_model_name(ap_judge):
-    """ap_judge factory accepts optional model_name kwarg."""
+def test_f049_ca_judge_accepts_model_name(ca_judge):
+    """ca_judge factory accepts optional model_name kwarg."""
     rubric = make_rubric()
-    judge = ap_judge(rubric, make_llm({"accuracy": 5}), model_name="gpt-4-turbo")
+    judge = ca_judge(rubric, make_llm({"accuracy": 5}), model_name="gpt-4-turbo")
     assert isinstance(judge, RubricJudge)
     # model_name should appear in scores
     # (we just verify it's stored — the actual use is in judge_verdicts key)
 
 
 @pytest.mark.agent_test(layer="judge")
-def test_f049_still_requires_custom_llm_callable(ap_judge):
-    """ap_judge fixture still requires a custom async LLM callable.
+def test_f049_still_requires_custom_llm_callable(ca_judge):
+    """ca_judge fixture still requires a custom async LLM callable.
     MockLLM cannot be passed directly — the fixture is a thin factory
     that doesn't provide a MockLLM bridge.
     """
@@ -106,8 +106,8 @@ def test_f049_still_requires_custom_llm_callable(ap_judge):
     # MockLLM is NOT an async (system, user) -> str callable
     # We verify this limitation: the interface doesn't match
     assert not callable(getattr(mock_llm, "__call__", None)) or True  # MockLLM is callable
-    # But passing it to ap_judge silently accepts it (no validation at construction time)
-    judge = ap_judge(rubric, mock_llm)
+    # But passing it to ca_judge silently accepts it (no validation at construction time)
+    judge = ca_judge(rubric, mock_llm)
     assert isinstance(judge, RubricJudge)
 
 
@@ -286,11 +286,11 @@ async def test_multi_judge_inconclusive_propagation():
 
 
 @pytest.mark.agent_test(layer="judge")
-async def test_f052_judge_verdicts_key_collision_same_rubric_name():
-    """F-052: When multiple judges use the same rubric name, judge_verdicts
-    only has 1 key — later entries overwrite earlier ones. This is the
-    canonical use case (same rubric, different LLM backends) and silently
-    loses per-judge result traceability.
+async def test_f052_judge_verdicts_no_key_collision():
+    """F-052 FIXED: judge_verdicts key now includes model_name to prevent collision.
+
+    Key format changed from 'rubric_judge:{rubric}' to 'rubric_judge:{rubric}:{model}'.
+    All 3 judges with same rubric now produce distinct keys.
     """
     # Canonical use case: same rubric, different LLM model_names
     rubric = make_rubric("quality")  # same name for all judges
@@ -300,18 +300,21 @@ async def test_f052_judge_verdicts_key_collision_same_rubric_name():
 
     v = await multi_judge_evaluate([judge_gpt4, judge_claude, judge_gemini], make_run(), num_trials=1)
 
-    # BUG: should be 3 keys (one per judge), but all collapse to 'rubric_judge:quality'
-    assert len(v.judge_verdicts) == 1, (
-        f"Expected 1 key due to collision bug, got {len(v.judge_verdicts)}. "
-        "If this fails, F-052 is fixed."
+    # F-052 FIXED: 3 separate keys, one per judge (includes model name)
+    assert len(v.judge_verdicts) == 3, (
+        f"Expected 3 keys (one per judge), got {len(v.judge_verdicts)}: {list(v.judge_verdicts.keys())}"
     )
-    # The single key loses model_name information
-    assert list(v.judge_verdicts.keys()) == ["rubric_judge:quality"]
+    assert "rubric_judge:quality:gpt-4" in v.judge_verdicts
+    assert "rubric_judge:quality:claude-3" in v.judge_verdicts
+    assert "rubric_judge:quality:gemini-pro" in v.judge_verdicts
 
 
 @pytest.mark.agent_test(layer="judge")
 async def test_f052_workaround_different_rubric_names():
-    """Workaround for F-052: use unique rubric names per judge to avoid collision."""
+    """F-052: New key format — 'rubric_judge:{rubric}:{model}'.
+
+    All 3 judges produce separate keys with the new format.
+    """
     judge_gpt4 = RubricJudge(
         rubric=make_rubric("quality_gpt4"),
         llm=make_llm({"accuracy": 5}),
@@ -330,14 +333,14 @@ async def test_f052_workaround_different_rubric_names():
 
     v = await multi_judge_evaluate([judge_gpt4, judge_claude, judge_gemini], make_run(), num_trials=1)
 
-    # With unique rubric names, all 3 keys are preserved
+    # With unique rubric names + model names, all 3 keys are preserved
     assert len(v.judge_verdicts) == 3
-    assert "rubric_judge:quality_gpt4" in v.judge_verdicts
-    assert "rubric_judge:quality_claude" in v.judge_verdicts
-    assert "rubric_judge:quality_gemini" in v.judge_verdicts
+    assert "rubric_judge:quality_gpt4:gpt-4" in v.judge_verdicts
+    assert "rubric_judge:quality_claude:claude-3" in v.judge_verdicts
+    assert "rubric_judge:quality_gemini:gemini-pro" in v.judge_verdicts
     # Correct individual verdicts
-    assert v.judge_verdicts["rubric_judge:quality_gpt4"].verdict == Verdict.PASS
-    assert v.judge_verdicts["rubric_judge:quality_gemini"].verdict == Verdict.FAIL
+    assert v.judge_verdicts["rubric_judge:quality_gpt4:gpt-4"].verdict == Verdict.PASS
+    assert v.judge_verdicts["rubric_judge:quality_gemini:gemini-pro"].verdict == Verdict.FAIL
 
 
 # ---------------------------------------------------------------------------
@@ -347,19 +350,19 @@ async def test_f052_workaround_different_rubric_names():
 
 @pytest.mark.agent_test(layer="judge")
 def test_f053_consensus_verdict_not_at_top_level():
-    """F-053: ConsensusVerdict is not importable from top-level checkagent."""
+    """F-053 FIXED: ConsensusVerdict IS importable from top-level checkagent."""
     import checkagent
-    assert not hasattr(checkagent, "ConsensusVerdict"), (
-        "ConsensusVerdict now at top-level — F-053 fixed."
+    assert hasattr(checkagent, "ConsensusVerdict"), (
+        "ConsensusVerdict not found at top-level — F-053 should be fixed."
     )
 
 
 @pytest.mark.agent_test(layer="judge")
 def test_f053_multi_judge_evaluate_not_at_top_level():
-    """F-053: multi_judge_evaluate is not importable from top-level checkagent."""
+    """F-053 FIXED: multi_judge_evaluate IS importable from top-level checkagent."""
     import checkagent
-    assert not hasattr(checkagent, "multi_judge_evaluate"), (
-        "multi_judge_evaluate now at top-level — F-053 fixed."
+    assert hasattr(checkagent, "multi_judge_evaluate"), (
+        "multi_judge_evaluate not found at top-level — F-053 should be fixed."
     )
 
 
@@ -432,17 +435,17 @@ async def test_consensus_verdict_agreement_rate_range():
 
 
 # ---------------------------------------------------------------------------
-# Integration: ap_judge fixture + multi_judge_evaluate
+# Integration: ca_judge fixture + multi_judge_evaluate
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.agent_test(layer="judge")
-async def test_ap_judge_with_multi_judge_evaluate(ap_judge):
-    """ap_judge fixture-created judges work with multi_judge_evaluate."""
+async def test_ca_judge_with_multi_judge_evaluate(ca_judge):
+    """ca_judge fixture-created judges work with multi_judge_evaluate."""
     rubric_a = make_rubric("r_a", "c")
     rubric_b = make_rubric("r_b", "c")
-    judge_a = ap_judge(rubric_a, make_llm({"c": 5}), model_name="model_a")
-    judge_b = ap_judge(rubric_b, make_llm({"c": 5}), model_name="model_b")
+    judge_a = ca_judge(rubric_a, make_llm({"c": 5}), model_name="model_a")
+    judge_b = ca_judge(rubric_b, make_llm({"c": 5}), model_name="model_b")
 
     run = make_run()
     v = await multi_judge_evaluate([judge_a, judge_b], run, num_trials=1)

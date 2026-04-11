@@ -52,28 +52,27 @@ def make_llm(scores: dict[str, int | str], reasoning: str = "ok"):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.agent_test(layer="judge")
-def test_f048_judge_not_at_top_level():
-    """Judge, RubricJudge, Rubric, Criterion, etc. not importable from top-level checkagent."""
+def test_f048_judge_partial_fix():
+    """F-048 FIXED: Rubric, RubricJudge, Criterion, and JudgeScore are now at top-level checkagent."""
     import checkagent
-    judge_names = [
-        "Judge", "RubricJudge", "Rubric", "Criterion", "CriterionScore",
-        "JudgeScore", "JudgeVerdict", "Verdict", "ScaleType", "compute_verdict",
-    ]
-    for name in judge_names:
-        assert not hasattr(checkagent, name), f"{name} unexpectedly found at top-level"
+    # These are now at top-level:
+    assert hasattr(checkagent, "RubricJudge"), "RubricJudge should be at top-level"
+    assert hasattr(checkagent, "JudgeScore"), "JudgeScore should be at top-level"
+    assert hasattr(checkagent, "Criterion"), "Criterion should be at top-level"
+    assert hasattr(checkagent, "Rubric"), "Rubric now at top-level — F-048 FIXED"
 
 
 # ---------------------------------------------------------------------------
-# F-049: No ap_judge fixture — judge module has no pytest integration
+# F-049: No ca_judge fixture — judge module has no pytest integration
 # ---------------------------------------------------------------------------
 
 @pytest.mark.agent_test(layer="judge")
-def test_f049_ap_judge_fixture_added(request):
-    """F-049 fixed in d88d3e7: ap_judge fixture is now registered by checkagent plugin."""
+def test_f049_ca_judge_fixture_added(request):
+    """F-049 fixed in d88d3e7: ca_judge fixture is now registered by checkagent plugin."""
     fixture_names = request.session._fixturemanager._arg2fixturedefs.keys()
-    ap_judge_fixtures = [f for f in fixture_names if f in ("ap_judge", "ap_rubric_judge")]
-    assert "ap_judge" in ap_judge_fixtures, (
-        f"ap_judge fixture still not registered. F-049 not yet fixed."
+    ca_judge_fixtures = [f for f in fixture_names if f in ("ca_judge", "ap_rubric_judge")]
+    assert "ca_judge" in ca_judge_fixtures, (
+        f"ca_judge fixture still not registered. F-049 not yet fixed."
     )
 
 
@@ -361,8 +360,9 @@ async def test_f050_bad_json_raises_json_decode_error():
         return "The answer looks good, 4 out of 5."
 
     judge = RubricJudge(rubric=rubric, llm=bad_llm)
-    # Should ideally raise a checkagent-specific error, but currently propagates JSONDecodeError
-    with pytest.raises(JSONDecodeError):
+    # F-050 FIXED: Now raises JudgeParseError (not raw JSONDecodeError)
+    from checkagent.judge.judge import JudgeParseError
+    with pytest.raises(JudgeParseError):
         await judge.evaluate(make_run())
 
 

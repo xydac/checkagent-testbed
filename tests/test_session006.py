@@ -249,22 +249,19 @@ async def test_mock_llm_get_calls_matching_empty_pattern_returns_all():
 
 @pytest.mark.agent_test(layer="mock")
 async def test_mock_llm_was_called_with_requires_exact_match():
-    """was_called_with does exact match on input_text — substring is NOT sufficient.
+    """was_called_with does SUBSTRING matching on input_text — F-009 FIXED.
 
-    This is a potential DX surprise: the name implies 'was called with this text
-    somewhere' but the implementation requires an exact match.
+    Previously (buggy): was_called_with required exact match only.
+    Now (correct): was_called_with does substring matching.
     """
     llm = MockLLM()
     llm.complete_sync("What is the capital of France?")
 
-    # exact match: True
-    assert llm.was_called_with("What is the capital of France?") is True
+    # substring match: True — F-009 FIXED
+    assert llm.was_called_with("capital of France") is True
 
-    # substring: False — this is the surprising behavior
-    assert llm.was_called_with("capital of France") is False
-
-    # partial: also False
-    assert llm.was_called_with("France") is False
+    # non-matching substring: False
+    assert llm.was_called_with("xyz_not_in_input") is False
 
 
 @pytest.mark.agent_test(layer="mock")
@@ -382,16 +379,16 @@ async def test_mock_tool_call_sync_and_async_share_call_history():
 async def test_mock_tool_call_sync_assertion_helpers_work():
     """assert_tool_called and assert_tool_not_called work after call_sync.
 
-    Note: MockTool.assert_tool_called() returns None (not a ToolCall).
-    Use tool.last_call or tool.calls to inspect details.
+    F-010 FIXED: MockTool.assert_tool_called() now returns a ToolCallRecord (not None).
     """
     tool = MockTool()
     tool.register("search", response="results")
     tool.call_sync("search", {"query": "cats"})
 
-    # assert_tool_called returns None but raises if NOT called
+    # F-010 FIXED: assert_tool_called returns a ToolCallRecord
     result = tool.assert_tool_called("search")
-    assert result is None  # documented: returns None
+    assert result is not None
+    assert hasattr(result, 'tool_name')
 
     # to inspect call details, use last_call
     assert tool.last_call.tool_name == "search"
@@ -441,9 +438,9 @@ async def mcp_agent(query: str, mcp_server: MockMCPServer) -> dict:
 
 
 @pytest.mark.agent_test(layer="mock")
-async def test_mcp_agent_calls_search_and_summarize(ap_mock_mcp_server):
+async def test_mcp_agent_calls_search_and_summarize(ca_mock_mcp_server):
     """Full agent scenario: agent makes sequential MCP tool calls and builds output."""
-    mcp = ap_mock_mcp_server
+    mcp = ca_mock_mcp_server
     mcp.register_tool("search", response="cat, siamese cat, tabby cat")
     mcp.register_tool("summarize", response="3 cat breeds found")
 
@@ -458,9 +455,9 @@ async def test_mcp_agent_calls_search_and_summarize(ap_mock_mcp_server):
 
 
 @pytest.mark.agent_test(layer="mock")
-async def test_mcp_agent_tool_call_order(ap_mock_mcp_server):
+async def test_mcp_agent_tool_call_order(ca_mock_mcp_server):
     """Verify that the agent calls tools in the correct order."""
-    mcp = ap_mock_mcp_server
+    mcp = ca_mock_mcp_server
     mcp.register_tool("search", response="results here")
     mcp.register_tool("summarize", response="summary here")
 
@@ -476,9 +473,9 @@ async def test_mcp_agent_tool_call_order(ap_mock_mcp_server):
 
 
 @pytest.mark.agent_test(layer="mock")
-async def test_mcp_agent_error_propagation(ap_mock_mcp_server):
+async def test_mcp_agent_error_propagation(ca_mock_mcp_server):
     """When MCP search returns an error, agent receives isError=True result."""
-    mcp = ap_mock_mcp_server
+    mcp = ca_mock_mcp_server
     mcp.register_tool("search", error="Search service unavailable")
 
     search_request = {
@@ -495,9 +492,9 @@ async def test_mcp_agent_error_propagation(ap_mock_mcp_server):
 
 
 @pytest.mark.agent_test(layer="mock")
-async def test_mcp_agent_assert_output_with_matchers(ap_mock_mcp_server):
+async def test_mcp_agent_assert_output_with_matchers(ca_mock_mcp_server):
     """Combine MCP agent execution with dirty_equals matchers on final output."""
-    mcp = ap_mock_mcp_server
+    mcp = ca_mock_mcp_server
     mcp.register_tool("search", response="12 items found")
     mcp.register_tool("summarize", response="Summary: 12 items")
 
@@ -519,9 +516,9 @@ async def test_mcp_agent_assert_output_with_matchers(ap_mock_mcp_server):
 
 
 @pytest.mark.agent_test(layer="mock")
-async def test_mcp_agent_multiple_queries_isolated(ap_mock_mcp_server):
-    """Each ap_mock_mcp_server fixture is fresh; state doesn't bleed between tests."""
-    mcp = ap_mock_mcp_server
+async def test_mcp_agent_multiple_queries_isolated(ca_mock_mcp_server):
+    """Each ca_mock_mcp_server fixture is fresh; state doesn't bleed between tests."""
+    mcp = ca_mock_mcp_server
     mcp.register_tool("search", response="fresh result")
 
     await mcp_agent("fresh query", mcp)

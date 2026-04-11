@@ -208,8 +208,8 @@ class TestGateEdgeCases:
 class TestProbeSetAddOrdering:
     def test_add_preserves_left_then_right_order(self):
         """ProbeSet + preserves: all left items come first, then right items."""
-        left = ProbeSet(injection.direct.all()[:3])
-        right = ProbeSet(injection.indirect.all()[:2])
+        left = ProbeSet(list(injection.direct.all())[:3])
+        right = ProbeSet(list(injection.indirect.all())[:2])
         combined = left + right
 
         left_names = [p.name for p in left]
@@ -220,7 +220,7 @@ class TestProbeSetAddOrdering:
 
     def test_add_cross_category_ordering_preserved(self):
         """Cross-category ProbeSet + preserves insertion order."""
-        inj_slice = ProbeSet(injection.direct.all()[:3])
+        inj_slice = ProbeSet(list(injection.direct.all())[:3])
         jb_slice = ProbeSet(list(jailbreak.all_probes)[:2])
         combined = inj_slice + jb_slice
 
@@ -230,7 +230,7 @@ class TestProbeSetAddOrdering:
 
     def test_add_allows_duplicates(self):
         """ProbeSet + does not deduplicate — same probe can appear twice."""
-        ps = ProbeSet(injection.direct.all()[:3])
+        ps = ProbeSet(list(injection.direct.all())[:3])
         doubled = ps + ps
         assert len(doubled) == len(ps) * 2
         names = [p.name for p in doubled]
@@ -248,7 +248,7 @@ class TestProbeSetAddOrdering:
 
     def test_add_empty_probeset_is_identity(self):
         """Adding an empty ProbeSet is a no-op."""
-        ps = ProbeSet(injection.direct.all()[:3])
+        ps = ProbeSet(list(injection.direct.all())[:3])
         empty = ProbeSet([])
         assert len(ps + empty) == len(ps)
         assert len(empty + ps) == len(ps)
@@ -256,8 +256,8 @@ class TestProbeSetAddOrdering:
 
     def test_add_len_is_sum(self):
         """len(a + b) == len(a) + len(b) for non-overlapping ProbeSet."""
-        direct = ProbeSet(injection.direct.all())
-        indirect = ProbeSet(injection.indirect.all())
+        direct = ProbeSet(list(injection.direct.all()))
+        indirect = ProbeSet(list(injection.indirect.all()))
         assert len(direct + indirect) == len(direct) + len(indirect)
 
 
@@ -267,17 +267,15 @@ class TestProbeSetAddOrdering:
 
 
 class TestGeneratePrCommentRegressionGap:
-    def test_generate_pr_comment_has_no_eval_summary_param(self):
-        """generate_pr_comment signature: no eval_summary or regressions param.
+    def test_generate_pr_comment_has_eval_summary_param(self):
+        """F-033 FIXED: generate_pr_comment now has eval_summary parameter.
 
-        Regression data from detect_regressions cannot be included in PR comments.
-        This is F-033 — the eval and CI modules are not integrated.
+        The eval and CI modules are now integrated via eval_summary and safety_report params.
         """
         import inspect
         sig = inspect.signature(generate_pr_comment)
         param_names = list(sig.parameters.keys())
-        assert "eval_summary" not in param_names
-        assert "regressions" not in param_names
+        assert "eval_summary" in param_names, "F-033 FIXED: eval_summary param now exists"
 
     def test_detect_regressions_not_surfaced_in_pr_comment(self):
         """Regressions detected by detect_regressions have no path to PR comment output."""
@@ -364,10 +362,10 @@ class TestJudgeLayerMarker:
         score = task_completion(run, check_no_error=True)
         assert score.passed is True
 
-    def test_judge_layer_can_use_all_fixtures(self, ap_mock_llm, ap_mock_tool):
+    def test_judge_layer_can_use_all_fixtures(self, ca_mock_llm, ca_mock_tool):
         """Judge-layer tests have access to all checkagent fixtures."""
-        ap_mock_llm.add_rule(".*", "Judge response", match_mode=MatchMode.REGEX)
-        response = ap_mock_llm.complete_sync("Evaluate this agent output for quality")
+        ca_mock_llm.add_rule(".*", "Judge response", match_mode=MatchMode.REGEX)
+        response = ca_mock_llm.complete_sync("Evaluate this agent output for quality")
         assert response == "Judge response"
 
     def test_judge_layer_marker_is_distinct_from_mock_layer(self):
@@ -403,7 +401,7 @@ class TestCIGatesNoPytestIntegration:
         assert "ap_quality_gates" not in src
 
     def test_quality_gates_from_config_not_auto_evaluated(self):
-        """Quality gates defined in checkagent.yml are loaded into ap_config
+        """Quality gates defined in checkagent.yml are loaded into ca_config
         but not automatically evaluated — users must call evaluate_gates() manually.
         """
         from checkagent.core.config import CheckAgentConfig, QualityGateEntry
@@ -529,6 +527,6 @@ class TestDetectRegressions:
         data = json.loads(path.read_text())
         assert "regressions" in data
 
-        # But load() doesn't restore them
+        # F-035 FIXED: regressions now preserved
         loaded = EvalRunSummary.load(path)
-        assert len(loaded.regressions) == 0  # F-035: should be 1
+        assert len(loaded.regressions) == 1  # F-035 FIXED: regressions now preserved

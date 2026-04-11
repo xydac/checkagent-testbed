@@ -284,19 +284,21 @@ def test_fault_injector_not_triggered_for_different_tool():
 
 
 @pytest.mark.agent_test(layer="mock")
-def test_fault_injector_slow_raises_tool_slow_error_in_sync_context():
-    """FaultInjector slow fault raises ToolSlowError in sync check_tool() context.
+def test_fault_injector_slow_now_sleeps_in_sync_context():
+    """F-016 FIXED: FaultInjector slow fault now actually sleeps in sync check_tool().
 
-    NOTE: The error message says 'use async for real delay' — slow() raises synchronously
-    instead of sleeping. For actual latency simulation, use check_tool_async().
-    This is a DX surprise: users expect slow() to not raise, just delay.
+    Previously raised ToolSlowError with 'use async for real delay'.
+    Now behaves symmetrically with async — just sleeps for latency_ms.
     """
+    import time
     fault = FaultInjector()
-    fault.on_tool("db").slow(latency_ms=10)
+    fault.on_tool("db").slow(latency_ms=50)
 
-    with pytest.raises(Exception, match="slow"):
-        fault.check_tool("db")
+    t0 = time.perf_counter()
+    fault.check_tool("db")  # No longer raises
+    elapsed_ms = (time.perf_counter() - t0) * 1000
 
+    assert elapsed_ms >= 40, f"Expected ~50ms sleep, got {elapsed_ms:.0f}ms"
     assert fault.was_triggered("db")
 
 

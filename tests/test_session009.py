@@ -40,11 +40,11 @@ def test_datasets_f014_goldendataset_importable():
 
 
 @pytest.mark.agent_test(layer="mock")
-def test_datasets_f014_testcase_importable():
-    """F-014 fixed: TestCase is importable again after e38593a."""
-    from checkagent.datasets import TestCase  # should not raise
+def test_datasets_f014_evalcase_importable():
+    """F-014 fixed (TestCase renamed to EvalCase): EvalCase is importable."""
+    from checkagent.datasets import EvalCase  # TestCase renamed to EvalCase
 
-    assert TestCase is not None
+    assert EvalCase is not None
 
 
 @pytest.mark.agent_test(layer="mock")

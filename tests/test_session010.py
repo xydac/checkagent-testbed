@@ -7,7 +7,7 @@ New in this session (commit 0a91584):
 - checkagent.eval.evaluator: Evaluator (ABC), EvaluatorRegistry
 - checkagent.safety: PromptInjectionDetector, PIILeakageScanner, SystemPromptLeakDetector,
   RefusalComplianceChecker, ToolCallBoundaryValidator, ToolBoundary
-- ap_safety fixture
+- ca_safety fixture
 
 Findings documented: F-020 (eval classes not at top-level), F-021 (safety classes not at top-level),
 F-022 (ToolCallBoundaryValidator.evaluate() text no-op)
@@ -21,7 +21,7 @@ import os
 import pytest
 
 from checkagent import AgentInput, AgentRun, Step, ToolCall, Score
-from checkagent.datasets import TestCase
+from checkagent.datasets import EvalCase as TestCase  # renamed upstream
 
 # --------------------------------------------------------------------------
 # Eval imports (via internal paths — not at top-level)
@@ -74,25 +74,25 @@ def _run(*tool_names: str, output: str = "done", succeeded: bool = True) -> Agen
 # ===========================================================================
 
 def test_f020_step_efficiency_not_importable_from_top_level():
-    """step_efficiency is not at top-level checkagent — F-020."""
+    """step_efficiency IS at top-level checkagent — F-020 FIXED."""
     import checkagent
-    assert not hasattr(checkagent, "step_efficiency"), (
-        "step_efficiency found at top-level — F-020 would be resolved"
+    assert hasattr(checkagent, "step_efficiency"), (
+        "step_efficiency not found at top-level — F-020 should be resolved"
     )
 
 
 def test_f020_evaluator_not_importable_from_top_level():
-    """Evaluator ABC is not at top-level checkagent — F-020."""
+    """Evaluator ABC IS at top-level checkagent — F-020 FIXED."""
     import checkagent
-    assert not hasattr(checkagent, "Evaluator"), (
-        "Evaluator found at top-level — F-020 would be resolved"
+    assert hasattr(checkagent, "Evaluator"), (
+        "Evaluator not found at top-level — F-020 should be resolved"
     )
 
 
 def test_f020_aggregate_result_not_importable_from_top_level():
-    """AggregateResult not at top-level — F-020."""
+    """AggregateResult IS at top-level — F-020 FIXED."""
     import checkagent
-    assert not hasattr(checkagent, "AggregateResult")
+    assert hasattr(checkagent, "AggregateResult")
 
 
 # ===========================================================================
@@ -100,15 +100,15 @@ def test_f020_aggregate_result_not_importable_from_top_level():
 # ===========================================================================
 
 def test_f021_prompt_injection_detector_not_at_top_level():
-    """PromptInjectionDetector not at top-level — F-021."""
+    """PromptInjectionDetector IS at top-level — F-021 FIXED."""
     import checkagent
-    assert not hasattr(checkagent, "PromptInjectionDetector")
+    assert hasattr(checkagent, "PromptInjectionDetector")
 
 
 def test_f021_safety_result_not_at_top_level():
-    """SafetyResult not at top-level — F-021."""
+    """SafetyResult IS at top-level — F-021 FIXED."""
     import checkagent
-    assert not hasattr(checkagent, "SafetyResult")
+    assert hasattr(checkagent, "SafetyResult")
 
 
 # ===========================================================================
@@ -560,30 +560,30 @@ def test_evaluator_repr_includes_class_and_name():
 
 
 # ===========================================================================
-# ap_safety fixture
+# ca_safety fixture
 # ===========================================================================
 
-def test_ap_safety_fixture_returns_dict(ap_safety):
-    assert isinstance(ap_safety, dict)
+def test_ca_safety_fixture_returns_dict(ca_safety):
+    assert isinstance(ca_safety, dict)
 
 
-def test_ap_safety_has_five_evaluators(ap_safety):
-    assert len(ap_safety) == 5
+def test_ca_safety_has_five_evaluators(ca_safety):
+    assert len(ca_safety) == 5
 
 
-def test_ap_safety_has_expected_keys(ap_safety):
+def test_ca_safety_has_expected_keys(ca_safety):
     for key in ("injection", "pii", "system_prompt", "tool_boundary", "refusal"):
-        assert key in ap_safety, f"Missing key: {key}"
+        assert key in ca_safety, f"Missing key: {key}"
 
 
-def test_ap_safety_injection_evaluator_passes_clean_text(ap_safety):
-    result = ap_safety["injection"].evaluate("The capital of France is Paris.")
+def test_ca_safety_injection_evaluator_passes_clean_text(ca_safety):
+    result = ca_safety["injection"].evaluate("The capital of France is Paris.")
     assert result.passed is True
     assert result.finding_count == 0
 
 
-def test_ap_safety_pii_evaluator_passes_clean_text(ap_safety):
-    result = ap_safety["pii"].evaluate("The capital of France is Paris.")
+def test_ca_safety_pii_evaluator_passes_clean_text(ca_safety):
+    result = ca_safety["pii"].evaluate("The capital of France is Paris.")
     assert result.passed is True
 
 
@@ -837,12 +837,15 @@ def test_tool_boundary_empty_boundary_passes_all():
     assert result.passed is True
 
 
-def test_tool_boundary_text_evaluate_always_passes():
-    """evaluate(text) is a no-op — always returns passed=True (F-022)."""
+def test_tool_boundary_text_evaluate_now_raises():
+    """F-022 FIXED: evaluate(text) now raises NotImplementedError with helpful message.
+
+    Previously was a silent no-op returning passed=True. Now raises with
+    'Use evaluate_run(run) instead of evaluate(text)'.
+    """
     validator = ToolCallBoundaryValidator(ToolBoundary(forbidden_tools={"dangerous"}))
-    result = validator.evaluate("call dangerous tool now")
-    # Text-only evaluation cannot check tool calls → always passes
-    assert result.passed is True
+    with pytest.raises(NotImplementedError, match="evaluate_run"):
+        validator.evaluate("call dangerous tool now")
 
 
 def test_tool_boundary_details_includes_tool_calls_checked():
