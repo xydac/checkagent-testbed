@@ -1192,3 +1192,67 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Actual:** All platforms fail at "Lint with ruff" step; tests never run.
 **Workaround:** The installed package (0.1.2) works correctly — ruff is a CI-only dev tool, not a runtime dependency. Tests in the testbed still pass.
 **Status:** Open
+
+---
+
+## F-093: `analyze-prompt` Rich markup strips `[bracket]` placeholders in recommendations
+**Date:** 2026-04-11
+**Status:** FIXED in 0.2.0
+**Fixed:** 2026-04-12 — `[your domain]` and similar bracket placeholders now preserved in terminal output.
+
+---
+
+## F-094: Non-existent file path silently analyzed as literal string in `analyze-prompt`
+**Date:** 2026-04-11
+**Status:** FIXED in 0.2.0
+**Fixed:** 2026-04-12 — Now gives explicit "File not found: /path" error with exit code 2.
+
+---
+
+## F-095: `PromptAnalyzer`, `PromptCheck`, `PromptAnalysisResult` not at top-level `checkagent`
+**Date:** 2026-04-11
+**Status:** FIXED in 0.2.0
+**Fixed:** 2026-04-12 — All three now importable from top-level `checkagent`.
+
+---
+
+## F-097: CI failing ALL platforms — ruff lint errors in `analyze-prompt` commit
+**Date:** 2026-04-11
+**Status:** FIXED
+**Fixed:** 2026-04-12 — 0.2.0 release commit passes CI on all platforms. v0.2.0 tag green.
+
+---
+
+## F-098: `--json` flag leaks "Auto-detected:" diagnostic line to stdout
+**Date:** 2026-04-12
+**Severity:** high
+**Category:** bug
+**Description:** When running `checkagent scan <target> --json`, the diagnostic line "Auto-detected: echo_agent.run() — using this method for each probe" is written to stdout before the JSON object. This makes the output unparseable by standard JSON tools without stripping the first line. The flag's contract is that stdout is machine-readable JSON, but the diagnostic violates this.
+**Expected:** With `--json`, stdout is a single valid JSON object. Diagnostics go to stderr.
+**Actual:** stdout = "Auto-detected: ...\n{...json...}" — first line is not JSON.
+**Workaround:** Strip lines not starting with `{` before parsing, or redirect stderr separately first to check if the diagnostic is there instead.
+**Status:** Open
+
+---
+
+## F-099: `GroundednessEvaluator` uncertainty mode: `hedging_signals` always 0
+**Date:** 2026-04-12
+**Severity:** high
+**Category:** bug
+**Description:** The `GroundednessEvaluator(mode='uncertainty')` evaluator never detects hedging signals. Common uncertainty phrases like "I might be wrong", "This could be incorrect", "I am not certain", "perhaps", "unable to verify" all return `hedging_signals: 0`. The source code defines `HEDGING_PATTERNS` including `(?i)\b(may|might|could|possibly|perhaps)\b`, but these patterns are not applied in uncertainty mode. Only the disclaimer path ("not financial advice") works. This makes the uncertainty mode unreliable for its stated purpose of detecting overconfident agent responses.
+**Expected:** "I might be wrong", "This may vary", "possibly incorrect" etc. trigger hedging signals.
+**Actual:** All return `hedging_signals: 0`. Only `not financial advice` passes via disclaimer.
+**Workaround:** Use `add_disclaimer_pattern()` to register custom patterns, or use fabrication mode with custom hedging patterns.
+**Status:** Open
+
+---
+
+## F-100: `checkagent wrap` crashes with `AttributeError` when `agents/` directory exists
+**Date:** 2026-04-12
+**Severity:** medium
+**Category:** bug
+**Description:** `checkagent wrap agents.echo_agent:echo_agent` crashes with `AttributeError: module 'agents' has no attribute 'Agent'`. The wrap CLI imports `agents` to check `isinstance(obj, agents.Agent)` — a heuristic for detecting OpenAI Agents SDK objects. When a local `agents/` directory exists (as in this testbed), Python imports that directory instead of the SDK, which has no `Agent` class. Same root cause as F-061. Should be wrapped in try/except AttributeError.
+**Expected:** wrap CLI gracefully skips OpenAI SDK detection when import fails or `Agent` not found.
+**Actual:** Raw traceback crash.
+**Workaround:** Run wrap from a directory without an `agents/` subdirectory.
+**Status:** Open

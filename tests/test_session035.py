@@ -216,21 +216,19 @@ def test_prompt_analyzer_importable_from_safety():
     assert PromptAnalysisResult is not None
 
 
-def test_prompt_analyzer_not_at_top_level():
-    """F-095: PromptAnalyzer not exported from top-level checkagent namespace."""
-    assert not hasattr(checkagent, "PromptAnalyzer"), (
-        "F-095 fixed if PromptAnalyzer is at top-level"
-    )
+def test_prompt_analyzer_at_top_level():
+    """F-095 FIXED (0.2.0): PromptAnalyzer is now exported from top-level checkagent."""
+    assert hasattr(checkagent, "PromptAnalyzer"), "F-095 fixed in 0.2.0"
 
 
-def test_prompt_check_not_at_top_level():
-    """F-095: PromptCheck not exported from top-level checkagent namespace."""
-    assert not hasattr(checkagent, "PromptCheck")
+def test_prompt_check_at_top_level():
+    """F-095 FIXED (0.2.0): PromptCheck is now exported from top-level checkagent."""
+    assert hasattr(checkagent, "PromptCheck"), "F-095 fixed in 0.2.0"
 
 
-def test_prompt_analysis_result_not_at_top_level():
-    """F-095: PromptAnalysisResult not exported from top-level checkagent namespace."""
-    assert not hasattr(checkagent, "PromptAnalysisResult")
+def test_prompt_analysis_result_at_top_level():
+    """F-095 FIXED (0.2.0): PromptAnalysisResult is now exported from top-level checkagent."""
+    assert hasattr(checkagent, "PromptAnalysisResult"), "F-095 fixed in 0.2.0"
 
 
 def test_prompt_analyzer_analyze_returns_result():
@@ -287,9 +285,9 @@ def test_prompt_analyzer_check_result_no_evidence_when_missing():
 
 
 def test_data_enumeration_probes_count():
-    """data_enumeration category has 20 probes."""
+    """data_enumeration category has 25 probes in 0.2.0 (grew from 20 in 0.1.2)."""
     from checkagent.safety.probes import data_enumeration as de_mod
-    assert len(de_mod.all_probes) == 20
+    assert len(de_mod.all_probes) == 25
 
 
 def test_data_enumeration_probes_correct_category():

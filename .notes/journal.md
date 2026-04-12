@@ -1656,3 +1656,74 @@ This is the biggest single quality jump since the framework started. Every major
 - Test PromptAnalyzer with edge cases: empty string, very long prompt, Unicode
 - Check if any new features appeared (the upstream has been very active)
 - Try `EvalCase` in a parametrized test scenario
+
+---
+
+## Session 035 — 2026-04-12
+
+### What I Did
+
+**Upgraded to checkagent 0.2.0 "Security Audit Edition"** — first PyPI release! Updated pyproject.toml to remove the git-source pin (`[tool.uv.sources]`) and use `checkagent>=0.2.0` from PyPI.
+
+**Upstream CI:** GREEN — v0.2.0 Publish to PyPI run succeeded. F-097 (ruff lint) resolved. Three latest runs all green including the new "Fix mkdocs.yml indentation" CI run.
+
+**Test suite:** Updated from 1272→1323 passing. Fixed 4 broken tests in test_session035.py:
+- F-095 tests (3): PromptAnalyzer/PromptCheck/PromptAnalysisResult now at top-level — inverted assertions
+- data_enumeration count: grew from 20 to 25 probes
+
+**Fixed findings (resolved in 0.2.0):** F-093, F-094, F-095, F-097 all confirmed fixed.
+
+### New Features Explored (0.2.0 "Security Audit Edition")
+
+**GroundednessEvaluator:**
+- Two modes: `fabrication` and `uncertainty` (not `certainty` — ValueError)
+- fabrication mode works correctly: definitive claims fail, hedged language passes
+- `evaluate(text)` and `evaluate_run(run)` both work
+- `add_hedging_pattern()` and `add_disclaimer_pattern()` allow custom signal injection
+- **CRITICAL BUG (F-099):** uncertainty mode `hedging_signals` always 0. "I might be wrong", "could be incorrect", "not certain" all return 0. Only "not financial advice" passes via disclaimer path. The HEDGING_PATTERNS exist in source but don't apply in uncertainty mode.
+
+**probes_groundedness:** 8 probes (fabrication+uncertainty). A module, not a ProbeSet (inconsistent with other probe modules). Access via `probes_groundedness.all_probes`.
+
+**ConversationSafetyScanner:** Requires `evaluators` list (no default). Uses `conv.say()` (not `conv.turn()`). Detects per-turn and aggregate findings. `aggregate_only_findings` is the key new feature — captures split-context attacks that only appear when conversation is concatenated. Clean, well-designed API.
+
+**ComplianceReport + render functions:** `generate_compliance_report(results, agent_version=, model_version=)` → ComplianceReport. Three renderers: `render_compliance_markdown`, `render_compliance_json`, `render_compliance_html`. The markdown and json are clean. HTML returns valid markup. All three work correctly.
+
+**EU_AI_ACT_MAPPING:** Maps every SafetyCategory to EU AI Act article references (Article 9, 10, 15). Alongside OWASP_MAPPING this gives dual compliance coverage. Not at top-level.
+
+**SARIF 2.1.0 output (`--sarif file.sarif`):** Valid SARIF 2.1.0 JSON. Tool metadata with version. Rules include remediation markdown guidance (e.g., "## Remediation: Prompt Injection\n\n### Immediate Actions\n1. **Add an injection guard**..."). This is production-ready GitHub Security tab integration.
+
+**`--repeat N` flag:** Adds `stability` object to JSON output with `stable_pass`, `stable_fail`, `flaky`, `stability_score`. Echo agent gets 1.0 stability (deterministic). **F-098 found**: "Auto-detected:" diagnostic leaks to stdout with --json, breaking machine-readable output.
+
+**`--prompt-file` flag:** Shows static prompt analysis inline with dynamic scan. Score table appears at top, then probe results follow. Clean UX — one command gives both static and dynamic analysis.
+
+**`checkagent wrap` CLI:** Auto-detects agent type (OpenAI SDK / run / invoke / kickoff / callable). For plain async functions outputs "No wrapper needed, scan directly." **F-100 found**: crashes in testbed with `AttributeError: module 'agents' has no attribute 'Agent'` — same agents/ dir conflict as F-061.
+
+### New Findings
+
+- **F-098 (high):** `--json` mode leaks "Auto-detected:" diagnostic to stdout before JSON object
+- **F-099 (high):** GroundednessEvaluator uncertainty mode: hedging_signals always 0
+- **F-100 (medium):** checkagent wrap crashes with AttributeError in testbed (agents/ dir conflict)
+
+### What Surprised Me
+
+- 0.2.0 is a genuine major release, not just a patch. The "Security Audit Edition" name is earned: SARIF output, compliance reports, EU AI Act mapping, groundedness probes, conversation scanning — this is a real security tool now.
+- The `--prompt-file` flag is very well-designed: combining static prompt analysis with dynamic probing in one command is exactly what a security engineer wants.
+- probes_groundedness is a module, not a ProbeSet — the only probe namespace that works this way. Inconsistency worth reporting.
+- The F-098 bug (diagnostic leaking to stdout) is subtle: it only breaks --json mode when the "Auto-detected:" message fires. If the target is explicit, it might not appear.
+- ConversationSafetyScanner requires evaluators as positional argument with no default. Reasonable design choice but surprising — other evaluators can be instantiated with zero args.
+- PyPI release means `pip install checkagent` now gets 0.2.0 — real users can actually install it without git URL tricks.
+
+### Total Tests
+
+1323 passed, 4 xfailed (up from 1272 passed, 3 xfailed)
+
+### What I Want to Try Next Session
+
+- Test `checkagent scan --url` with a local FastAPI agent (high priority — real HTTP scanning)
+- Test GroundednessEvaluator uncertainty mode patterns directly (F-099 deep dive)
+- Test `ConversationSafetyScanner` with `aggregate_only_findings` split-attack scenario
+- Check if GroundednessEvaluator/ConversationSafetyScanner get top-level exports
+- Test SARIF upload workflow to GitHub Security tab (would need a real GitHub action)
+- Test `checkagent wrap` on a CrewAI/LangChain agent (auto-detection for invoke/kickoff)
+- Check docs site at checkagent.xydac.com for new 18 pages
+- Test `render_compliance_html` more thoroughly (what does the HTML look like?)

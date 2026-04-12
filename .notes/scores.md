@@ -240,3 +240,17 @@ Rate each feature on:
 | SafetyFinding/SafetyResult/SafetyEvaluator top-level | 5 | 4 | All 3 at top-level; SafetyEvaluator.evaluate_run() returns SafetyResult correctly; evaluate() for direct output text; clean API | 2026-04-11 |
 | ScenarioResult top-level export | 5 | 5 | At top-level; scenario/scores/degradation/resilience fields all correct | 2026-04-11 |
 | TestRunSummary | 5 | 4 | Alias for CI RunSummary with better name; same pass_rate/total/passed/failed; resolves F-029 naming confusion partially | 2026-04-11 |
+| upstream CI (session-035) | 5 | 5 | GREEN — v0.2.0 published to PyPI. All platforms passing. F-097 fixed. | 2026-04-12 |
+| checkagent 0.2.0 upgrade | 5 | 4 | PyPI release! 2107 tests upstream. F-093/F-094/F-095/F-097 all fixed. New: groundedness, compliance, conversation scanner, SARIF, wrap, --repeat | 2026-04-12 |
+| GroundednessEvaluator (fabrication mode) | 4 | 4 | Detects missing hedging language correctly; evaluate() and evaluate_run() both work; custom patterns via add_hedging_pattern(); uncertainty mode broken (F-099) | 2026-04-12 |
+| GroundednessEvaluator (uncertainty mode) | 1 | 2 | F-099: hedging_signals always 0 — "might", "could", "not certain" all miss; only "not financial advice" disclaimer path works | 2026-04-12 |
+| probes_groundedness | 4 | 3 | 8 probes (fabrication+uncertainty); correct category/severity; but it's a module not a ProbeSet — inconsistent with probes_injection/probes_pii etc. which are ProbeSet | 2026-04-12 |
+| ConversationSafetyScanner | 4 | 3 | Detects per-turn and aggregate findings; uses conv.say(); requires evaluators list (no default); split/accumulation attack detection via aggregate_only_findings; not at top-level | 2026-04-12 |
+| ConversationSafetyResult | 5 | 5 | per_turn_findings, aggregate_findings, aggregate_only_findings, turns_with_findings all work cleanly | 2026-04-12 |
+| ComplianceReport / generate_compliance_report | 5 | 4 | Correct totals/rates; has_critical_findings works; to_dict() complete; not at top-level | 2026-04-12 |
+| render_compliance_markdown/json/html | 5 | 4 | All three render correctly; markdown has proper table, JSON is parseable, HTML returns valid markup | 2026-04-12 |
+| EU_AI_ACT_MAPPING | 5 | 4 | Covers all SafetyCategory values; Article strings; not at top-level checkagent | 2026-04-12 |
+| SARIF 2.1.0 output (--sarif) | 5 | 5 | Valid SARIF 2.1.0; tool metadata with version; rules with remediation markdown; works alongside --json | 2026-04-12 |
+| --repeat N flag | 5 | 4 | Stability object in JSON (repeat, stable_pass, stable_fail, flaky, stability_score); echo agent shows 1.0 stability; F-098 (diagnostic on stdout breaks --json parse) | 2026-04-12 |
+| --prompt-file flag | 5 | 5 | Static analysis shown inline with dynamic scan; correct scores; injection guard detected | 2026-04-12 |
+| checkagent wrap CLI | 3 | 3 | Works for plain callables ("No wrapper needed"); crashes in testbed due to agents/ dir conflict (F-100); other auto-detection (run/invoke/kickoff) untested | 2026-04-12 |
