@@ -1225,13 +1225,13 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 
 ## F-098: `--json` flag leaks "Auto-detected:" diagnostic line to stdout
 **Date:** 2026-04-12
-**Severity:** high
+**Severity:** medium (reduced from high — partially fixed)
 **Category:** bug
-**Description:** When running `checkagent scan <target> --json`, the diagnostic line "Auto-detected: echo_agent.run() — using this method for each probe" is written to stdout before the JSON object. This makes the output unparseable by standard JSON tools without stripping the first line. The flag's contract is that stdout is machine-readable JSON, but the diagnostic violates this.
-**Expected:** With `--json`, stdout is a single valid JSON object. Diagnostics go to stderr.
-**Actual:** stdout = "Auto-detected: ...\n{...json...}" — first line is not JSON.
-**Workaround:** Strip lines not starting with `{` before parsing, or redirect stderr separately first to check if the diagnostic is there instead.
-**Status:** Open
+**Description:** When running `checkagent scan <target> --json` where `<target>` is a `@wrap` adapter (GenericAdapter), the diagnostic "Auto-detected: echo_agent.run() — using this method for each probe" leaks to stdout before the JSON object. Plain async functions do NOT trigger this — their JSON output is clean. The bug only affects targets that are adapter objects (created by `@wrap`, `LangChainAdapter`, etc.) where auto-detection of the callable method is needed.
+**Expected:** With `--json`, stdout is always a single valid JSON object regardless of target type. Diagnostics go to stderr.
+**Actual:** For plain callables: clean JSON (fixed in 0.2.0). For @wrap adapters: stdout = "Auto-detected: ...\n{...json...}".
+**Workaround:** Strip lines not starting with `{` before parsing. Or use plain async functions without `@wrap`.
+**Status:** Partially fixed in 0.2.0 — plain functions clean, @wrap adapters still leak
 
 ---
 
@@ -1255,4 +1255,28 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** wrap CLI gracefully skips OpenAI SDK detection when import fails or `Agent` not found.
 **Actual:** Raw traceback crash.
 **Workaround:** Run wrap from a directory without an `agents/` subdirectory.
+**Status:** Open (scan with `module:callable` colon syntax works — only wrap is affected)
+
+---
+
+## F-101: `ConversationSafetyResult.per_turn_findings` is a dict, not a list
+**Date:** 2026-04-13
+**Severity:** medium
+**Category:** dx-friction
+**Description:** `ConversationSafetyResult.per_turn_findings` is typed and documented as if it were a list indexed by turn number, but it's actually a `dict[int, list[SafetyFinding]]` containing only turns that HAD findings. Iterating with `enumerate(result.per_turn_findings)` gives dict keys (ints) — causing `TypeError: object of type 'int' has no len()` when users try to `len(findings)` on the yielded key. The correct pattern requires `.items()`.
+**Expected:** Either a list `[findings_per_turn_0, findings_per_turn_1, ...]` (indexed by turn), or documentation explicitly stating it's a sparse dict with only turns-with-findings as keys.
+**Actual:** `dict[int, list[SafetyFinding]]` — only turns with findings appear as keys. `result.per_turn_findings.keys() == set(result.turns_with_findings)`.
+**Workaround:** Use `result.per_turn_findings.items()` for iteration. Use `turn_idx in result.per_turn_findings` for membership checks. Do not use `enumerate()`.
+**Status:** Open
+
+---
+
+## F-102: HTTP scan with server down shows score 0.0 without explanation
+**Date:** 2026-04-13
+**Severity:** low
+**Category:** dx-friction
+**Description:** When `checkagent scan --url` cannot reach the server, the JSON output shows `"score": 0.0`, `"errors": 35`, `"findings": []`. The errors count is there but not prominently explained. A user reading only `score: 0.0` might think their agent failed all safety tests, when actually the server was unreachable. The non-JSON (rich) output also shows the same scan table with only errors, no explanation.
+**Expected:** A clear message in both JSON and rich output indicating the server was unreachable, not just `errors: 35` and `score: 0.0`.
+**Actual:** `{"score": 0.0, "errors": 35, "findings": []}` with no contextual error message.
+**Workaround:** Check `summary.errors` count; if equal to `summary.total`, assume server is down.
 **Status:** Open

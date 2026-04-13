@@ -1727,3 +1727,70 @@ This is the biggest single quality jump since the framework started. Every major
 - Test `checkagent wrap` on a CrewAI/LangChain agent (auto-detection for invoke/kickoff)
 - Check docs site at checkagent.xydac.com for new 18 pages
 - Test `render_compliance_html` more thoroughly (what does the HTML look like?)
+
+---
+
+## Session-036 — 2026-04-13
+
+### What I Did
+
+**Updated checkagent:** Still v0.2.0 — no new release since session-035. Upstream CI is green (all 3 latest runs pass). 1332 tests pass (up from 1323 last session due to new HTTP scan tests added).
+
+**Checked open findings:**
+- **F-098 (partial fix):** Retested. Plain async functions produce clean JSON — no "Auto-detected:" leak. But `@wrap` adapters still leak. `checkagent scan agents.echo_agent:echo_agent --json` still outputs "Auto-detected: echo_agent.run()" before the JSON. Reduced severity to medium since it only affects wrapped objects.
+- **F-099 (still open):** Confirmed `hedging_signals` is always 0. "might", "could", "not certain", "perhaps", "I cannot guarantee" — all score 0 hedging signals. Only "not financial advice" matches the disclaimer path. The bug is in pattern routing between hedging vs. disclaimer checks.
+- **F-100 (nuance clarified):** `checkagent wrap` still crashes with agents/ dir conflict. But discovered that `checkagent scan agents.echo_agent:echo_agent` (colon format: module:callable) DOES work now — Python imports the submodule correctly. Only the dot-only format fails. Updated F-100 status accordingly.
+
+**New feature tested: `checkagent scan --url` (HTTP scanning):**
+Built a minimal stdlib HTTP server (no FastAPI — FastAPI version in venv had init compat issue) and ran HTTP scanning against it. Results:
+- Sends HTTP POST with probe in `{"message": ...}` format by default
+- `--input-field` and `--output-field` both work; field auto-detection works (tries "output", "response", "answer", "text", "result", "message" in order)
+- `-H "Authorization: Bearer token"` custom headers accepted
+- `--json` output is clean (no diagnostic leak for HTTP targets)
+- `--generate-tests` creates a stdlib-based test file using `urllib.request` — no extra dependencies. Has `agent_fn` fixture that sends HTTP POST. Still imports from `checkagent.cli.scan` (F-089 still applies).
+- Server-down: shows `errors: 35, score: 0.0, findings: []` — functional but misleading (F-102 filed)
+- Multiple categories supported — tested injection (35 probes)
+
+**ConversationSafetyScanner deep dive:**
+- Works correctly for per-turn injection detection
+- `per_turn_findings` is a **dict** not a list (F-101 filed)
+  - Keys are only turns WITH findings
+  - `enumerate(result.per_turn_findings)` gives integer keys, not `(idx, findings)` pairs
+  - Correct usage: `result.per_turn_findings.items()`
+  - `result.turns_with_findings` gives the same key set as a list
+- `aggregate_only_findings` is empty when all findings are per-turn (expected)
+- Multiple evaluators in one scanner work correctly (injection + PII tested)
+
+**Top-level exports for 0.2.0 new classes:**
+None of the new 0.2.0 modules are at top-level: `GroundednessEvaluator`, `ConversationSafetyScanner`, `ConversationSafetyResult`, `ComplianceReport`, `generate_compliance_report`, `EU_AI_ACT_MAPPING`, `probes_groundedness` — all require `from checkagent.safety import ...`. This is the 14th+ instance of the pattern. Not filing a new finding (it's covered by the ongoing pattern), but noting for the score.
+
+### New Findings
+
+- **F-101 (medium):** `ConversationSafetyResult.per_turn_findings` is a dict not a list — enumerate() gives keys, need .items()
+- **F-102 (low):** HTTP scan server-down shows score 0.0 + errors count without clear "server unreachable" message
+
+### Updated Findings
+
+- **F-098:** Reduced severity medium, partially fixed — plain callables clean, @wrap adapters still leak
+
+### What Surprised Me
+
+- The HTTP scan feature is polished. Zero setup required — just point it at any URL, specify the input field, and it runs 35+ probes. The generated test file uses only stdlib `urllib.request` — no extra deps. This is genuinely useful for testing deployed agents.
+- FastAPI had a breaking change in its venv (Router.__init__ keyword arg). Had to fall back to stdlib http.server. Not a checkagent issue but worth noting for real users who try the --url scanning.
+- `checkagent scan agents.echo_agent:echo_agent` (colon format) WORKS in the testbed even though `agents.echo_agent` (dot format) doesn't. The `:` syntax tells checkagent to do a proper submodule import, which correctly picks up our local `agents/echo_agent.py` rather than the OpenAI package. F-100 is now more precisely "wrap uses the wrong import strategy" not "scan is broken in testbed."
+- `per_turn_findings` being a dict instead of list is the kind of thing that burns users. The name implies list semantics. `enumerate(result.per_turn_findings)` doesn't raise — it silently iterates over the integer keys, giving confusing TypeError only when you try to use those ints as findings.
+
+### Total Tests
+
+1332 passed, 5 xfailed (up from 1323/4)
+
+### What I Want to Try Next Session
+
+- Test ConversationSafetyScanner with aggregate_only_findings — find a scenario that produces cross-turn findings
+- Test GroundednessEvaluator with `evaluate_run()` on a multi-step AgentRun
+- Test `checkagent scan --url` with all 5 categories (not just injection)
+- Test `checkagent scan --url --repeat N` stability measurement for HTTP agents
+- Test `checkagent scan --url --sarif` — does SARIF work for HTTP targets?
+- Check docs site at checkagent.xydac.com
+- Test `checkagent wrap` on a LangChain agent (invoke method auto-detection)
+- Test `checkagent scan --llm-judge` flag with a local model
