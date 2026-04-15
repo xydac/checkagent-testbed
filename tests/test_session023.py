@@ -484,29 +484,30 @@ class TestGenerateTestCases:
 
     def test_basic_generation(self):
         runs = self._make_runs(3)
-        dataset = generate_test_cases(runs, dataset_name="test-ds")
+        # F-103: generate_test_cases now returns tuple[GoldenDataset, TraceScreeningResult]
+        dataset, _ = generate_test_cases(runs, dataset_name="test-ds")
         assert dataset.name == "test-ds"
         assert len(dataset.cases) == 3
 
     def test_dataset_description_includes_count(self):
         runs = self._make_runs(5)
-        dataset = generate_test_cases(runs)
+        dataset, _ = generate_test_cases(runs)
         assert "5" in dataset.description
 
     def test_case_id_is_deterministic(self):
         run = AgentRun(input=AgentInput(query="hello world"), final_output="hi")
-        dataset1 = generate_test_cases([run])
-        dataset2 = generate_test_cases([run])
+        dataset1, _ = generate_test_cases([run])
+        dataset2, _ = generate_test_cases([run])
         assert dataset1.cases[0].id == dataset2.cases[0].id
 
     def test_imported_tag_always_added(self):
         runs = self._make_runs(1)
-        dataset = generate_test_cases(runs)
+        dataset, _ = generate_test_cases(runs)
         assert "imported" in dataset.cases[0].tags
 
     def test_extra_tags_added(self):
         runs = self._make_runs(1)
-        dataset = generate_test_cases(runs, tags=["regression", "prod"])
+        dataset, _ = generate_test_cases(runs, tags=["regression", "prod"])
         case_tags = dataset.cases[0].tags
         assert "regression" in case_tags
         assert "prod" in case_tags
@@ -516,7 +517,7 @@ class TestGenerateTestCases:
             input=AgentInput(query="bad query"),
             error="ServiceUnavailable",
         )
-        dataset = generate_test_cases([run])
+        dataset, _ = generate_test_cases([run])
         assert "error" in dataset.cases[0].tags
 
     def test_tool_run_gets_has_tools_tag(self):
@@ -525,7 +526,7 @@ class TestGenerateTestCases:
             steps=[Step(step_index=0, tool_calls=[ToolCall(name="search", arguments={"q": "x"})])],
             final_output="found it",
         )
-        dataset = generate_test_cases([run])
+        dataset, _ = generate_test_cases([run])
         assert "has-tools" in dataset.cases[0].tags
 
     def test_expected_tools_populated_from_tool_calls(self):
@@ -537,7 +538,7 @@ class TestGenerateTestCases:
             ])],
             final_output="done",
         )
-        dataset = generate_test_cases([run])
+        dataset, _ = generate_test_cases([run])
         assert dataset.cases[0].expected_tools == ["search", "fetch"]
 
     def test_expected_output_contains_extracted_from_final_output(self):
@@ -545,7 +546,7 @@ class TestGenerateTestCases:
             input=AgentInput(query="capital of france"),
             final_output="The capital of France is Paris. It is a beautiful city.",
         )
-        dataset = generate_test_cases([run], scrub_pii=False)
+        dataset, _ = generate_test_cases([run], scrub_pii=False)
         assert len(dataset.cases[0].expected_output_contains) > 0
         first = dataset.cases[0].expected_output_contains[0]
         assert len(first) > 10  # should be a real sentence fragment
@@ -555,7 +556,7 @@ class TestGenerateTestCases:
             input=AgentInput(query="Find john@example.com"),
             final_output="Found john@example.com",
         )
-        dataset = generate_test_cases([run])
+        dataset, _ = generate_test_cases([run])
         assert "@" not in dataset.cases[0].input
 
     def test_pii_scrubbing_disabled(self):
@@ -563,17 +564,17 @@ class TestGenerateTestCases:
             input=AgentInput(query="Find john@example.com"),
             final_output="Found result",
         )
-        dataset = generate_test_cases([run], scrub_pii=False)
+        dataset, _ = generate_test_cases([run], scrub_pii=False)
         assert dataset.cases[0].input == "Find john@example.com"
 
     def test_original_duration_in_metadata(self):
         run = AgentRun(input=AgentInput(query="q"), final_output="a", duration_ms=500.0)
-        dataset = generate_test_cases([run])
+        dataset, _ = generate_test_cases([run])
         assert dataset.cases[0].metadata.get("original_duration_ms") == 500.0
 
     def test_original_error_in_metadata(self):
         run = AgentRun(input=AgentInput(query="q"), error="Timeout")
-        dataset = generate_test_cases([run])
+        dataset, _ = generate_test_cases([run])
         assert dataset.cases[0].metadata.get("original_error") == "Timeout"
 
     def test_max_steps_is_double_step_count(self):
@@ -586,12 +587,12 @@ class TestGenerateTestCases:
             ],
             final_output="done",
         )
-        dataset = generate_test_cases([run])
+        dataset, _ = generate_test_cases([run])
         assert dataset.cases[0].max_steps == 6  # 3 steps * 2
 
     def test_max_steps_is_none_for_empty_steps(self):
         run = AgentRun(input=AgentInput(query="q"), final_output="a")
-        dataset = generate_test_cases([run])
+        dataset, _ = generate_test_cases([run])
         # no steps, max_steps should be None or a minimal fallback
         # (None because there are no steps to double)
         # Note: code does max(len(run.steps), 1) * 2 if run.steps else None
@@ -600,7 +601,7 @@ class TestGenerateTestCases:
     def test_custom_pii_scrubber_used(self):
         custom_scrubber = PiiScrubber(extra_patterns=[("TOKEN", r"tok-[a-z]+")])
         run = AgentRun(input=AgentInput(query="auth tok-abcdef"), final_output="ok")
-        dataset = generate_test_cases([run], pii_scrubber=custom_scrubber)
+        dataset, _ = generate_test_cases([run], pii_scrubber=custom_scrubber)
         assert "tok-abcdef" not in dataset.cases[0].input
 
     def test_f066_pii_collision_crashes(self):

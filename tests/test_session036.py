@@ -697,6 +697,7 @@ def test_wrap_cli_crashes_in_testbed_due_to_agents_dir():
     """
     code, stdout, stderr = run_cli(
         "wrap", "agents.echo_agent:echo_agent",
+        "--force",  # F-100 is fixed; use --force in case output file already exists
         timeout=10,
     )
     output = stdout + stderr

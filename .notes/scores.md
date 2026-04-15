@@ -172,7 +172,8 @@ Rate each feature on:
 | JsonFileImporter | 5 | 4 | Handles flat, native (steps), span, and JSONL formats; filter by status; limit; not at top-level (F-067) | 2026-04-06 |
 | OtelJsonImporter | 5 | 4 | Parses OTLP JSON correctly; groups by traceId; root span detection; tool spans from child names; error from status.code; not at top-level (F-067) | 2026-04-06 |
 | PiiScrubber | 5 | 5 | Deterministic replacements; 5 built-in patterns (email/phone/SSN/CC/IP); extra_patterns; scrub_value for nested dicts/lists; reset() works correctly | 2026-04-06 |
-| generate_test_cases | 3 | 3 | Works correctly for distinct queries; PII ID collision crashes with raw ValidationError (F-066) — common real-world scenario; not at top-level (F-067) | 2026-04-06 |
+| generate_test_cases | 3 | 1 | F-103: Breaking API change — returns tuple not GoldenDataset, `name=` renamed to `dataset_name=`, no deprecation. Existing code breaks silently. Safety screening useful but the migration story is terrible. | 2026-04-15 |
+| TraceScreeningResult | 5 | 4 | New in 0.2.0 (safety screening commit): total/clean/flagged counts, findings_by_trace with SafetyFinding objects. Catches injection in traced outputs. Not at top-level. | 2026-04-15 |
 | trace_import top-level exports | N/A | 1 | Eleventh instance of missing-top-level-export pattern (F-067) | 2026-04-06 |
 | checkagent.multiagent (overall) | 3 | 3 | New multi-agent trace + blame attribution module. Core logic works for most strategies; LEAF_ERRORS bug (F-069) makes the most useful strategy unreliable; agent_id silent failure (F-070); not at top-level (F-068) | 2026-04-06 |
 | MultiAgentTrace construction | 5 | 4 | Clean Pydantic model; runs + handoffs + trace_id; defaults to empty lists; no handoff agent_id validation (F-072) | 2026-04-06 |
@@ -253,6 +254,6 @@ Rate each feature on:
 | SARIF 2.1.0 output (--sarif) | 5 | 5 | Valid SARIF 2.1.0; tool metadata with version; rules with remediation markdown; works alongside --json | 2026-04-12 |
 | --repeat N flag | 5 | 4 | Stability object in JSON (repeat, stable_pass, stable_fail, flaky, stability_score); echo agent shows 1.0 stability; F-098 (diagnostic on stdout breaks --json parse) | 2026-04-12 |
 | --prompt-file flag | 5 | 5 | Static analysis shown inline with dynamic scan; correct scores; injection guard detected | 2026-04-12 |
-| checkagent wrap CLI | 3 | 3 | Works for plain callables ("No wrapper needed"); crashes in testbed due to agents/ dir conflict (F-100); other auto-detection (run/invoke/kickoff) untested | 2026-04-12 |
+| checkagent wrap CLI | 4 | 4 | F-100 FIXED: no longer crashes in testbed; auto-detects .run()/.invoke()/plain callable; generates valid async wrapper; --force flag for overwrites | 2026-04-15 |
 | checkagent scan --url (HTTP) | 5 | 5 | HTTP endpoint scanning works: POST probes, --input-field, --output-field, auto-detect, -H headers, --json clean, --generate-tests creates stdlib test file, server-down shows errors count | 2026-04-13 |
 | upstream CI (session-036) | 5 | 5 | GREEN — all 3 latest runs passing. Still on v0.2.0 (no new release since session-035) | 2026-04-13 |

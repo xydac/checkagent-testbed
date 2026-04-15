@@ -1794,3 +1794,83 @@ None of the new 0.2.0 modules are at top-level: `GroundednessEvaluator`, `Conver
 - Check docs site at checkagent.xydac.com
 - Test `checkagent wrap` on a LangChain agent (invoke method auto-detection)
 - Test `checkagent scan --llm-judge` flag with a local model
+
+---
+
+## Session 037 — 2026-04-15
+
+### Upgrade
+
+Installed latest checkagent from git main — still reports 0.2.0 (no new release since session-035 PyPI push). The latest upstream commit was "Add safety screening to import-trace, fix per_turn_findings iteration".
+
+### Upstream CI
+
+Red again — **Python 3.13 on Windows** fails with `ConnectionAbortedError: [WinError 10053]` in `TestMakeHttpAgent::test_server_error_raises`. This is the 6th distinct Windows-specific failure across all sessions (F-043, F-047, F-054, F-091, F-104). All non-Windows platforms green. The pattern is undeniable: checkagent's test suite is brittle on Windows for any test that touches networking or timing. Filed as F-104.
+
+### Pre-existing tests
+
+Previous full run had 17 failures:
+- 8 in `TestGenerateTestCases` (test_session023) — AttributeError 'tuple' has no attribute 'name'
+- 1 in `test_session036` — wrap crash test failing because `checkagent_target.py` already exists
+
+### Root cause: `generate_test_cases` API breaking change (F-103)
+
+The safety screening commit changed `generate_test_cases` in two ways:
+1. `name=` → `dataset_name=` (no deprecation, `TypeError: unexpected keyword argument 'name'`)
+2. Return type: `GoldenDataset` → `tuple[GoldenDataset, TraceScreeningResult]` (no deprecation, `AttributeError: 'tuple' object has no attribute 'name'`)
+
+The new `TraceScreeningResult` is genuinely useful — it flags imported traces that contain injection patterns, PII leaks, etc. But the migration story is terrible. Old code breaks silently. Filed F-103.
+
+Fixed all 16 affected tests in test_session023.py by unpacking: `dataset, _ = generate_test_cases(...)`.
+
+### test_session036 wrap fix
+
+`test_wrap_cli_crashes_in_testbed_due_to_agents_dir` was failing because `checkagent_target.py` already exists from a previous session's wrap run. F-100 is fixed upstream — wrap no longer crashes, but without `--force` it returns exit code 1 "file already exists". Added `--force` to the test. Now passes.
+
+### F-100 and F-102 confirmed fixed
+
+- **F-100**: `checkagent wrap agents.echo_agent:echo_agent` now works in testbed — no AttributeError. Auto-detects `.run()` method. Score upgraded to 4/4.
+- **F-102**: JSON output now includes `"warning": "All N probes failed... may be unreachable."` — clear server-down message.
+
+### New tests: TraceScreeningResult API
+
+Added `TestTraceScreeningResult` class (9 tests) to test_session037.py documenting:
+- Return type is now `tuple` (breaking change)
+- `total_count`, `clean_count`, `flagged_count`, `findings_by_trace` fields
+- Injection detection in imported traces works correctly
+- `safety_check=False` skips screening (not tested — discovered parameter exists)
+- Old `name=` param raises `TypeError` (not helpful migration hint)
+- Dataset still includes ALL runs, even flagged ones (screening is informational)
+
+### Session 037 tests
+
+All 33 tests in test_session037.py pass (24 pre-written + 9 new TraceScreeningResult).
+
+### Final count
+
+**1366 passed, 4 xfailed** (up from 1332/4 last session — +34 net tests)
+
+### What surprised me
+
+- The `generate_test_cases` API change was introduced in the same commit that fixed F-101 (`per_turn_findings` dict iteration). Classic "one commit, two changes" DX trap — one fix broke existing code. The `findings_by_trace` dict keys are trace IDs (strings like `'q2-bee98bf1'`), which are deterministic content hashes. Nice design, but not surfaced anywhere in docs.
+- Windows CI failures are now a persistent pattern — 6 different root causes across 37 sessions. All are networking or timing-related. Checkagent needs a CI policy for Windows: either fix the flakiness or run Windows CI on a separate cadence with known-flaky tests marked.
+- `checkagent wrap` actually works well now. Auto-detected `.run()`, `.invoke()`, and plain callable correctly in tests. The generated async wrapper is clean Python. F-100 fix was solid.
+
+### New Findings
+
+- **F-103 (high):** `generate_test_cases` breaking API — tuple return + `name` → `dataset_name` rename, no deprecation
+- **F-104 (high):** Upstream CI failing on Windows Python 3.13 — `ConnectionAbortedError` in HTTP scan test
+
+### Updated Findings
+
+- **F-100:** FIXED — wrap no longer crashes in testbed due to `agents/` dir
+- **F-102:** FIXED — JSON output now includes clear "unreachable" warning key
+
+### What I Want to Try Next Session
+
+- Test `TraceScreeningResult` with `safety_check=False` parameter
+- Test `checkagent scan --llm-judge` flag (if it exists)
+- Test `checkagent scan --url --repeat N` with a flaky/randomized agent (stability < 1.0)
+- Test docs site at checkagent.xydac.com
+- Test `checkagent wrap` with a LangChain LCEL chain (invoke method)
+- Investigate whether F-101 (`per_turn_findings` dict) was actually fixed in the "fix per_turn_findings iteration" commit or just documented better

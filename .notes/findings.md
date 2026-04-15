@@ -1255,7 +1255,7 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** wrap CLI gracefully skips OpenAI SDK detection when import fails or `Agent` not found.
 **Actual:** Raw traceback crash.
 **Workaround:** Run wrap from a directory without an `agents/` subdirectory.
-**Status:** Open (scan with `module:callable` colon syntax works — only wrap is affected)
+**Status:** Fixed in commit b323ad33 (session-037). `_detect_kind()` now catches `(ImportError, AttributeError)`. Wrap auto-detects `.run()`/`.invoke()`/plain callable correctly even with local `agents/` dir.
 
 ---
 
@@ -1279,4 +1279,28 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** A clear message in both JSON and rich output indicating the server was unreachable, not just `errors: 35` and `score: 0.0`.
 **Actual:** `{"score": 0.0, "errors": 35, "findings": []}` with no contextual error message.
 **Workaround:** Check `summary.errors` count; if equal to `summary.total`, assume server is down.
+**Status:** Fixed in commit b323ad33 (session-037). JSON output now includes `"warning": "All N probes failed with connection errors. Server at URL may be unreachable."`
+
+---
+
+## F-103: `generate_test_cases` breaking API change — tuple return and parameter rename
+**Date:** 2026-04-15
+**Severity:** high
+**Category:** bug
+**Description:** The `generate_test_cases` function in `checkagent.trace_import` changed its return type and parameter names in the 0.2.0 safety screening commit without any deprecation warning or migration guide. Two breaking changes in one commit: (1) `name=` parameter renamed to `dataset_name=` — existing code gets `TypeError: unexpected keyword argument 'name'`. (2) Return type changed from `GoldenDataset` to `tuple[GoldenDataset, TraceScreeningResult]` — existing code gets `AttributeError: 'tuple' object has no attribute 'name'` (or similar) when accessing dataset fields directly. The new `TraceScreeningResult` is useful (safety screening of imported traces), but the silent breaking change is a DX trap. The rename error at least gives a `TypeError`; the tuple change silently breaks attribute access with an unintuitive message.
+**Expected:** Either: (a) backward-compatible addition (new `return_screening=True` flag), or (b) deprecation warnings in the old code pointing users to the new API.
+**Actual:** Silent behavior change — old code that worked before 0.2.0 breaks at runtime with no helpful migration hints.
+**Workaround:** Update all `generate_test_cases` call sites to unpack the tuple: `dataset, screening = generate_test_cases(...)`. Use `dataset_name=` instead of `name=`.
+**Status:** Open
+
+---
+
+## F-104: Upstream CI failing on Windows — `ConnectionAbortedError` in HTTP scan test
+**Date:** 2026-04-15
+**Severity:** high
+**Category:** bug
+**Description:** CI job "Python 3.13 on windows-latest" fails with `ConnectionAbortedError: [WinError 10053] An established connection was aborted by the software in your host machine` in `tests/cli/test_scan.py::TestMakeHttpAgent::test_server_error_raises`. This is the latest in a pattern of Windows-specific networking/timing failures in checkagent's CI (see also F-043, F-047, F-054, F-091). The commit that introduced this failure was "Add safety screening to import-trace, fix per_turn_findings iteration". All other platforms (Ubuntu/macOS × Python 3.10–3.13) pass. Only Python 3.13 on Windows fails.
+**Expected:** CI green on all platforms including Windows Python 3.13.
+**Actual:** CI red on latest commit. `test_server_error_raises` passes on all other platform/Python combos but not Windows 3.13.
+**Workaround:** None for testbed users. This is an upstream CI issue; the framework code itself is not affected on non-Windows platforms.
 **Status:** Open
