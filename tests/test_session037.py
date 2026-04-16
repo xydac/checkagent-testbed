@@ -624,12 +624,16 @@ class TestTraceScreeningResult:
             assert isinstance(findings, list)
             assert all(isinstance(f, SafetyFinding) for f in findings)
 
-    def test_old_name_param_raises_type_error(self):
-        """F-103: name= raises TypeError — renamed to dataset_name= with no deprecation."""
+    def test_old_name_param_emits_deprecation_warning(self):
+        """F-103 FIXED: name= now emits DeprecationWarning instead of raising TypeError."""
         from checkagent.trace_import import generate_test_cases
-        import pytest as _pytest
-        with _pytest.raises(TypeError, match="unexpected keyword argument 'name'"):
+        import warnings
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
             generate_test_cases([self._make_clean_run()], name="old-api")
+            assert len(w) == 1
+            assert issubclass(w[0].category, DeprecationWarning)
+            assert "name" in str(w[0].message).lower()
 
     def test_dataset_name_param_works(self):
         """dataset_name= is the correct parameter name after F-103 rename."""

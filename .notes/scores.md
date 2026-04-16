@@ -247,13 +247,17 @@ Rate each feature on:
 | GroundednessEvaluator (uncertainty mode) | 1 | 2 | F-099: hedging_signals always 0 — "might", "could", "not certain" all miss; only "not financial advice" disclaimer path works | 2026-04-12 |
 | probes_groundedness | 4 | 3 | 8 probes (fabrication+uncertainty); correct category/severity; but it's a module not a ProbeSet — inconsistent with probes_injection/probes_pii etc. which are ProbeSet | 2026-04-12 |
 | ConversationSafetyScanner | 4 | 3 | Detects per-turn and aggregate findings; uses conv.say(); requires evaluators list (no default); split/accumulation attack detection via aggregate_only_findings; not at top-level | 2026-04-12 |
-| ConversationSafetyResult | 4 | 3 | per_turn_findings is a dict not a list (F-101 — enumerate() gives keys not values, need .items()); other fields correct | 2026-04-13 |
+| ConversationSafetyResult | 5 | 4 | F-101 FIXED: iter_turn_findings() helper added with docstring warning against enumerate(); turns_with_findings/total_per_turn_findings/total_findings properties also added | 2026-04-16 |
 | ComplianceReport / generate_compliance_report | 5 | 4 | Correct totals/rates; has_critical_findings works; to_dict() complete; not at top-level | 2026-04-12 |
 | render_compliance_markdown/json/html | 5 | 4 | All three render correctly; markdown has proper table, JSON is parseable, HTML returns valid markup | 2026-04-12 |
 | EU_AI_ACT_MAPPING | 5 | 4 | Covers all SafetyCategory values; Article strings; not at top-level checkagent | 2026-04-12 |
 | SARIF 2.1.0 output (--sarif) | 5 | 5 | Valid SARIF 2.1.0; tool metadata with version; rules with remediation markdown; works alongside --json | 2026-04-12 |
 | --repeat N flag | 5 | 4 | Stability object in JSON (repeat, stable_pass, stable_fail, flaky, stability_score); echo agent shows 1.0 stability; F-098 (diagnostic on stdout breaks --json parse) | 2026-04-12 |
 | --prompt-file flag | 5 | 5 | Static analysis shown inline with dynamic scan; correct scores; injection guard detected | 2026-04-12 |
-| checkagent wrap CLI | 4 | 4 | F-100 FIXED: no longer crashes in testbed; auto-detects .run()/.invoke()/plain callable; generates valid async wrapper; --force flag for overwrites | 2026-04-15 |
+| checkagent wrap CLI | 2 | 2 | F-105: generates broken wrapper for class agents — _target.invoke() (unbound) instead of _target().invoke(); 35/35 probes error; plain functions work fine | 2026-04-16 |
+| checkagent wrap (plain function) | 5 | 5 | "No wrapper needed, scan directly" message for plain callables; correct auto-detection | 2026-04-16 |
 | checkagent scan --url (HTTP) | 5 | 5 | HTTP endpoint scanning works: POST probes, --input-field, --output-field, auto-detect, -H headers, --json clean, --generate-tests creates stdlib test file, server-down shows errors count | 2026-04-13 |
-| upstream CI (session-036) | 5 | 5 | GREEN — all 3 latest runs passing. Still on v0.2.0 (no new release since session-035) | 2026-04-13 |
+| --repeat N with --url (flaky agents) | 5 | 5 | stability_score < 1.0 for flaky server; stable_pass/stable_fail/flaky counts correct; probe fails if ANY run triggers finding | 2026-04-16 |
+| generate_test_cases (session-038) | 4 | 3 | F-103 partially fixed: name= now emits DeprecationWarning (not TypeError). safety_check=False skips screening correctly. Return type still tuple (breaking). | 2026-04-16 |
+| upstream CI (session-037) | 1 | 1 | Red — Windows Python 3.13 ConnectionAbortedError in HTTP scan test (F-104) | 2026-04-15 |
+| upstream CI (session-038) | 5 | 5 | GREEN — all 12 jobs passing including Windows 3.10/3.11/3.12/3.13. F-104 fixed. 1 session red streak ended. | 2026-04-16 |

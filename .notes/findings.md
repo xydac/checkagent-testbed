@@ -1267,7 +1267,7 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** Either a list `[findings_per_turn_0, findings_per_turn_1, ...]` (indexed by turn), or documentation explicitly stating it's a sparse dict with only turns-with-findings as keys.
 **Actual:** `dict[int, list[SafetyFinding]]` — only turns with findings appear as keys. `result.per_turn_findings.keys() == set(result.turns_with_findings)`.
 **Workaround:** Use `result.per_turn_findings.items()` for iteration. Use `turn_idx in result.per_turn_findings` for membership checks. Do not use `enumerate()`.
-**Status:** Open
+**Status:** Fixed in session-038 upstream commit "Fix Windows CI failure and generate_test_cases API compat". Added `iter_turn_findings()` helper method that returns sorted `(turn_idx, findings)` pairs, with docstring explicitly warning against `enumerate()`. Also added `turns_with_findings`, `total_per_turn_findings`, `total_findings` properties.
 
 ---
 
@@ -1291,7 +1291,7 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** Either: (a) backward-compatible addition (new `return_screening=True` flag), or (b) deprecation warnings in the old code pointing users to the new API.
 **Actual:** Silent behavior change — old code that worked before 0.2.0 breaks at runtime with no helpful migration hints.
 **Workaround:** Update all `generate_test_cases` call sites to unpack the tuple: `dataset, screening = generate_test_cases(...)`. Use `dataset_name=` instead of `name=`.
-**Status:** Open
+**Status:** Partially fixed in session-038 upstream commit "Fix Windows CI failure and generate_test_cases API compat". The `name=` parameter now emits `DeprecationWarning` instead of raising `TypeError` — backward compatibility restored for that parameter. Return type still `tuple[GoldenDataset, TraceScreeningResult]` (no revert). Migration is now clearer.
 
 ---
 
@@ -1303,4 +1303,16 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** CI green on all platforms including Windows Python 3.13.
 **Actual:** CI red on latest commit. `test_server_error_raises` passes on all other platform/Python combos but not Windows 3.13.
 **Workaround:** None for testbed users. This is an upstream CI issue; the framework code itself is not affected on non-Windows platforms.
+**Status:** Fixed in session-038 upstream commit "Fix Windows CI failure and generate_test_cases API compat". All 12 CI jobs pass including Windows Python 3.10/3.11/3.12/3.13.
+
+---
+
+## F-105: `checkagent wrap` generates broken wrapper for class-based agents
+**Date:** 2026-04-16
+**Severity:** high
+**Category:** bug
+**Description:** When `checkagent wrap module:ClassName` generates a wrapper for a class-based agent with an `.invoke()` method, the generated code calls `_target.invoke(prompt)` where `_target` is the **imported class** (not an instance). This is an unbound method call — Python raises `TypeError: LCELAgent.invoke() missing 1 required positional argument: 'input_text'` at runtime. The correct code should be `_target().invoke(prompt)` (instantiate first). As a result, when you run `checkagent scan checkagent_target:checkagent_target` on the generated wrapper, ALL probes (35/35) error out with no findings.
+**Expected:** Generated wrapper instantiates the class before calling `invoke()`: `result = _target().invoke(prompt)`.
+**Actual:** Generated wrapper: `result = _target.invoke(prompt)` — this is equivalent to calling an unbound method, which fails in Python 3 with a clear TypeError.
+**Workaround:** Manually edit the generated `checkagent_target.py` to add parentheses: change `_target.invoke(prompt)` to `_target().invoke(prompt)`.
 **Status:** Open

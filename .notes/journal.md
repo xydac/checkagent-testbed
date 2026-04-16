@@ -1874,3 +1874,63 @@ All 33 tests in test_session037.py pass (24 pre-written + 9 new TraceScreeningRe
 - Test docs site at checkagent.xydac.com
 - Test `checkagent wrap` with a LangChain LCEL chain (invoke method)
 - Investigate whether F-101 (`per_turn_findings` dict) was actually fixed in the "fix per_turn_findings iteration" commit or just documented better
+
+---
+
+## Session 038 — 2026-04-16
+
+### What I did
+
+1. **Updated checkagent** — `pip install --upgrade` from git main. Version stayed at 0.2.0 (no new PyPI release since session-035). Upstream commit was "Fix Windows CI failure and generate_test_cases API compat".
+
+2. **Upstream CI** — Latest run green. All 12 jobs pass including Windows 3.10/3.11/3.12/3.13. The session-037 failure (F-104, Windows Python 3.13 `ConnectionAbortedError` in HTTP scan test) is fixed.
+
+3. **Existing tests** — 1 failure: `test_old_name_param_raises_type_error` in session-037. The test expected `TypeError` when calling `generate_test_cases(name=...)`, but upstream fixed F-103 by adding a `DeprecationWarning` instead. Updated test to assert `DeprecationWarning` — all 1366 tests now pass (+ 4 xfailed).
+
+4. **Previous findings checked:**
+   - **F-101 FIXED**: `ConversationSafetyResult` now has `iter_turn_findings()` helper method that returns sorted `(turn_idx, findings)` pairs. The docstring explicitly calls out the `enumerate()` gotcha. Also added `turns_with_findings`, `total_per_turn_findings`, `total_findings` properties. This is a solid fix — solves the DX problem with a well-documented helper.
+   - **F-103 PARTIALLY FIXED**: `generate_test_cases(name=...)` no longer raises `TypeError` — now emits `DeprecationWarning` and still works. Return type is still `tuple[GoldenDataset, TraceScreeningResult]` (breaking change stands, but at least `name=` usage is graceful now).
+   - **F-104 FIXED**: Windows CI all green.
+
+5. **New testing:**
+
+   - **`safety_check=False`**: Works correctly. When `False`, all runs are marked clean regardless of content (0 flagged). Return type is still `tuple` even with `safety_check=False`.
+   
+   - **`iter_turn_findings()`** (F-101 fix): Confirmed works. Returns list of `(int, list[SafetyFinding])` pairs. Existing `enumerate()` still gives dict keys — the new method is the right way to iterate.
+   
+   - **`--repeat N` with `--url`**: Tested with a flaky HTTP agent that randomly complies or refuses injection probes (50% rate). Got `stability_score=0.69`, `flaky=11`, `stable_pass=23`, `stable_fail=1`. This confirms the stability reporting works end-to-end with HTTP endpoints (not just local callables). The `summary.score` equals `stability_score` when repeating.
+   
+   - **`checkagent wrap` with LangChain LCEL chain**: Created `agents/langchain_lcel_agent.py` (plain function) — wrap correctly responded "No wrapper needed, scan directly". Good auto-detection. Created `agents/langchain_lcel_class_agent.py` (class with `.invoke()`) — wrap detected `.invoke()` and generated a wrapper. BUT the generated code has a bug (**F-105**): calls `_target.invoke(prompt)` (class method, unbound) instead of `_target().invoke(prompt)` (instance method). Result: 35/35 probes error with `TypeError: missing 1 required positional argument`. The generated wrapper is unusable for class-based agents.
+
+### New Findings
+
+- **F-105 (high):** `checkagent wrap` generates broken wrapper for class-based agents — `_target.invoke()` (unbound) instead of `_target().invoke()` (instantiated). All scan probes fail with TypeError. Plain function callables work fine and don't even need a wrapper (correctly identified by wrap). This is a significant gap since the whole point of `checkagent wrap` is to handle class-based agents.
+
+### Session-038 Tests
+
+Added `tests/test_session038.py` (17 tests):
+- `TestF101ConversationIterTurnFindings` (7 tests) — verifies iter_turn_findings() fix
+- `TestF103GenerateTestCasesNameParam` (3 tests) — verifies deprecation warning behavior
+- `TestGenerateTestCasesSafetyCheckFalse` (4 tests) — new feature coverage
+- `TestF105WrapClassAgentBroken` (3 tests) — documents and verifies the broken wrapper bug
+
+Also added:
+- `agents/langchain_lcel_agent.py` — LangChain LCEL plain function agent
+- `agents/langchain_lcel_class_agent.py` — LangChain LCEL class-based agent
+- `tests/fixtures/f105_broken_class_wrapper.py` — snapshot of broken generated wrapper for regression testing
+
+**Final count: 1383 passed, 4 xfailed** (up from 1366/4 last session — +17 net tests)
+
+### What surprised me
+
+- `checkagent wrap` was correctly smart about plain functions — "No wrapper needed, scan directly" is the right message and prevents users from adding unnecessary indirection. But then getting the class-based case wrong (unbound method) is all the more glaring. The detection logic is clearly there; the code generation just has a missing `()`.
+- `iter_turn_findings()` fix is excellent — the docstring explicitly says "Use this instead of `enumerate(per_turn_findings)` which yields dict keys" — that's exactly the trap users fall into, and now there's a named method plus a warning. This is the right pattern for fixing DX issues without changing the underlying data structure.
+- The `--repeat N` + `--url` combination gives real stability data for deployed agents. A 69% stability score on a 50%-compliant flaky agent is mathematically correct (35 probes × 3 runs: 50% pass rate means expected ~17.5 stable_pass, ~11 flaky, ~6 stable_fail — actual: 23 stable_pass, 11 flaky, 1 stable_fail). The stable_pass count is higher than expected because some probes may use patterns the agent always passes or always fails on.
+
+### What I Want to Try Next Session
+
+- **Test `checkagent wrap` with manually fixed wrapper** — change `_target.invoke(prompt)` to `_target().invoke(prompt)` and verify it works end-to-end with `checkagent scan`
+- **Test `--llm-judge` flag** — requires OpenAI or Anthropic API key; would test whether LLM-based judging gives different results than regex for the injection probes
+- **Test `checkagent scan --url --repeat N --generate-tests`** — does generate-tests produce useful tests that capture flakiness?
+- **Check `probes_groundedness` module vs ProbeSet inconsistency** — it's a module not a ProbeSet; explore if this limits composability with ProbeSet API
+- **Test docs site** — `checkagent.xydac.com` if it's live; check if it covers the new 0.2.0 features (conversation scanner, compliance, SARIF, wrap)
