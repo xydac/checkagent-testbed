@@ -1315,4 +1315,24 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** Generated wrapper instantiates the class before calling `invoke()`: `result = _target().invoke(prompt)`.
 **Actual:** Generated wrapper: `result = _target.invoke(prompt)` — this is equivalent to calling an unbound method, which fails in Python 3 with a clear TypeError.
 **Workaround:** Manually edit the generated `checkagent_target.py` to add parentheses: change `_target.invoke(prompt)` to `_target().invoke(prompt)`.
+**Status:** Fixed in "Fix wrap class-based agents, add scan --report HTML compliance flag" (2026-04-17) — generated wrapper now correctly uses `_agent = _target()` at module level and calls `_agent.invoke(prompt)`. Verified in session-039.
+
+## F-106: "Auto-detected" wrap diagnostic goes to stdout, breaking --json parsing
+**Date:** 2026-04-17
+**Severity:** medium
+**Category:** bug
+**Description:** When scanning a `@wrap`-decorated agent (or any agent where checkagent auto-detects the method to call), the message "Auto-detected: agent.run() — using this method for each probe" is printed to stdout. This appears before the JSON output, making the combined stdout unparseable as JSON when piped to `json.load()`. This is an extension of F-098 (which noted the same for `--repeat N`). Affects both `--json` alone and `--json --report` combined.
+**Expected:** Diagnostic messages go to stderr; stdout contains only valid JSON when `--json` is used.
+**Actual:** stdout contains: `Auto-detected: ...\n{JSON}` — the JSON parse fails unless the caller strips the first line.
+**Workaround:** Split stdout on newlines and skip until the first `{` character.
+**Status:** Open
+
+## F-107: `GroundednessEvaluator` and `ConversationSafetyScanner` not at top-level checkagent
+**Date:** 2026-04-17
+**Severity:** low
+**Category:** dx-friction
+**Description:** The batch top-level export fix in 0.2.0 added many classes to `checkagent.__init__`, but `GroundednessEvaluator` and `ConversationSafetyScanner` (both added in 0.2.0) were missed. Users must use `from checkagent.safety import GroundednessEvaluator` instead of `from checkagent import GroundednessEvaluator`. This is the 13th instance of the missing-top-level-export pattern.
+**Expected:** All public-facing classes importable from `checkagent` directly.
+**Actual:** `hasattr(checkagent, 'GroundednessEvaluator')` → False; `hasattr(checkagent, 'ConversationSafetyScanner')` → False.
+**Workaround:** Use `from checkagent.safety import GroundednessEvaluator, ConversationSafetyScanner`.
 **Status:** Open

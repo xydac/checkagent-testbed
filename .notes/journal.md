@@ -1934,3 +1934,64 @@ Also added:
 - **Test `checkagent scan --url --repeat N --generate-tests`** — does generate-tests produce useful tests that capture flakiness?
 - **Check `probes_groundedness` module vs ProbeSet inconsistency** — it's a module not a ProbeSet; explore if this limits composability with ProbeSet API
 - **Test docs site** — `checkagent.xydac.com` if it's live; check if it covers the new 0.2.0 features (conversation scanner, compliance, SARIF, wrap)
+
+---
+
+## Session-039 — 2026-04-17
+
+### What I Did
+
+**Upgrade:** Still 0.2.0 but new commit "Fix wrap class-based agents, add scan --report HTML compliance flag" landed upstream.
+
+**CI check:** GREEN — latest CI run passed. Previous 8-session green streak continues.
+
+**Test suite:** 1383 passed, 4 xfailed — no regressions from previous session.
+
+**F-105 FIXED — `checkagent wrap` class agents now work:**
+- `checkagent wrap module:ClassName --force` now generates `_agent = _target()` at module level then calls `_agent.invoke(prompt)` on the instance.
+- Previously generated `_target.invoke(prompt)` (unbound method call → TypeError for all 35 probes).
+- Verified end-to-end: wrap on simple class agent → scan → 0 errors, 35 probes run.
+- The existing session-038 F-105 tests still "pass" because they check a static snapshot (fixture file) of the old broken wrapper. Updated tests in session-039 check the CURRENT wrap output.
+- Also confirmed: plain function callables still correctly get "No wrapper needed, scan directly".
+
+**New feature: `--report FILE` HTML compliance report:**
+- Generates self-contained HTML with: summary table (total/passed/failed/resistance rate), category breakdown with OWASP IDs, OWASP LLM Top 10 regulatory mapping, EU AI Act article mapping.
+- Clean, professional-looking output — useful for compliance handoffs.
+- Works alongside `--json` — both emit simultaneously. BUT the "Auto-detected" diagnostic line still goes to stdout ahead of the JSON (F-106 — extension of F-098).
+- Terminal shows "Compliance report written → path/to/file.html" confirmation.
+- Scored 5/5 for both functionality and DX.
+
+**Groundedness scan category:**
+- `--category groundedness` runs exactly 8 probes (fabrication + uncertainty subcategories), 0 errors.
+- `probes_groundedness` module structure is consistent with `probes_injection` and `probes_pii` — all are modules with `.all_probes` ProbeSet and subcategory ProbeSet attributes. My previous note calling this "inconsistent" was wrong; corrected the score.
+- ProbeSet composition works: `probes_groundedness.all_probes + probes_injection.all_probes` → 43 probes, chainable filter().
+
+**F-099 still open:** `GroundednessEvaluator(mode='uncertainty')` still returns 0 hedging signals for clear hedging text like "This might be true, but I could be wrong and am not certain." Both hedged and overconfident responses return `passed=False` with "0/1 signals found" — the mode cannot distinguish them at all.
+
+**New finding F-107:** `GroundednessEvaluator` and `ConversationSafetyScanner` are missing from top-level `checkagent`. These were added in 0.2.0 after the batch export fix in session-035. Must use `from checkagent.safety import GroundednessEvaluator`. 13th instance of this pattern.
+
+### New Tests
+
+Added `tests/test_session039.py` (21 tests):
+- `TestF105WrapFixed` (3 tests) — verify correct wrapper generation and execution
+- `TestScanReportHTML` (6 tests) — HTML report content, file creation, combined with --json
+- `TestGroundednessScanCategory` (4 tests) — 8 probes, no errors, composable, consistent structure
+- `TestF099GroundednessUncertaintyStillBroken` (3 tests) — documents F-099 still open
+- `TestGroundednessEvaluatorTopLevel` (4 tests) — documents F-107
+
+**Final count: 1404 passed, 4 xfailed** (up from 1383/4 — +21 net tests)
+
+### What Surprised Me
+
+- The wrap fix is clean: instead of generating `result = _target().invoke(prompt)` (instantiate inline), it generates `_agent = _target()` at module level. This is actually smarter — class is instantiated once, not per-probe. Good for stateful agents.
+- The HTML report is genuinely compliance-report quality. The EU AI Act article mappings are specific and useful (Article 9 Risk Management, Article 10 Data Governance, Article 15 Accuracy). This could save hours of compliance prep work.
+- The `probes_groundedness` inconsistency I flagged last session didn't actually exist — both it and `probes_injection` are modules, not ProbeSet instances. I was confused because I expected a ProbeSet directly. The `.all_probes` accessor is the consistent pattern.
+
+### What I Want to Try Next Session
+
+- **Test `--llm-judge` flag** — requires OpenAI or Anthropic API key; would test whether LLM judging gives different results vs regex for injection probes
+- **Test `checkagent scan --url --repeat N --generate-tests`** — does generate-tests produce useful tests that capture flakiness?
+- **Check if F-106 is the same root cause as F-098** — investigate whether the "Auto-detected" message and the `--repeat N` diagnostic both come from the same code path
+- **Test `checkagent analyze-prompt` docs site link** — check if `checkagent.xydac.com/guides/safety/` is live and covers new 0.2.0 features
+- **Re-test F-099** — if still broken, try adding a custom pattern via `add_hedging_pattern()` to understand the underlying detection mechanism
+

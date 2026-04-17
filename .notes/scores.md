@@ -245,7 +245,7 @@ Rate each feature on:
 | checkagent 0.2.0 upgrade | 5 | 4 | PyPI release! 2107 tests upstream. F-093/F-094/F-095/F-097 all fixed. New: groundedness, compliance, conversation scanner, SARIF, wrap, --repeat | 2026-04-12 |
 | GroundednessEvaluator (fabrication mode) | 4 | 4 | Detects missing hedging language correctly; evaluate() and evaluate_run() both work; custom patterns via add_hedging_pattern(); uncertainty mode broken (F-099) | 2026-04-12 |
 | GroundednessEvaluator (uncertainty mode) | 1 | 2 | F-099: hedging_signals always 0 — "might", "could", "not certain" all miss; only "not financial advice" disclaimer path works | 2026-04-12 |
-| probes_groundedness | 4 | 3 | 8 probes (fabrication+uncertainty); correct category/severity; but it's a module not a ProbeSet — inconsistent with probes_injection/probes_pii etc. which are ProbeSet | 2026-04-12 |
+| probes_groundedness | 4 | 4 | 8 probes (fabrication+uncertainty); correct category/severity; module structure consistent with probes_injection/probes_pii — all are modules with .all_probes ProbeSet; ProbeSet composition works | 2026-04-17 |
 | ConversationSafetyScanner | 4 | 3 | Detects per-turn and aggregate findings; uses conv.say(); requires evaluators list (no default); split/accumulation attack detection via aggregate_only_findings; not at top-level | 2026-04-12 |
 | ConversationSafetyResult | 5 | 4 | F-101 FIXED: iter_turn_findings() helper added with docstring warning against enumerate(); turns_with_findings/total_per_turn_findings/total_findings properties also added | 2026-04-16 |
 | ComplianceReport / generate_compliance_report | 5 | 4 | Correct totals/rates; has_critical_findings works; to_dict() complete; not at top-level | 2026-04-12 |
@@ -254,10 +254,13 @@ Rate each feature on:
 | SARIF 2.1.0 output (--sarif) | 5 | 5 | Valid SARIF 2.1.0; tool metadata with version; rules with remediation markdown; works alongside --json | 2026-04-12 |
 | --repeat N flag | 5 | 4 | Stability object in JSON (repeat, stable_pass, stable_fail, flaky, stability_score); echo agent shows 1.0 stability; F-098 (diagnostic on stdout breaks --json parse) | 2026-04-12 |
 | --prompt-file flag | 5 | 5 | Static analysis shown inline with dynamic scan; correct scores; injection guard detected | 2026-04-12 |
-| checkagent wrap CLI | 2 | 2 | F-105: generates broken wrapper for class agents — _target.invoke() (unbound) instead of _target().invoke(); 35/35 probes error; plain functions work fine | 2026-04-16 |
+| checkagent wrap CLI | 5 | 4 | F-105 FIXED: generates correct `_agent = _target()` then `_agent.invoke(prompt)`; 0 errors on class agent scan; auto-detection message goes to stdout (F-106) | 2026-04-17 |
 | checkagent wrap (plain function) | 5 | 5 | "No wrapper needed, scan directly" message for plain callables; correct auto-detection | 2026-04-16 |
 | checkagent scan --url (HTTP) | 5 | 5 | HTTP endpoint scanning works: POST probes, --input-field, --output-field, auto-detect, -H headers, --json clean, --generate-tests creates stdlib test file, server-down shows errors count | 2026-04-13 |
 | --repeat N with --url (flaky agents) | 5 | 5 | stability_score < 1.0 for flaky server; stable_pass/stable_fail/flaky counts correct; probe fails if ANY run triggers finding | 2026-04-16 |
 | generate_test_cases (session-038) | 4 | 3 | F-103 partially fixed: name= now emits DeprecationWarning (not TypeError). safety_check=False skips screening correctly. Return type still tuple (breaking). | 2026-04-16 |
 | upstream CI (session-037) | 1 | 1 | Red — Windows Python 3.13 ConnectionAbortedError in HTTP scan test (F-104) | 2026-04-15 |
 | upstream CI (session-038) | 5 | 5 | GREEN — all 12 jobs passing including Windows 3.10/3.11/3.12/3.13. F-104 fixed. 1 session red streak ended. | 2026-04-16 |
+| checkagent scan --report HTML | 5 | 5 | Generates valid HTML with summary stats, category breakdown, OWASP LLM Top 10 + EU AI Act regulatory mapping; works alongside --json; written confirmation in terminal | 2026-04-17 |
+| GroundednessEvaluator top-level export | N/A | 1 | Missing from top-level checkagent (F-107) — 13th instance of pattern; use from checkagent.safety import GroundednessEvaluator | 2026-04-17 |
+| groundedness scan category | 5 | 5 | --category groundedness runs 8 probes (fabrication+uncertainty) with 0 errors; composable with ProbeSet; clean JSON output | 2026-04-17 |
