@@ -277,7 +277,7 @@ Format:
 **Expected:** Path boundary check should verify proper directory containment. `/dataextra/file.txt` should NOT match when `/data` is the allowed path.
 **Actual:** `ToolBoundary(allowed_paths=["/data"])` + path `/dataextra/file.txt` → `SafetyResult(passed=True)`. This is a security vulnerability in the boundary validator.
 **Workaround:** Use more specific allowed paths (e.g., `/data/` with trailing slash, or the full absolute path). Do not rely on `ToolCallBoundaryValidator` for security-critical path enforcement.
-**Status:** Open
+**Status:** Fixed in v0.3.0. `ToolCallBoundaryValidator` now uses `ToolBoundary` dataclass internally; path prefix check requires trailing separator.
 
 ---
 
@@ -289,7 +289,7 @@ Format:
 **Expected:** Path boundary check should normalize paths (resolve `..`, `.`, symlinks conceptually) before checking containment. This is a standard security requirement for path traversal prevention.
 **Actual:** `/data/../etc/passwd` with `allowed_paths=["/data"]` → `SafetyResult(passed=True)`. Attacker can escape any allowed directory with `../` traversal.
 **Workaround:** Agents using `ToolCallBoundaryValidator` for security enforcement must pre-normalize paths themselves: `os.path.normpath(path)` before passing to the agent. Do not rely on checkagent for path traversal protection.
-**Status:** Open
+**Status:** Fixed in v0.3.0. Both path traversal and prefix bypass now blocked via `ToolBoundary` refactor.
 
 ---
 
@@ -1243,7 +1243,7 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** "I might be wrong", "This may vary", "possibly incorrect" etc. trigger hedging signals.
 **Actual:** All return `hedging_signals: 0`. Only `not financial advice` passes via disclaimer.
 **Workaround:** Use `add_disclaimer_pattern()` to register custom patterns, or use fabrication mode with custom hedging patterns.
-**Status:** Open
+**Status:** Fixed in v0.3.0. Uncertainty mode now correctly detects epistemic hedging signals; custom `add_hedging_pattern()` patterns also now applied during evaluation.
 
 ---
 
@@ -1325,7 +1325,7 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** Diagnostic messages go to stderr; stdout contains only valid JSON when `--json` is used.
 **Actual:** stdout contains: `Auto-detected: ...\n{JSON}` — the JSON parse fails unless the caller strips the first line.
 **Workaround:** Split stdout on newlines and skip until the first `{` character.
-**Status:** Open
+**Status:** Fixed in v0.3.0. "Auto-detected" diagnostic now goes to stderr; stdout is clean JSON when `--json` is used.
 
 ## F-107: `GroundednessEvaluator` and `ConversationSafetyScanner` not at top-level checkagent
 **Date:** 2026-04-17
@@ -1335,4 +1335,14 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** All public-facing classes importable from `checkagent` directly.
 **Actual:** `hasattr(checkagent, 'GroundednessEvaluator')` → False; `hasattr(checkagent, 'ConversationSafetyScanner')` → False.
 **Workaround:** Use `from checkagent.safety import GroundednessEvaluator, ConversationSafetyScanner`.
+**Status:** Fixed in v0.3.0. Both are now at top-level `checkagent`.
+
+## F-109: `ToolCallBoundaryValidator` old kwargs API removed without deprecation — breaking change
+**Date:** 2026-04-19
+**Severity:** high
+**Category:** bug
+**Description:** In v0.3.0, `ToolCallBoundaryValidator` was refactored to require a `ToolBoundary` dataclass parameter. The old constructor kwargs (`allowed_tools=`, `forbidden_tools=`, `allowed_paths=`, `forbidden_argument_patterns=`) were removed with no deprecation warning. Any code written against v0.2.0 that calls `ToolCallBoundaryValidator(allowed_tools=..., forbidden_tools=...)` will immediately raise `TypeError: ToolCallBoundaryValidator.__init__() got an unexpected keyword argument 'allowed_tools'`. This is a breaking API change shipped without a deprecation cycle.
+**Expected:** Either: (a) Old kwargs accepted with DeprecationWarning and forwarded to ToolBoundary, or (b) Migration guide in changelog/docs.
+**Actual:** `ToolCallBoundaryValidator(allowed_tools={"search"}, forbidden_tools={"delete"})` → `TypeError`.
+**Workaround:** Migrate to new API: `ToolCallBoundaryValidator(boundary=ToolBoundary(allowed_tools=..., forbidden_tools=...))`.
 **Status:** Open

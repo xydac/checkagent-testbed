@@ -77,7 +77,7 @@ Rate each feature on:
 | ProbeSet.filter() | 5 | 5 | Filter by tags, category, severity; returns new ProbeSet; combined filtering works | 2026-04-05 |
 | severity_meets_threshold | 5 | 5 | Correct ordering (LOW<MED<HIGH<CRITICAL); works as F-023 workaround; importable from checkagent.safety | 2026-04-05 |
 | OWASP_MAPPING | 5 | 4 | All SafetyCategory values covered; string values (OWASP IDs); importable from checkagent.safety | 2026-04-05 |
-| ToolCallBoundaryValidator path checks | 2 | 3 | Basic pass/fail works; but naive string prefix allows /dataextra bypass (F-024) and no path normalization allows ../traversal (F-025) — security bugs | 2026-04-05 |
+| ToolCallBoundaryValidator path checks | 5 | 3 | F-024 and F-025 FIXED in v0.3.0 via ToolBoundary refactor; but F-109: kwargs API removed without deprecation — breaking change | 2026-04-19 |
 | end-to-end eval pipeline (datasets→metrics→aggregate→RunSummary) | 5 | 3 | Full pipeline works: TestCase → task_completion → aggregate_scores → RunSummary.save/load → detect_regressions; API requires tuples not Score objects (surprising) | 2026-04-05 |
 | TestCase.input field | 3 | 2 | Input is `str` not `dict` — surprising for agents that expect structured input. Users who pass dicts get ValidationError with confusing message | 2026-04-05 |
 | jailbreak probe library (probes_jailbreak) | 5 | 4 | 15 probes (7 roleplay + 8 encoding); CRITICAL to LOW severity; clean tag/category metadata; case-sensitive severity string filter gotcha | 2026-04-05 |
@@ -244,7 +244,7 @@ Rate each feature on:
 | upstream CI (session-035) | 5 | 5 | GREEN — v0.2.0 published to PyPI. All platforms passing. F-097 fixed. | 2026-04-12 |
 | checkagent 0.2.0 upgrade | 5 | 4 | PyPI release! 2107 tests upstream. F-093/F-094/F-095/F-097 all fixed. New: groundedness, compliance, conversation scanner, SARIF, wrap, --repeat | 2026-04-12 |
 | GroundednessEvaluator (fabrication mode) | 4 | 4 | Detects missing hedging language correctly; evaluate() and evaluate_run() both work; custom patterns via add_hedging_pattern(); uncertainty mode broken (F-099) | 2026-04-12 |
-| GroundednessEvaluator (uncertainty mode) | 1 | 2 | F-099: hedging_signals always 0 — "might", "could", "not certain" all miss; only "not financial advice" disclaimer path works | 2026-04-12 |
+| GroundednessEvaluator (uncertainty mode) | 5 | 4 | F-099 FIXED in v0.3.0: hedging signals detected correctly; add_hedging_pattern() now applied; requires `description` arg (undocumented) | 2026-04-19 |
 | probes_groundedness | 4 | 4 | 8 probes (fabrication+uncertainty); correct category/severity; module structure consistent with probes_injection/probes_pii — all are modules with .all_probes ProbeSet; ProbeSet composition works | 2026-04-17 |
 | ConversationSafetyScanner | 4 | 3 | Detects per-turn and aggregate findings; uses conv.say(); requires evaluators list (no default); split/accumulation attack detection via aggregate_only_findings; not at top-level | 2026-04-12 |
 | ConversationSafetyResult | 5 | 4 | F-101 FIXED: iter_turn_findings() helper added with docstring warning against enumerate(); turns_with_findings/total_per_turn_findings/total_findings properties also added | 2026-04-16 |
@@ -264,3 +264,5 @@ Rate each feature on:
 | checkagent scan --report HTML | 5 | 5 | Generates valid HTML with summary stats, category breakdown, OWASP LLM Top 10 + EU AI Act regulatory mapping; works alongside --json; written confirmation in terminal | 2026-04-17 |
 | GroundednessEvaluator top-level export | N/A | 1 | Missing from top-level checkagent (F-107) — 13th instance of pattern; use from checkagent.safety import GroundednessEvaluator | 2026-04-17 |
 | groundedness scan category | 5 | 5 | --category groundedness runs 8 probes (fabrication+uncertainty) with 0 errors; composable with ProbeSet; clean JSON output | 2026-04-17 |
+| ToolBoundary dataclass | 4 | 4 | New in v0.3.0: clean config object for ToolCallBoundaryValidator; importable from checkagent.safety; F-109: no backward compat shim for old kwargs API | 2026-04-19 |
+| PromptAnalysisResult.missing_high/missing_medium/recommendations | 5 | 5 | New properties in v0.3.0: filter failed checks by severity; recommendations returns actionable strings; all work correctly | 2026-04-19 |

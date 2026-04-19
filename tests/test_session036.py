@@ -93,8 +93,9 @@ def http_agent_server():
 
 
 def test_checkagent_version_is_0_2_0():
-    """0.2.0 Security Audit Edition is installed."""
-    assert checkagent.__version__ == "0.2.0"
+    """Was 0.2.0 Security Audit Edition; upgraded to 0.3.0 in session-040."""
+    # Updated: now at 0.3.0 (F-106 + F-107 fixed, bumped to v0.3.0)
+    assert checkagent.__version__ in ("0.2.0", "0.3.0")
 
 
 # ---------------------------------------------------------------------------
@@ -125,9 +126,9 @@ def test_groundedness_evaluator_importable():
 
 
 def test_groundedness_evaluator_at_top_level():
-    """GroundednessEvaluator is NOT yet at top-level checkagent (new in 0.2.0)."""
-    # It's in checkagent.safety but not checkagent directly
-    assert not hasattr(checkagent, "GroundednessEvaluator")
+    """GroundednessEvaluator is now at top-level checkagent (fixed in v0.3.0, F-107)."""
+    # Fixed: was missing in 0.2.0, now exported at top level
+    assert hasattr(checkagent, "GroundednessEvaluator")
 
 
 def test_groundedness_evaluator_fabrication_mode_default():
@@ -569,7 +570,7 @@ def test_sarif_output_has_tool_info(tmp_path):
     data = json.loads(sarif_file.read_text())
     driver = data["runs"][0]["tool"]["driver"]
     assert driver["name"] == "checkagent"
-    assert driver["version"] == "0.2.0"
+    assert driver["version"] in ("0.2.0", "0.3.0")  # updated: bumped to 0.3.0
     assert "rules" in driver
 
 
@@ -736,13 +737,15 @@ def test_wrap_plain_callable_no_wrapper_needed(tmp_path):
 
 
 def test_groundedness_evaluator_not_yet_at_top_level():
-    """GroundednessEvaluator is not yet at top-level checkagent (in checkagent.safety only)."""
-    assert not hasattr(checkagent, "GroundednessEvaluator")
+    """F-107 FIXED in v0.3.0: GroundednessEvaluator is now at top-level checkagent."""
+    # Was missing in 0.2.0, fixed in 0.3.0
+    assert hasattr(checkagent, "GroundednessEvaluator")  # Now True
 
 
 def test_conversation_safety_scanner_not_yet_at_top_level():
-    """ConversationSafetyScanner is not yet at top-level checkagent."""
-    assert not hasattr(checkagent, "ConversationSafetyScanner")
+    """F-107 FIXED in v0.3.0: ConversationSafetyScanner is now at top-level checkagent."""
+    # Was missing in 0.2.0, fixed in 0.3.0
+    assert hasattr(checkagent, "ConversationSafetyScanner")  # Now True
 
 
 def test_compliance_report_not_yet_at_top_level():

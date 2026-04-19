@@ -270,52 +270,43 @@ class TestGroundednessScanCategory:
         assert isinstance(probes_groundedness.uncertainty, ProbeSet)
 
 
-class TestF099GroundednessUncertaintyStillBroken:
-    """F-099: GroundednessEvaluator uncertainty mode still not detecting hedging words."""
+class TestF099UncertaintyModeFixed:
+    """F-099 FIXED in v0.3.0: GroundednessEvaluator uncertainty mode now detects hedging."""
 
-    def test_hedging_response_fails_uncertainty_check(self):
-        """Words like 'might', 'could', 'not certain' are not detected — F-099 open."""
+    def test_hedging_response_passes_uncertainty_check(self):
+        """F-099 FIXED: 'might', 'could', 'not certain' are now detected as hedging signals."""
         from checkagent.safety import GroundednessEvaluator
         g = GroundednessEvaluator(mode="uncertainty")
-        # This text clearly hedges — should PASS uncertainty check
         result = g.evaluate("This might be true, but I could be wrong and am not certain.")
-        # F-099: it incorrectly returns passed=False (0 signals found)
-        # When fixed, this test should be updated to assert passed=True
-        assert result.passed is False, (
-            "F-099 may be fixed — uncertainty mode now detects hedging. Update this test."
-        )
-        assert "0/" in result.findings[0].description, (
-            "Expected 0 signals found — F-099 symptom"
-        )
+        assert result.passed is True
+        assert result.details.get("hedging_signals", 0) > 0
 
-    def test_confident_response_also_fails(self):
-        """Overconfident statement also returns passed=False — both fail, so mode is useless."""
+    def test_confident_response_fails_uncertainty_check(self):
+        """Overconfident statements still fail — F-099 fix preserves this correct behavior."""
         from checkagent.safety import GroundednessEvaluator
         g = GroundednessEvaluator(mode="uncertainty")
         result = g.evaluate("The stock will definitely rise 20% next quarter.")
-        # This should also fail (correct), but for the same broken reason
         assert result.passed is False
 
-    def test_uncertainty_mode_cannot_distinguish_hedged_from_confident(self):
-        """F-099: uncertainty mode treats hedged and overconfident responses identically."""
+    def test_uncertainty_mode_distinguishes_hedged_from_confident(self):
+        """F-099 FIXED: uncertainty mode now distinguishes hedged from overconfident responses."""
         from checkagent.safety import GroundednessEvaluator
         g = GroundednessEvaluator(mode="uncertainty")
         hedged = g.evaluate("I'm not sure, this might not be accurate.")
         confident = g.evaluate("I am 100% certain this is correct.")
-        # Both fail with 0 signals — mode cannot distinguish
-        assert hedged.passed == confident.passed, (
-            "F-099: both should return same result (both broken)"
-        )
+        assert hedged.passed is True
+        assert confident.passed is False
 
 
 class TestGroundednessEvaluatorTopLevel:
-    """GroundednessEvaluator and ConversationSafetyScanner missing from top-level checkagent."""
+    """F-107 FIXED in v0.3.0: GroundednessEvaluator and ConversationSafetyScanner now at top-level."""
 
     def test_groundedness_evaluator_not_at_top_level(self):
-        """GroundednessEvaluator is absent from top-level checkagent — requires deep import."""
+        """F-107 FIXED: GroundednessEvaluator is now at top-level checkagent in v0.3.0."""
         import checkagent
-        assert not hasattr(checkagent, "GroundednessEvaluator"), (
-            "GroundednessEvaluator is now at top-level — update scores and close this finding."
+        # Was False in 0.2.0 (F-107), now True in 0.3.0
+        assert hasattr(checkagent, "GroundednessEvaluator"), (
+            "GroundednessEvaluator should be at top-level after F-107 fix."
         )
 
     def test_groundedness_evaluator_importable_from_safety(self):
@@ -324,10 +315,11 @@ class TestGroundednessEvaluatorTopLevel:
         assert GroundednessEvaluator is not None
 
     def test_conversation_safety_scanner_not_at_top_level(self):
-        """ConversationSafetyScanner is absent from top-level checkagent."""
+        """F-107 FIXED: ConversationSafetyScanner is now at top-level checkagent in v0.3.0."""
         import checkagent
-        assert not hasattr(checkagent, "ConversationSafetyScanner"), (
-            "ConversationSafetyScanner is now at top-level — update findings."
+        # Was False in 0.2.0 (F-107), now True in 0.3.0
+        assert hasattr(checkagent, "ConversationSafetyScanner"), (
+            "ConversationSafetyScanner should be at top-level after F-107 fix."
         )
 
     def test_conversation_safety_scanner_importable_from_safety(self):
