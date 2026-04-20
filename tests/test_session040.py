@@ -460,19 +460,24 @@ class TestComplianceRenderers:
 
 class TestToolBoundaryAPI:
     """
-    F-109: ToolCallBoundaryValidator kwargs API removed in v0.3.0 — breaking change.
+    F-109 FIXED: ToolCallBoundaryValidator kwargs API now emits DeprecationWarning
+    (not TypeError) — old code still works during migration period.
 
     Old API (v0.2.0): ToolCallBoundaryValidator(allowed_tools=..., forbidden_tools=...)
     New API (v0.3.0): ToolCallBoundaryValidator(boundary=ToolBoundary(...))
-
-    No deprecation warning was emitted — old code raises TypeError immediately.
     """
 
-    def test_old_kwargs_api_raises_typeerror(self):
-        """F-109: Old kwarg API raises TypeError — breaking change with no deprecation."""
+    def test_old_kwargs_api_emits_deprecation_warning(self):
+        """F-109 FIXED: Old kwarg API now emits DeprecationWarning instead of TypeError."""
+        import warnings
         from checkagent.safety import ToolCallBoundaryValidator
-        with pytest.raises(TypeError):
-            ToolCallBoundaryValidator(allowed_tools={"search"}, forbidden_tools={"delete"})
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            v = ToolCallBoundaryValidator(allowed_tools={"search"}, forbidden_tools={"delete"})
+            assert v is not None, "Old API should still create a working object"
+            assert len(w) == 1, f"Expected 1 DeprecationWarning, got {len(w)}"
+            assert issubclass(w[0].category, DeprecationWarning)
+            assert "deprecated" in str(w[0].message).lower()
 
     def test_new_boundary_api_works(self):
         """New ToolBoundary dataclass API works correctly."""

@@ -2056,3 +2056,67 @@ Both were severity=high security bugs open since session-004. The `ToolBoundary`
 - **Test `PromptAnalyzer.check_results[n].evidence`** — what exactly is in the evidence field for passed vs failed checks?
 - **Test more `ToolBoundary` combinations** — `forbidden_argument_patterns` field with regex matching; what happens with multiple args matched?
 - **Explore the `wrap` module** (`checkagent.wrap`) — it appears as a top-level export. Is it a Python-importable API or just the CLI?
+
+---
+
+## Session 041 — 2026-04-20
+
+**Version:** v0.3.0 (latest commit: "Fix F-109: add deprecation shim for ToolCallBoundaryValidator legacy kwargs")
+**Tests:** 1466 passing (up from 1438 last session; +28 new tests)
+**CI:** Green — all 12 jobs passing, 3 consecutive successes
+
+### What I Tried
+
+**1. F-109 verification — kwargs deprecation shim**
+
+The latest upstream commit added a deprecation shim for `ToolCallBoundaryValidator`. Previous behavior: `TypeError` on old kwargs. New behavior: `DeprecationWarning` emitted, object still created and functional. This is the right fix — users can migrate gradually instead of getting a hard crash. The warning message is clear: "Use ToolCallBoundaryValidator(boundary=ToolBoundary(...)) instead."
+
+Our test `test_old_kwargs_api_raises_typeerror` needed updating — it was correctly documenting the old broken behavior. Updated it to verify the new DeprecationWarning behavior.
+
+**2. wrap() Python API exploration**
+
+The `checkagent.wrap` function is importable as `from checkagent import wrap`. Works as:
+- `@wrap` decorator on a function — clean, creates GenericAdapter directly
+- `wrap(fn)` function call — same result
+- `wrap(instance)` with `__call__` method — works correctly
+
+DX trap: `wrap(MyClass)` where the class has an `invoke` method returns `final_output=None`. This is because `wrap` treats the class as a callable and calls `MyClass(query)` — which instantiates the class, not invokes it. The CLI `checkagent wrap` handles class agents correctly (it generates adapter code), but the Python API doesn't auto-detect `invoke`. Users who read the CLI docs and then try the Python API will get a silent failure.
+
+**3. CheckResult DX friction (F-110)**
+
+While testing `PromptAnalyzer`, discovered that `CheckResult` objects in `check_results` have only 3 fields: `check`, `evidence`, `passed`. To get severity: `cr.check.severity`. But `missing_high` and `missing_medium` return `PromptCheck` objects which have `.severity` and `.name` directly. Iterating both requires different access patterns — a real DX trap. First attempt to write `for cr in result.check_results: print(cr.severity)` raises `AttributeError`.
+
+**4. ToolBoundary.forbidden_argument_patterns API (F-111)**
+
+Discovered that `forbidden_argument_patterns` is a `dict[str, str]` mapping argument names to regex patterns (e.g., `{'path': r'\.\.'}`) — NOT a set of patterns as the field name implies. Passing a set of strings raises `AttributeError: 'set' object has no attribute 'items'` in the validator constructor. The error is confusing because it points to an internal line rather than explaining the expected type. `forbidden_argument_patterns` should be renamed or its type enforced at the dataclass level.
+
+The correct usage: `ToolBoundary(forbidden_argument_patterns={'path': r'\.\.|passwd'})` — this correctly blocked `../../etc/passwd` and allowed `/data/file.txt`.
+
+### What Surprised Me
+
+- The deprecation shim fix was exactly right. One upstream commit fixed the hard crash and gave users a proper migration path. This is how breaking changes should be handled.
+- `CheckResult` vs `PromptCheck` inconsistency is the exact kind of API surface confusion that accumulates when a module grows organically. `missing_high` returns `PromptCheck` (the check definition), while `check_results` returns `CheckResult` (a wrapper). A user iterating both must know the difference. This should either be unified or have properties added to `CheckResult`.
+- `wrap(Class)` silently returning `None` is a real trap. No error, no warning — the adapter is created successfully, and the run succeeds, but `final_output` is always `None`. A user debugging this would have a hard time.
+
+### New Tests Added
+
+`tests/test_session041.py` (13 tests):
+- `TestF109DeprecationShimAdded` (3 tests) — confirms DeprecationWarning emitted, old API still functional
+- `TestF110CheckResultNamingDXFriction` (4 tests) — documents .severity/.name AttributeError trap, inconsistency with missing_high
+- `TestF111ForbiddenArgumentPatternsRequiresDict` (2 tests) — set raises AttributeError at construction, dict works
+- `TestWrapPythonAPI` (4 tests) — decorator, function call, callable instance, class-with-invoke silent failure
+
+### Updated
+
+- F-109 marked Fixed in findings.md
+- `ToolCallBoundaryValidator path checks` score updated: DX 3→4 (F-109 fixed)
+- `ToolBoundary dataclass` score updated: DX 4→3 (F-111 discovered)
+- `PromptAnalyzer Python API` score updated: DX 3→2 (F-110 discovered)
+
+### What I Want to Try Next Session
+
+- **Test `--llm-judge` flag** — requires real API key (OpenAI/Anthropic). Would validate whether LLM judging gives meaningfully different results vs regex on ambiguous probes. The flag supports both OpenAI and Anthropic model names.
+- **Test deprecated kwargs API actually produces working validator** — does `evaluate_run()` on deprecated-constructed validator give correct results for all boundary types (allowed_paths, forbidden_argument_patterns)?
+- **Try real-world agent integration** — PydanticAI or CrewAI agent with `wrap()` to see if the Python API is good enough for a realistic use case, or if users will always need the CLI scan approach.
+- **Test `ProbeSet.filter(severity='HIGH')` vs `filter(severity='high')`** — verify case sensitivity behavior is still present (F-032 related).
+- **Check if `forbidden_argument_patterns` via deprecated kwargs API also maps correctly** — does the shim dict-coerce it or pass it through?

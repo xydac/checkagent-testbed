@@ -77,7 +77,7 @@ Rate each feature on:
 | ProbeSet.filter() | 5 | 5 | Filter by tags, category, severity; returns new ProbeSet; combined filtering works | 2026-04-05 |
 | severity_meets_threshold | 5 | 5 | Correct ordering (LOW<MED<HIGH<CRITICAL); works as F-023 workaround; importable from checkagent.safety | 2026-04-05 |
 | OWASP_MAPPING | 5 | 4 | All SafetyCategory values covered; string values (OWASP IDs); importable from checkagent.safety | 2026-04-05 |
-| ToolCallBoundaryValidator path checks | 5 | 3 | F-024 and F-025 FIXED in v0.3.0 via ToolBoundary refactor; but F-109: kwargs API removed without deprecation — breaking change | 2026-04-19 |
+| ToolCallBoundaryValidator path checks | 5 | 4 | F-024/F-025/F-109 all FIXED. Path security solid, deprecation shim added for kwargs migration | 2026-04-20 |
 | end-to-end eval pipeline (datasets→metrics→aggregate→RunSummary) | 5 | 3 | Full pipeline works: TestCase → task_completion → aggregate_scores → RunSummary.save/load → detect_regressions; API requires tuples not Score objects (surprising) | 2026-04-05 |
 | TestCase.input field | 3 | 2 | Input is `str` not `dict` — surprising for agents that expect structured input. Users who pass dicts get ValidationError with confusing message | 2026-04-05 |
 | jailbreak probe library (probes_jailbreak) | 5 | 4 | 15 probes (7 roleplay + 8 encoding); CRITICAL to LOW severity; clean tag/category metadata; case-sensitive severity string filter gotcha | 2026-04-05 |
@@ -234,7 +234,7 @@ Rate each feature on:
 | version consistency (0.1.2) | 5 | 5 | __version__ and importlib.metadata both return '0.1.2'. Version inconsistency bug from 0.1.1 fixed. | 2026-04-11 |
 | upstream CI (session-034) | 1 | 1 | Red — ALL platforms failing. Latest commit "Add checkagent analyze-prompt" breaks ruff lint (I001 unsorted imports x3, E501 line too long). Previous commit was green. | 2026-04-11 |
 | checkagent analyze-prompt CLI | 3 | 3 | New: 8-check static analysis (no LLM needed); exit 0/1 based on HIGH checks; --json output; file reading works; F-093 (Rich markup strips [brackets]), F-094 (nonexistent file silent), exit code behavior undocumented | 2026-04-11 |
-| PromptAnalyzer Python API | 4 | 3 | analyze() returns PromptAnalysisResult with score/check_results; solid pattern matching; in checkagent.safety not top-level (F-095); CheckResult.evidence populated on pass, None on fail | 2026-04-11 |
+| PromptAnalyzer Python API | 4 | 2 | analyze() solid; F-110: CheckResult lacks .severity/.name (must use .check.severity); missing_high returns PromptCheck (has .name) while check_results returns CheckResult (no .name) — inconsistent types | 2026-04-20 |
 | data_enumeration scan category | 4 | 3 | New 5th category; 20 probes (HIGH+CRITICAL); correct category metadata; echo agents get false positives (expected); DataEnumerationDetector/probes_data_enumeration not at top-level | 2026-04-11 |
 | class-based agent scan | 4 | 4 | module:ClassName auto-instantiates class; correct probe execution; refusal class agent scores 1.0 on injection; clean JSON output | 2026-04-11 |
 | EvalCase top-level export | 4 | 4 | At top-level checkagent; id+input+expected_tools/output_contains/output_equals/max_steps/tags/context/metadata; still str-only input (same as TestCase) | 2026-04-11 |
@@ -264,5 +264,7 @@ Rate each feature on:
 | checkagent scan --report HTML | 5 | 5 | Generates valid HTML with summary stats, category breakdown, OWASP LLM Top 10 + EU AI Act regulatory mapping; works alongside --json; written confirmation in terminal | 2026-04-17 |
 | GroundednessEvaluator top-level export | N/A | 1 | Missing from top-level checkagent (F-107) — 13th instance of pattern; use from checkagent.safety import GroundednessEvaluator | 2026-04-17 |
 | groundedness scan category | 5 | 5 | --category groundedness runs 8 probes (fabrication+uncertainty) with 0 errors; composable with ProbeSet; clean JSON output | 2026-04-17 |
-| ToolBoundary dataclass | 4 | 4 | New in v0.3.0: clean config object for ToolCallBoundaryValidator; importable from checkagent.safety; F-109: no backward compat shim for old kwargs API | 2026-04-19 |
+| ToolBoundary dataclass | 4 | 3 | Clean config object; F-109 shim added; but forbidden_argument_patterns is dict[str,str] not set — confusing name causes AttributeError (F-111) | 2026-04-20 |
 | PromptAnalysisResult.missing_high/missing_medium/recommendations | 5 | 5 | New properties in v0.3.0: filter failed checks by severity; recommendations returns actionable strings; all work correctly | 2026-04-19 |
+| checkagent.wrap Python API | 5 | 4 | @wrap decorator and wrap(fn) both work cleanly; wrap(callable_instance) works; wrap(Class) with invoke() silently returns None — CLI handles class agents but Python API doesn't auto-detect invoke() | 2026-04-20 |
+| upstream CI (session-041) | 5 | 5 | Green — all 12 jobs passing. Latest: "Fix F-109: add deprecation shim". 3 consecutive successes. | 2026-04-20 |

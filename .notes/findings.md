@@ -1345,4 +1345,24 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** Either: (a) Old kwargs accepted with DeprecationWarning and forwarded to ToolBoundary, or (b) Migration guide in changelog/docs.
 **Actual:** `ToolCallBoundaryValidator(allowed_tools={"search"}, forbidden_tools={"delete"})` → `TypeError`.
 **Workaround:** Migrate to new API: `ToolCallBoundaryValidator(boundary=ToolBoundary(allowed_tools=..., forbidden_tools=...))`.
+**Status:** Fixed in latest commit (2026-04-20). Deprecation shim added: old kwargs now emit `DeprecationWarning` and still work during migration window. Old code no longer crashes with `TypeError`.
+
+## F-110: `CheckResult` lacks direct `.severity` and `.name` — DX friction
+**Date:** 2026-04-20
+**Severity:** low
+**Category:** dx-friction
+**Description:** `PromptAnalysisResult.check_results` returns a list of `CheckResult` objects. Each `CheckResult` has only three fields: `check`, `evidence`, `passed`. The severity and name are on `cr.check.severity` and `cr.check.name` — two levels of indirection. Users naturally write `for cr in result.check_results: if cr.severity == "high"` and get an `AttributeError`. This is compounded by an inconsistency: `missing_high` and `missing_medium` return `PromptCheck` objects (which DO have `.severity` and `.name` directly), so users iterating both must use different access patterns.
+**Expected:** `CheckResult.severity` and `CheckResult.name` as convenience properties delegating to `cr.check`.
+**Actual:** `cr.severity` → `AttributeError`. Must use `cr.check.severity`.
+**Workaround:** Use `cr.check.severity` and `cr.check.name`. Or convert: `{cr.check.name: cr for cr in result.check_results}`.
+**Status:** Open
+
+## F-111: `ToolBoundary.forbidden_argument_patterns` requires `dict`, not `set` — confusing API name
+**Date:** 2026-04-20
+**Severity:** medium
+**Category:** dx-friction
+**Description:** `ToolBoundary.forbidden_argument_patterns` is a `dict[str, str]` mapping argument names to regex patterns (e.g. `{'path': r'\.\.|passwd'}`). The field name implies a collection of patterns, leading users to naturally pass a `set` of pattern strings. Passing a set raises `AttributeError: 'set' object has no attribute 'items'` in `ToolCallBoundaryValidator.__init__`. The error fires at construction time with an internal stack trace — no type validation at the dataclass level.
+**Expected:** Either: (a) Type annotation enforced at dataclass level with clear ValidationError, or (b) Field renamed to `forbidden_argument_regex` or similar to clarify it's a name→pattern mapping.
+**Actual:** `ToolBoundary(forbidden_argument_patterns={"../", "passwd"})` → `AttributeError: 'set' object has no attribute 'items'` in validator constructor.
+**Workaround:** Use dict: `ToolBoundary(forbidden_argument_patterns={'path': r'\.\.|passwd'})`.
 **Status:** Open
