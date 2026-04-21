@@ -2120,3 +2120,90 @@ The correct usage: `ToolBoundary(forbidden_argument_patterns={'path': r'\.\.|pas
 - **Try real-world agent integration** — PydanticAI or CrewAI agent with `wrap()` to see if the Python API is good enough for a realistic use case, or if users will always need the CLI scan approach.
 - **Test `ProbeSet.filter(severity='HIGH')` vs `filter(severity='high')`** — verify case sensitivity behavior is still present (F-032 related).
 - **Check if `forbidden_argument_patterns` via deprecated kwargs API also maps correctly** — does the shim dict-coerce it or pass it through?
+
+## Session 042 — 2026-04-21
+
+**Upstream CI:** 3 consecutive green runs. Latest: "Fix F-109: add deprecation shim". Stable.
+
+**Version:** v0.3.0 (unchanged from session-041)
+
+**Test suite:** 1466 passed, 1 xfailed — no regressions.
+
+### What I Tested
+
+**1. F-022 confirmed fixed: evaluate(text) raises NotImplementedError**
+
+Previously `ToolCallBoundaryValidator.evaluate(text)` was a silent no-op — it returned `SafetyResult(passed=True)` with no warning, making it a "lying pass." The fix changed it to raise `NotImplementedError` with a message directing users to `evaluate_run(run)`. This is the right fix — a silent pass was actively harmful. Now the error message is useful.
+
+**2. Deprecated kwargs API (F-109 shim) — end-to-end verification**
+
+Confirmed the full shim works correctly:
+- `DeprecationWarning` fires with message pointing to `ToolBoundary`
+- `forbidden_tools` detection works via deprecated API
+- `forbidden_argument_patterns` works via deprecated API (dict form)
+- `allowed_tools` + `allowed_paths` work correctly
+
+The shim is a good migration story. One DX gap: the deprecation message says "Use `ToolCallBoundaryValidator(boundary=ToolBoundary(...))` instead" but `ToolBoundary` is not at top-level `checkagent` — users need to `from checkagent.safety import ToolBoundary`. The message could include the import path.
+
+Also confirmed: `evaluate_run()` requires structured `ToolCall` objects in `Step.tool_calls`, not just text. Users whose agents return text output (not structured tool call records) cannot use this validator at all without constructing `ToolCall` objects manually.
+
+**3. ProbeSet.filter() severity case-sensitivity — FIXED**
+
+`filter(severity='CRITICAL')` and `filter(severity='critical')` now return identical results across all probe sets tested (injection, jailbreak). Previously `filter(severity='CRITICAL')` returned 0 silently — a DX trap. This is fixed.
+
+Tags filtering is still case-sensitive: `filter(tags={'INDIRECT'})` returns 0; `filter(tags={'indirect'})` returns 10. This inconsistency (case-insensitive severity, case-sensitive tags) is a new DX trap — users who assume one follows the other will be confused.
+
+**4. wrap() TypeError with PydanticAI Agent — F-112**
+
+Tried `wrap(pydantic_ai_agent_instance)` and got `TypeError: Agent is not a callable object`. PydanticAI's `Agent` class is not a Python callable — you use `.run()` or `.run_sync()`. The `wrap()` function calls `inspect.signature(fn)` which requires a callable. No descriptive error pointing to `PydanticAIAdapter`.
+
+The correct approach is `PydanticAIAdapter(agent)` — which works perfectly and gives string `final_output`. But a user reading the `checkagent wrap` CLI docs (which does handle class agents) would naturally try the Python API and hit this wall with no guidance.
+
+The lambda workaround `wrap(lambda q: agent.run_sync(q))` works, but `final_output` is the raw `AgentRunResult` object — not a string. So it silently breaks `assert_output_matches` unless you do `result.final_output.output`.
+
+**5. PydanticAI end-to-end (real agent integration)**
+
+`PydanticAIAdapter` with `TestModel` is the correct path for testing PydanticAI agents:
+- Structured output (`output_type=MyModel`) flows through correctly as `result.final_output`
+- `assert_output_schema(result.final_output.model_dump(), MyModel)` works
+- `assert_output_matches(result.final_output.model_dump(), {...})` works
+- Steps are created (3 steps for a simple request)
+
+This is a solid integration story — if users find the adapter.
+
+**6. F-110 still open: CheckResult.severity/.name AttributeError**
+
+Still not fixed. `check_results` returns `CheckResult` (no `.severity`, no `.name`), while `missing_high` returns `PromptCheck` (has both). Same API inconsistency documented in session-041.
+
+### What Surprised Me
+
+- Severity filter case-insensitivity fix was quiet — no changelog entry visible, but it's a real improvement. Tags still case-sensitive is the remaining DX trap.
+- `evaluate(text)` raising `NotImplementedError` is a better fix than I expected. The old "silent pass" was actively dangerous. Now users get a clear error with the right API name.
+- `ToolBoundary` not being at top-level is annoying given that the deprecation warning explicitly tells users to use it. If you follow the warning verbatim, you'd write `from checkagent import ToolBoundary` and get an `ImportError`.
+
+### New Tests Added
+
+`tests/test_session042.py` (22 tests):
+- `TestF022EvaluateTextFixed` (3 tests) — confirms evaluate(text) raises NotImplementedError
+- `TestDeprecatedKwargsAPIEndToEnd` (4 tests) — full kwargs API shim verification
+- `TestProbeSetSeverityFilterCaseInsensitive` (4 tests) — severity case-insensitive, tags still case-sensitive
+- `TestF112WrapNonCallableAgents` (4 tests) — TypeError on non-callable, lambda workaround, PydanticAIAdapter correct path, end-to-end
+- `TestF110CheckResultMissingFields` (4 tests) — CheckResult still lacks .severity/.name
+- `TestToolBoundaryNotAtTopLevel` (3 tests) — ToolBoundary not at top-level, importable from safety
+
+### Updated
+
+- F-022 behavior confirmed (already marked fixed, stays fixed)
+- `ToolCallBoundaryValidator` score: DX 3→4 (evaluate(text) now raises vs silent no-op)
+- `ProbeSet.filter() severity case-sensitivity` score: 3/2 → 5/5 (FIXED)
+- New finding F-112 added (wrap() TypeError for non-callable agents)
+- New scores: `wrap() Python API (framework agents)`, `PydanticAI real agent end-to-end`, `ToolBoundary new API`
+
+### What I Want to Try Next Session
+
+- **Test `--llm-judge` flag** — no API key available this session. Priority remains high.
+- **Test `ProbeSet.filter()` tags case-sensitivity as a new finding** — document that severity and tags have inconsistent case behavior (tags remain case-sensitive despite severity fix).
+- **Test `ToolBoundary` import path in error message** — file a finding that the deprecation warning should include the import path (`from checkagent.safety import ToolBoundary`).
+- **Explore what's inside `checkagent.replay` vs `@pytest.mark.cassette`** — the cassette data model exists but the marker still does no auto record/replay. Is there any new integration in v0.3.0?
+- **Test `wrap()` with a LangChain agent** once langchain is available — verify same TypeError pattern.
+- **Check ConversationSafetyScanner with real multi-turn scenario** — test split-personality and context-poisoning probe patterns.

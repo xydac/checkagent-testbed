@@ -69,7 +69,7 @@ Rate each feature on:
 | PIILeakageScanner | 5 | 5 | Email, SSN, CC, phone detection; disabled set works; add_pattern() works; deduplicates findings | 2026-04-05 |
 | SystemPromptLeakDetector | 5 | 5 | Pattern detection + verbatim fragment leak; set_system_prompt with min_fragment_len; clean API | 2026-04-05 |
 | RefusalComplianceChecker | 5 | 5 | Both modes (expect/forbid refusal) work correctly; add_pattern(); result.details populated | 2026-04-05 |
-| ToolCallBoundaryValidator | 4 | 3 | Allowed/forbidden tools, path boundaries, arg patterns all work correctly; evaluate(text) silent no-op is misleading (F-022); not at top-level (F-021) | 2026-04-05 |
+| ToolCallBoundaryValidator | 4 | 4 | F-022 FIXED: evaluate(text) now raises NotImplementedError. evaluate_run() works correctly with structured ToolCall objects. not at top-level (F-021). ToolBoundary not at top-level despite deprecation notice pointing to it | 2026-04-21 |
 | Severity enum | 3 | 2 | String values instead of ordered integers — can't compare with >= or <; must use set membership or SEVERITY_ORDER dict (F-023) | 2026-04-05 |
 | attack probe library (Probe, ProbeSet) | 5 | 4 | 35 probes (25 direct + 10 indirect), clean composable API (filter/+/iter), parametrize-friendly; not at top-level (F-026) | 2026-04-05 |
 | probes.injection.direct | 5 | 5 | 25 well-categorized probes; Severity.CRITICAL for high-risk attacks; names are pytest-friendly param IDs | 2026-04-05 |
@@ -83,7 +83,7 @@ Rate each feature on:
 | jailbreak probe library (probes_jailbreak) | 5 | 4 | 15 probes (7 roleplay + 8 encoding); CRITICAL to LOW severity; clean tag/category metadata; case-sensitive severity string filter gotcha | 2026-04-05 |
 | PII probe library (probes_pii) | 5 | 4 | 10 extraction probes; all HIGH severity; diverse tags (direct/social_engineering/harvest etc.); importable via safety module | 2026-04-05 |
 | scope/boundary probe library (probes_scope) | 5 | 4 | 8 boundary probes covering financial/travel/medical/political actions; MEDIUM to CRITICAL severity | 2026-04-05 |
-| ProbeSet.filter() severity case-sensitivity | 3 | 2 | filter(severity='critical') works; filter(severity='CRITICAL') returns 0 silently — case-sensitive string filter is a DX trap | 2026-04-05 |
+| ProbeSet.filter() severity case-sensitivity | 5 | 5 | FIXED in v0.3.0: filter(severity='CRITICAL') and filter(severity='critical') now return same count. Tags filter still case-sensitive (DX trap) | 2026-04-21 |
 | ProbeSet.filter() tags OR logic | 5 | 3 | filter(tags={'a','b'}) is OR (any match) not AND (all required) — not documented, surprising to users expecting AND logic | 2026-04-05 |
 | task_completion expected_output_contains list | 5 | 4 | AND logic: all items must appear; partial scores; threshold applies to fraction; check_no_error=True adds implicit check | 2026-04-05 |
 | AgentRun / Step field names | 2 | 1 | Silent field drop: AgentRun(output=...) discards value (correct: final_output); Step(input=...) discards (correct: input_text). No ValidationError (F-027) | 2026-04-05 |
@@ -268,3 +268,6 @@ Rate each feature on:
 | PromptAnalysisResult.missing_high/missing_medium/recommendations | 5 | 5 | New properties in v0.3.0: filter failed checks by severity; recommendations returns actionable strings; all work correctly | 2026-04-19 |
 | checkagent.wrap Python API | 5 | 4 | @wrap decorator and wrap(fn) both work cleanly; wrap(callable_instance) works; wrap(Class) with invoke() silently returns None — CLI handles class agents but Python API doesn't auto-detect invoke() | 2026-04-20 |
 | upstream CI (session-041) | 5 | 5 | Green — all 12 jobs passing. Latest: "Fix F-109: add deprecation shim". 3 consecutive successes. | 2026-04-20 |
+| wrap() Python API (framework agents) | 2 | 1 | wrap(agent_instance) raises TypeError for non-callable framework objects (PydanticAI, LangChain). Must use PydanticAIAdapter etc. directly. No hint in error message. F-112 | 2026-04-21 |
+| PydanticAI real agent end-to-end (session-042) | 5 | 4 | PydanticAIAdapter + TestModel + assert_output_schema/matches all work. Structured output flows through correctly. wrap() workaround (lambda) gives raw AgentRunResult not string | 2026-04-21 |
+| ToolBoundary new API (non-deprecated) | 5 | 3 | Works correctly with no warnings. But ToolBoundary not at top-level — deprecation message tells users to use it but doesn't say where to import it from | 2026-04-21 |

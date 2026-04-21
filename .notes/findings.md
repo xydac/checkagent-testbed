@@ -1366,3 +1366,13 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Actual:** `ToolBoundary(forbidden_argument_patterns={"../", "passwd"})` → `AttributeError: 'set' object has no attribute 'items'` in validator constructor.
 **Workaround:** Use dict: `ToolBoundary(forbidden_argument_patterns={'path': r'\.\.|passwd'})`.
 **Status:** Open
+
+## F-112: `wrap()` raises `TypeError` for framework agent objects that aren't Python callables
+**Date:** 2026-04-21
+**Severity:** medium
+**Category:** dx-friction
+**Description:** `checkagent.wrap()` calls `inspect.signature(fn)` internally, which requires a Python callable. Framework agent objects like `pydantic_ai.Agent` are not callable — you use `.run()` or `.run_sync()` on them, not `agent(query)`. Calling `wrap(agent)` raises `TypeError: <Agent object> is not a callable object`. This is a first-time user trap: the README and CLI docs for `checkagent wrap` both mention class/agent support, but the Python `wrap()` function only works with plain callables or functions.
+**Expected:** Either: (a) `wrap()` detects non-callables and raises a descriptive error pointing to framework adapters, or (b) `wrap()` detects framework agent objects (PydanticAI, LangChain, etc.) and auto-selects the appropriate adapter.
+**Actual:** `wrap(pydantic_ai_agent)` → `TypeError: Agent(model=...) is not a callable object` — no hint that `PydanticAIAdapter` is the correct approach.
+**Workaround:** Use `PydanticAIAdapter(agent)` directly. Or use a lambda: `wrap(lambda q: agent.run_sync(q))` — but this gives a raw `AgentRunResult` as `final_output`, not a string.
+**Status:** Open
