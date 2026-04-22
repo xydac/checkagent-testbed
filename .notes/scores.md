@@ -69,7 +69,7 @@ Rate each feature on:
 | PIILeakageScanner | 5 | 5 | Email, SSN, CC, phone detection; disabled set works; add_pattern() works; deduplicates findings | 2026-04-05 |
 | SystemPromptLeakDetector | 5 | 5 | Pattern detection + verbatim fragment leak; set_system_prompt with min_fragment_len; clean API | 2026-04-05 |
 | RefusalComplianceChecker | 5 | 5 | Both modes (expect/forbid refusal) work correctly; add_pattern(); result.details populated | 2026-04-05 |
-| ToolCallBoundaryValidator | 4 | 4 | F-022 FIXED: evaluate(text) now raises NotImplementedError. evaluate_run() works correctly with structured ToolCall objects. not at top-level (F-021). ToolBoundary not at top-level despite deprecation notice pointing to it | 2026-04-21 |
+| ToolCallBoundaryValidator | 4 | 4 | F-022 FIXED: evaluate(text) raises NotImplementedError. evaluate_run() works correctly. ToolBoundary now at top-level (F-112 commit). F-111 partial: forbidden_argument_patterns still confusingly named but TypeError message is now clear | 2026-04-22 |
 | Severity enum | 3 | 2 | String values instead of ordered integers — can't compare with >= or <; must use set membership or SEVERITY_ORDER dict (F-023) | 2026-04-05 |
 | attack probe library (Probe, ProbeSet) | 5 | 4 | 35 probes (25 direct + 10 indirect), clean composable API (filter/+/iter), parametrize-friendly; not at top-level (F-026) | 2026-04-05 |
 | probes.injection.direct | 5 | 5 | 25 well-categorized probes; Severity.CRITICAL for high-risk attacks; names are pytest-friendly param IDs | 2026-04-05 |
@@ -234,7 +234,7 @@ Rate each feature on:
 | version consistency (0.1.2) | 5 | 5 | __version__ and importlib.metadata both return '0.1.2'. Version inconsistency bug from 0.1.1 fixed. | 2026-04-11 |
 | upstream CI (session-034) | 1 | 1 | Red — ALL platforms failing. Latest commit "Add checkagent analyze-prompt" breaks ruff lint (I001 unsorted imports x3, E501 line too long). Previous commit was green. | 2026-04-11 |
 | checkagent analyze-prompt CLI | 3 | 3 | New: 8-check static analysis (no LLM needed); exit 0/1 based on HIGH checks; --json output; file reading works; F-093 (Rich markup strips [brackets]), F-094 (nonexistent file silent), exit code behavior undocumented | 2026-04-11 |
-| PromptAnalyzer Python API | 4 | 2 | analyze() solid; F-110: CheckResult lacks .severity/.name (must use .check.severity); missing_high returns PromptCheck (has .name) while check_results returns CheckResult (no .name) — inconsistent types | 2026-04-20 |
+| PromptAnalyzer Python API | 4 | 4 | F-110 FIXED: CheckResult now has .severity/.name @property shortcuts; check_results and missing_high now use consistent access pattern | 2026-04-22 |
 | data_enumeration scan category | 4 | 3 | New 5th category; 20 probes (HIGH+CRITICAL); correct category metadata; echo agents get false positives (expected); DataEnumerationDetector/probes_data_enumeration not at top-level | 2026-04-11 |
 | class-based agent scan | 4 | 4 | module:ClassName auto-instantiates class; correct probe execution; refusal class agent scores 1.0 on injection; clean JSON output | 2026-04-11 |
 | EvalCase top-level export | 4 | 4 | At top-level checkagent; id+input+expected_tools/output_contains/output_equals/max_steps/tags/context/metadata; still str-only input (same as TestCase) | 2026-04-11 |
@@ -268,6 +268,8 @@ Rate each feature on:
 | PromptAnalysisResult.missing_high/missing_medium/recommendations | 5 | 5 | New properties in v0.3.0: filter failed checks by severity; recommendations returns actionable strings; all work correctly | 2026-04-19 |
 | checkagent.wrap Python API | 5 | 4 | @wrap decorator and wrap(fn) both work cleanly; wrap(callable_instance) works; wrap(Class) with invoke() silently returns None — CLI handles class agents but Python API doesn't auto-detect invoke() | 2026-04-20 |
 | upstream CI (session-041) | 5 | 5 | Green — all 12 jobs passing. Latest: "Fix F-109: add deprecation shim". 3 consecutive successes. | 2026-04-20 |
-| wrap() Python API (framework agents) | 2 | 1 | wrap(agent_instance) raises TypeError for non-callable framework objects (PydanticAI, LangChain). Must use PydanticAIAdapter etc. directly. No hint in error message. F-112 | 2026-04-21 |
-| PydanticAI real agent end-to-end (session-042) | 5 | 4 | PydanticAIAdapter + TestModel + assert_output_schema/matches all work. Structured output flows through correctly. wrap() workaround (lambda) gives raw AgentRunResult not string | 2026-04-21 |
-| ToolBoundary new API (non-deprecated) | 5 | 3 | Works correctly with no warnings. But ToolBoundary not at top-level — deprecation message tells users to use it but doesn't say where to import it from | 2026-04-21 |
+| wrap() Python API (framework agents) | 5 | 5 | F-112 FIXED: wrap() auto-detects PydanticAI Agent → PydanticAIAdapter, LangChain Runnable → LangChainAdapter; unrecognized non-callables get helpful TypeError listing adapters | 2026-04-22 |
+| PydanticAI real agent end-to-end (session-043) | 5 | 5 | wrap(pydantic_ai.Agent) now works directly — auto-detects and returns PydanticAIAdapter with string final_output. No lambda workaround needed. | 2026-04-22 |
+| ToolBoundary new API (non-deprecated) | 5 | 4 | Now at top-level checkagent (from checkagent import ToolBoundary). Deprecation migration path fully resolved. F-111 improved: set raises TypeError with clear dict format message | 2026-04-22 |
+| upstream CI (session-043) | 5 | 5 | Green — latest "Fix F-112: wrap() auto-detects framework agents, add ToolBoundary top…" passes all platforms. 4 consecutive successes. | 2026-04-22 |
+| ProbeSet.filter() tags case-sensitivity | 2 | 2 | F-113 NEW: tags are case-sensitive (indirect ≠ INDIRECT) while severity is case-insensitive. Inconsistent — users who learn severity is case-insensitive will be surprised. All tag values are lowercase. | 2026-04-22 |

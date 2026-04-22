@@ -1355,7 +1355,7 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** `CheckResult.severity` and `CheckResult.name` as convenience properties delegating to `cr.check`.
 **Actual:** `cr.severity` → `AttributeError`. Must use `cr.check.severity`.
 **Workaround:** Use `cr.check.severity` and `cr.check.name`. Or convert: `{cr.check.name: cr for cr in result.check_results}`.
-**Status:** Open
+**Status:** Fixed in session-043 ("Fix F-112: wrap() auto-detects framework agents, add ToolBoundary top…" commit). `CheckResult` now has `name` and `severity` as `@property` convenience accessors delegating to `self.check`.
 
 ## F-111: `ToolBoundary.forbidden_argument_patterns` requires `dict`, not `set` — confusing API name
 **Date:** 2026-04-20
@@ -1365,7 +1365,7 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** Either: (a) Type annotation enforced at dataclass level with clear ValidationError, or (b) Field renamed to `forbidden_argument_regex` or similar to clarify it's a name→pattern mapping.
 **Actual:** `ToolBoundary(forbidden_argument_patterns={"../", "passwd"})` → `AttributeError: 'set' object has no attribute 'items'` in validator constructor.
 **Workaround:** Use dict: `ToolBoundary(forbidden_argument_patterns={'path': r'\.\.|passwd'})`.
-**Status:** Open
+**Status:** Partially improved in session-043. Now raises `TypeError` with a clear message ("must be a dict mapping argument names to regex patterns, e.g. {'path': r'\.\.'}. Got 'set' instead.") instead of the cryptic `AttributeError`. Field name is still confusing — the name→pattern mapping semantics remain undiscoverable from the field name alone.
 
 ## F-112: `wrap()` raises `TypeError` for framework agent objects that aren't Python callables
 **Date:** 2026-04-21
@@ -1375,4 +1375,14 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** Either: (a) `wrap()` detects non-callables and raises a descriptive error pointing to framework adapters, or (b) `wrap()` detects framework agent objects (PydanticAI, LangChain, etc.) and auto-selects the appropriate adapter.
 **Actual:** `wrap(pydantic_ai_agent)` → `TypeError: Agent(model=...) is not a callable object` — no hint that `PydanticAIAdapter` is the correct approach.
 **Workaround:** Use `PydanticAIAdapter(agent)` directly. Or use a lambda: `wrap(lambda q: agent.run_sync(q))` — but this gives a raw `AgentRunResult` as `final_output`, not a string.
+**Status:** Fixed in "Fix F-112: wrap() auto-detects framework agents, add ToolBoundary top…" (2026-04-22). `wrap()` now auto-detects PydanticAI agents (→ PydanticAIAdapter) and LangChain Runnables (→ LangChainAdapter). For truly unrecognized non-callables, raises a helpful `TypeError` listing available adapters with import paths.
+
+## F-113: `ProbeSet.filter(tags=...)` is case-sensitive while `filter(severity=...)` is case-insensitive
+**Date:** 2026-04-22
+**Severity:** low
+**Category:** dx-friction
+**Description:** In v0.3.0, `ProbeSet.filter(severity=...)` was made case-insensitive (F-032 fix) — `filter(severity='CRITICAL')` and `filter(severity='critical')` return identical results. However, `filter(tags={'indirect'})` and `filter(tags={'INDIRECT'})` return different results: lowercase returns 10 probes, uppercase returns 0. Actual tag values in probe metadata are all lowercase (e.g. `'indirect'`, `'classic'`, `'ignore'`). Users who learned that severity is case-insensitive will naturally try uppercase or title-case tags and get 0 results with no error or warning.
+**Expected:** Either: (a) `filter(tags=...)` normalizes to lowercase for comparison (consistent with severity), or (b) documentation explicitly states that tags are case-sensitive and severity is not.
+**Actual:** `filter(tags={'indirect'})` → 10 probes. `filter(tags={'INDIRECT'})` → 0 probes. `filter(tags={'Indirect'})` → 0 probes. No error or warning.
+**Workaround:** Always use lowercase tag values: `filter(tags={'indirect'})` not `filter(tags={'INDIRECT'})`. Check actual tag values by iterating `probe.tags` on sample probes.
 **Status:** Open
