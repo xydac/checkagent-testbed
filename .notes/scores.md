@@ -273,3 +273,9 @@ Rate each feature on:
 | ToolBoundary new API (non-deprecated) | 5 | 4 | Now at top-level checkagent (from checkagent import ToolBoundary). Deprecation migration path fully resolved. F-111 improved: set raises TypeError with clear dict format message | 2026-04-22 |
 | upstream CI (session-043) | 5 | 5 | Green — latest "Fix F-112: wrap() auto-detects framework agents, add ToolBoundary top…" passes all platforms. 4 consecutive successes. | 2026-04-22 |
 | ProbeSet.filter() tags case-sensitivity | 2 | 2 | F-113 NEW: tags are case-sensitive (indirect ≠ INDIRECT) while severity is case-insensitive. Inconsistent — users who learn severity is case-insensitive will be surprised. All tag values are lowercase. | 2026-04-22 |
+| --llm-judge flag error handling | 5 | 5 | Clear, actionable error messages for both Anthropic (ANTHROPIC_API_KEY) and OpenAI (OPENAI_API_KEY) — no stack trace, correct env var name per model | 2026-04-23 |
+| wrap() + PydanticAI structured output_type | 5 | 4 | wrap(Agent(output_type=Model)) auto-detects → PydanticAIAdapter; final_output is Pydantic model instance (not str). assert_output_schema and assert_json_schema(result.final_output, ...) both work correctly | 2026-04-23 |
+| CrewAI adapter lazy import | 5 | 5 | Importable without crewai; raises ImportError with clear message ("requires crewai") at instantiation; wrap() TypeError lists CrewAIAdapter as option | 2026-04-23 |
+| upstream CI (session-044) | 5 | 5 | Green — new ROADMAP-only commit today ("Add Phase 5"). No code changes. 5 consecutive successes. | 2026-04-24 |
+| v0.3.0 PyPI gap | 1 | 1 | F-114: v0.3.0 not on PyPI — `pip install checkagent` gets 0.2.0. All 0.3.0 fixes (F-099/F-101/F-103/F-109/F-110/F-112) unavailable to first-time users. | 2026-04-24 |
+| checkagent init (session-044) | 5 | 5 | Still works: generates 2-test project that passes immediately. Phase 5 end-to-end goal confirmed on git main. | 2026-04-24 |

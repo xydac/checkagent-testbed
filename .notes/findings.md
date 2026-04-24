@@ -1386,3 +1386,13 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Actual:** `filter(tags={'indirect'})` → 10 probes. `filter(tags={'INDIRECT'})` → 0 probes. `filter(tags={'Indirect'})` → 0 probes. No error or warning.
 **Workaround:** Always use lowercase tag values: `filter(tags={'indirect'})` not `filter(tags={'INDIRECT'})`. Check actual tag values by iterating `probe.tags` on sample probes.
 **Status:** Open
+
+## F-114: v0.3.0 not published to PyPI — `pip install checkagent` gets v0.2.0
+**Date:** 2026-04-24
+**Severity:** high
+**Category:** missing-feature
+**Description:** `checkagent` v0.3.0 exists on git main and is tagged as released in the ROADMAP, but PyPI still shows v0.2.0 as the latest. Running `pip install checkagent` or `pip install --upgrade checkagent` gives 0.2.0. Many fixes from sessions 033-043 (F-099, F-101, F-103, F-105, F-106, F-109, F-110, F-111, F-112) are only in git main. Available PyPI versions: 0.1.0, 0.1.1, 0.1.2, 0.2.0. `pip index versions checkagent` shows nothing ≥ 0.3.0.
+**Expected:** Phase 5 ROADMAP explicitly lists "PyPI v0.3.0 published with all current fixes" as a milestone item. A first-time user following the README's `pip install checkagent` would miss all 0.3.0 fixes.
+**Actual:** `pip install checkagent` → 0.2.0. `pip install checkagent @ git+...` → 0.3.0. The gap includes: wrap() auto-detection (F-112), ToolBoundary top-level export, GroundednessEvaluator uncertainty mode fix (F-099), iter_turn_findings() helper (F-101), generate_test_cases deprecation warning (F-103), PromptAnalysisResult new properties.
+**Workaround:** Install from git: `pip install "checkagent @ git+https://github.com/xydac/checkagent.git@main"`. Not discoverable from the README.
+**Status:** Open

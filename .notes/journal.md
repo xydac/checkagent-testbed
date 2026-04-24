@@ -2294,3 +2294,69 @@ These tests document history accurately but are now maintenance burden. Will mar
 - **Test the wrap() + PydanticAI + scan pipeline** — can I `wrap(agent)` and immediately run `checkagent scan` on the result?
 - **Explore structured output + wrap() for PydanticAI** — does `wrap(Agent(output_type=MyModel))` give a Pydantic model as `final_output`?
 - **Document the AgentRun vs str return type requirement for Conversation** — users who pass plain string-returning agents will hit a confusing error.
+
+---
+
+## Session 044 — 2026-04-24
+
+### What I Did
+
+**1. Updated checkagent from git main**
+
+Still v0.3.0 — no new code since session-043. The only upstream change today was "Add Phase 5 to ROADMAP: first impression fixes, browser playground, zero-config eval" (ROADMAP.md only, no code). CI is green for the 5th consecutive run.
+
+**2. Fixed 8 stale bug-confirming tests**
+
+Added `@pytest.mark.xfail(strict=True, reason=...)` to 8 tests across session-041/042 that were asserting bug behavior that's since been fixed:
+- 3 tests in `TestF110CheckResultNamingDXFriction` (F-110 fixed in session-043)
+- 1 test in `TestF111ForbiddenArgumentPatternsRequiresDict` (F-111 improved)
+- 1 test in `TestF112WrapNonCallableAgents` (F-112 fixed)
+- 2 tests in `TestF110CheckResultMissingFields` (F-110 fixed)
+- 1 test in `TestToolBoundaryNotAtTopLevel` (ToolBoundary now at top-level)
+
+All 9 xfails pass with `strict=True`, confirming the fixes are in place.
+
+**3. Wrote and ran session-044 tests (13 tests)**
+
+`tests/test_session044.py` covers three areas:
+
+- **`TestWrapPydanticAIStructuredOutput` (5 tests):** Confirmed that `wrap(Agent(output_type=Model))` auto-detects to PydanticAIAdapter and `final_output` is the Pydantic model instance (not a string). `assert_output_schema` accepts a Pydantic model instance directly. `assert_json_schema` works when you pass `result.final_output` (the model instance) as the data argument. Wrong-schema assertion raises `StructuredAssertionError` with the failing field name.
+
+- **`TestCrewAIAdapterLazyImport` (3 tests):** `CrewAIAdapter` imports cleanly without crewai installed. Instantiation raises `ImportError` with "crewai" in the message. `wrap()` TypeError for unrecognized objects lists `CrewAIAdapter` with its import path.
+
+- **`TestWrapTypeErrorMessageCompleteness` (5 tests):** TypeError message from `wrap()` lists all 4 framework adapters (PydanticAI, LangChain, CrewAI, OpenAI Agents), mentions "lambda" as a workaround, but still works for plain callables and auto-detects PydanticAI and LangChain.
+
+**4. Discovered F-114: v0.3.0 not on PyPI**
+
+`pip index versions checkagent` shows 0.1.0/0.1.1/0.1.2/0.2.0 — nothing ≥ 0.3.0. This is explicitly listed as a Phase 5 ROADMAP item ("PyPI v0.3.0 published with all current fixes") but hasn't shipped yet. A developer following the README's `pip install checkagent` would get 0.2.0, missing all the fixes landed since then. This is a high-severity gap: the "first impression fixes" milestone literally can't be complete until this ships.
+
+**5. Verified `checkagent init` end-to-end**
+
+`checkagent init mybot` + `pytest tests/` inside the generated project → 2 tests pass. The Phase 5 goal "pip install checkagent && checkagent demo && checkagent init && pytest" is achievable on git main. The PyPI gap (F-114) is the only blocker to that working for ordinary users.
+
+**6. Read ROADMAP Phase 5**
+
+Key upcoming items:
+- Milestone 15: Browser Safety Playground (static HTML, no install needed)
+- Milestone 16: `--provider claude-code` flag (eval/judge without separate API key), auto-instrumentation
+- These are future features with nothing testable today
+
+### Results
+
+- 1519 passed, 9 xfailed, 0 errors
+- New: F-114 (v0.3.0 not on PyPI — high severity)
+- No open findings from prior sessions were fixed this cycle (upstream only added ROADMAP)
+
+### What Surprised Me
+
+- The ROADMAP Phase 5 item "PyPI v0.3.0 published" sitting open when v0.3.0 has been the git main version since at least session-035 (~2 weeks ago). The code is clearly ready; the release step just hasn't happened.
+- `assert_output_schema(result, TripPlan)` works correctly even when `result.final_output` is already a `TripPlan` instance (not JSON) — the assertion is smart enough to validate the existing model instance without re-parsing.
+- `assert_json_schema(result.final_output, schema)` also works directly on a Pydantic model instance — it apparently calls `.model_dump()` or similar internally before schema validation.
+
+### What I Want to Try Next Session
+
+- **`--provider claude-code` flag** — ROADMAP says this is coming. When it lands, test it immediately.
+- **Auto-instrumentation** — "one import captures LLM calls" (Milestone 16). When it ships, this is a major DX win worth thorough testing.
+- **F-114 follow-up** — once v0.3.0 hits PyPI, verify `pip install checkagent` gives the right version and re-score.
+- **Browser playground** (Milestone 15) — when it ships, test safety scan from a browser without installing anything.
+- **F-113 (tags case-sensitivity)** — still open, monitor for a fix.

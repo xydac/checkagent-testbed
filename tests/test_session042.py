@@ -184,6 +184,7 @@ class TestF112WrapNonCallableAgents:
     adapters (PydanticAIAdapter, etc.) or wrap with a lambda.
     """
 
+    @pytest.mark.xfail(strict=True, reason="F-112 fixed in session-043: wrap() now auto-detects PydanticAI Agent and returns PydanticAIAdapter")
     def test_wrap_pydantic_ai_agent_raises_type_error(self):
         """PydanticAI Agent is not a Python callable — wrap() fails with TypeError."""
         pytest.importorskip("pydantic_ai")
@@ -259,6 +260,7 @@ class TestF110CheckResultMissingFields:
     Still open in v0.3.0.
     """
 
+    @pytest.mark.xfail(strict=True, reason="F-110 fixed in session-043: CheckResult now has .severity property")
     def test_check_result_has_no_severity_attribute(self):
         from checkagent.safety.prompt_analyzer import PromptAnalyzer
         analyzer = PromptAnalyzer()
@@ -269,6 +271,7 @@ class TestF110CheckResultMissingFields:
             "F-110: CheckResult should NOT have .severity yet"
         )
 
+    @pytest.mark.xfail(strict=True, reason="F-110 fixed in session-043: CheckResult now has .name property")
     def test_check_result_has_no_name_attribute(self):
         from checkagent.safety.prompt_analyzer import PromptAnalyzer
         analyzer = PromptAnalyzer()
@@ -308,6 +311,7 @@ class TestToolBoundaryNotAtTopLevel:
     but they need to know the import path.
     """
 
+    @pytest.mark.xfail(strict=True, reason="Fixed in session-043: ToolBoundary is now exported from top-level checkagent")
     def test_tool_boundary_not_at_top_level(self):
         import checkagent
         assert not hasattr(checkagent, "ToolBoundary"), (

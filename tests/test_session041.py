@@ -86,6 +86,7 @@ class TestF110CheckResultNamingDXFriction:
     .severity directly), creating an inconsistent API surface.
     """
 
+    @pytest.mark.xfail(strict=True, reason="F-110 fixed in session-043: CheckResult now has .severity property")
     def test_check_result_lacks_direct_severity_access(self):
         """F-110: cr.severity raises AttributeError — must use cr.check.severity."""
         from checkagent.safety import PromptAnalyzer
@@ -98,6 +99,7 @@ class TestF110CheckResultNamingDXFriction:
         # Two-level access works
         assert cr.check.severity in {"high", "medium", "low"}
 
+    @pytest.mark.xfail(strict=True, reason="F-110 fixed in session-043: CheckResult now has .name property")
     def test_check_result_lacks_direct_name_access(self):
         """F-110: cr.name raises AttributeError — must use cr.check.name."""
         from checkagent.safety import PromptAnalyzer
@@ -109,6 +111,7 @@ class TestF110CheckResultNamingDXFriction:
         assert isinstance(cr.check.name, str)
         assert len(cr.check.name) > 0
 
+    @pytest.mark.xfail(strict=True, reason="F-110 fixed in session-043: CheckResult now has .name/.severity properties, API is now consistent")
     def test_missing_high_returns_prompt_check_not_check_result(self):
         """missing_high returns PromptCheck (has .name/.severity directly)
         while check_results returns CheckResult (needs .check.name/.check.severity).
@@ -155,6 +158,7 @@ class TestF111ForbiddenArgumentPatternsRequiresDict:
     The correct API: {'path': r'[.][.]|passwd', 'query': r'DROP TABLE'}
     """
 
+    @pytest.mark.xfail(strict=True, reason="F-111 improved in session-043: now raises TypeError with clear message instead of AttributeError")
     def test_set_raises_attribute_error_at_construction(self):
         """F-111: Passing set to forbidden_argument_patterns → AttributeError at construction.
 
