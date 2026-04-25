@@ -2360,3 +2360,72 @@ Key upcoming items:
 - **F-114 follow-up** — once v0.3.0 hits PyPI, verify `pip install checkagent` gives the right version and re-score.
 - **Browser playground** (Milestone 15) — when it ships, test safety scan from a browser without installing anything.
 - **F-113 (tags case-sensitivity)** — still open, monitor for a fix.
+
+---
+
+## Session-045 — 2026-04-25
+
+**checkagent version:** 0.3.0 (git main)
+**Tests:** 1551 passed, 9 xfailed (+32 from this session)
+**Upstream CI:** Green — "Expand scope_boundary patterns to catch common real-world phrasings" (6 consecutive successes)
+
+### What I Did This Session
+
+**1. Updated checkagent and checked upstream CI**
+
+`pip install checkagent @ git+...@main` → still 0.3.0. One new upstream commit since session-044:
+- "Expand scope_boundary patterns to catch common real-world phrasings" (green CI, ~3 min build)
+
+F-114 (PyPI gap) still open: `pip index versions checkagent` still shows 0.2.0 as latest on PyPI.
+
+**2. Investigated the new commit**
+
+The commit expands `PromptAnalyzer`'s scope_boundary check with three new pattern groups:
+
+1. **No 'with' required**: `(?:only|solely|exclusively)\s+(?:help|assist|answer|respond)\s+(?:to|about|questions?|requests?|\w)` — previously required 'only answer WITH' but real prompts write 'only answer HR questions' or 'only answer questions about'
+2. **Role limited**: `(?:your\s+role|your\s+purpose)\s+is\s+(?:limited|restricted|only)` — 'Your role is limited to X' is a very common real-world phrasing
+3. **Domain agent**: `(?:you\s+are\s+a\s+)?(?:hr|finance|support|sales|legal)\s+(?:agent|assistant|bot)\s+(?:and\s+)?(?:only|solely)` — detects 'you are an HR agent and only answer HR questions'
+
+All three new patterns confirmed working. Old patterns confirmed not broken.
+
+**3. Tested edge cases**
+
+Key finding: "You are an HR assistant." alone does NOT trigger scope_boundary (correct — role declaration without restriction is not a scope boundary). The detection requires an explicit restriction on what the agent will/won't do.
+
+Tested negative cases all pass correctly — generic "helpful assistant" prompts don't get false positives.
+
+**4. Wrote 32 new tests in test_session045.py**
+
+Coverage:
+- 6 tests: new 'no with keyword' pattern group
+- 5 tests: new 'role/purpose is limited' pattern group
+- 3 tests: new 'domain agent and only' pattern group
+- 5 tests: existing patterns regression check
+- 4 tests: negative cases (no false positives)
+- 6 tests: result quality (severity, evidence, missing_high, score, recommendations)
+- 3 tests: F-113 documented behavior (tags case-sensitive, confirmed still open)
+
+All 32 pass.
+
+### Results
+
+- 1551 passed (+32), 9 xfailed, 0 errors
+- No new findings opened
+- No previously open findings closed
+- F-113 (tags case-sensitivity) confirmed still open
+- F-114 (PyPI gap) confirmed still open
+
+### What Surprised Me
+
+- The new scope_boundary patterns are purely additive regex alternatives — no behavioral changes to anything else. Clean, safe improvement. The patterns cover the most common real-world agent prompt phrasings I've seen in the wild ("Your role is limited to...", "Only answer [domain] questions").
+- The commit makes the analyzer meaningfully more useful for real HR/finance/support domain agents — a large slice of enterprise AI deployments. This was a practical gap, not a theoretical one.
+- The domain-specific pattern (`hr|finance|support|sales|legal`) requires the agent to be explicitly named as a domain specialist AND include 'only'. Just "You are an HR assistant." is correctly not flagged — this avoids false positives.
+
+### What I Want to Try Next Session
+
+- **`--provider claude-code` flag** — ROADMAP Milestone 16. Test when it lands.
+- **Auto-instrumentation** — "one import captures LLM calls". Test when it ships.
+- **F-114 follow-up** — verify when v0.3.0 hits PyPI.
+- **Browser playground** (Milestone 15) — test when it ships.
+- **F-113** — still open, monitor.
+- **Explore whether `analyze-prompt` has a `--file` option** for scanning existing system prompt files in a directory.

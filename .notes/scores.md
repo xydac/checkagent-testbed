@@ -279,3 +279,5 @@ Rate each feature on:
 | upstream CI (session-044) | 5 | 5 | Green — new ROADMAP-only commit today ("Add Phase 5"). No code changes. 5 consecutive successes. | 2026-04-24 |
 | v0.3.0 PyPI gap | 1 | 1 | F-114: v0.3.0 not on PyPI — `pip install checkagent` gets 0.2.0. All 0.3.0 fixes (F-099/F-101/F-103/F-109/F-110/F-112) unavailable to first-time users. | 2026-04-24 |
 | checkagent init (session-044) | 5 | 5 | Still works: generates 2-test project that passes immediately. Phase 5 end-to-end goal confirmed on git main. | 2026-04-24 |
+| PromptAnalyzer scope_boundary patterns | 5 | 4 | New patterns (session-045): 'ONLY answer HR questions', 'your role is limited to', 'domain agent and only' all detected correctly; old patterns still work; DX: patterns are fully invisible to users (no docs listing what to write) | 2026-04-25 |
+| upstream CI (session-045) | 5 | 5 | Green — new commit "Expand scope_boundary patterns to catch common real-world phrasings". 6 consecutive successes. | 2026-04-25 |
