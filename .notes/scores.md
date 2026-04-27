@@ -281,3 +281,7 @@ Rate each feature on:
 | checkagent init (session-044) | 5 | 5 | Still works: generates 2-test project that passes immediately. Phase 5 end-to-end goal confirmed on git main. | 2026-04-24 |
 | PromptAnalyzer scope_boundary patterns | 5 | 4 | New patterns (session-045): 'ONLY answer HR questions', 'your role is limited to', 'domain agent and only' all detected correctly; old patterns still work; DX: patterns are fully invisible to users (no docs listing what to write) | 2026-04-25 |
 | upstream CI (session-045) | 5 | 5 | Green — new commit "Expand scope_boundary patterns to catch common real-world phrasings". 6 consecutive successes. | 2026-04-25 |
+| check_behavioral_compliance (overall) | 4 | 3 | Core logic works: detects compliance via no-refusal + structural divergence; correctly skips scope-limiting refusals; importable from checkagent.safety; F-115 (severity not inherited from probe), F-116 (probe field empty), F-117 (not at top-level checkagent) | 2026-04-27 |
+| behavioral baseline: refusal detection | 5 | 5 | 5 common refusal patterns all correctly return 0 findings; scope-limiting refusals pass cleanly after latest fix | 2026-04-27 |
+| behavioral baseline: compliance detection | 4 | 3 | Detects structural divergence (bullets, tables, code blocks, length_anomaly) and basic no-refusal; short compliant responses missed (length bias); finding quality good | 2026-04-27 |
+| upstream CI (session-046) | 5 | 5 | Green — 7 consecutive successes. "Fix behavioral detector false positive on scope-limiting refusals" passes all platforms. | 2026-04-27 |

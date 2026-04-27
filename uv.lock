@@ -549,8 +549,8 @@ wheels = [
 
 [[package]]
 name = "checkagent"
-version = "0.2.0"
-source = { registry = "https://pypi.org/simple" }
+version = "0.3.0"
+source = { git = "https://github.com/xydac/checkagent.git?rev=main#0ebdcad0beafcf88cc4e3ba6d1109cb6181ac1f3" }
 dependencies = [
     { name = "click" },
     { name = "pluggy" },
@@ -559,10 +559,6 @@ dependencies = [
     { name = "pytest-asyncio" },
     { name = "pyyaml" },
     { name = "rich" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/03/e3/1872df21585f70d63f43f101fc022062ee8fc7f19c3fb1c2121a16ca4873/checkagent-0.2.0.tar.gz", hash = "sha256:2c9aa61930096b36bfb7fde3c912be88e27614d9313e7dc500dce523afe29fc3", size = 1139132, upload-time = "2026-04-12T05:38:06.536Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/39/db/9dc3a73a09ddb3f41a5018b6545b17d6b9df26550bb8f618451e7ae2784d/checkagent-0.2.0-py3-none-any.whl", hash = "sha256:eff90ed619f75040e33b284b2e2e4afb9842ef35cf2b4941a2f4709db7bcd820", size = 198715, upload-time = "2026-04-12T05:38:04.699Z" },
 ]
 
 [[package]]
@@ -584,7 +580,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "checkagent", specifier = ">=0.2.0" },
+    { name = "checkagent", git = "https://github.com/xydac/checkagent.git?rev=main" },
     { name = "dirty-equals", specifier = ">=0.6" },
     { name = "langchain-core", specifier = ">=1.2.28" },
     { name = "pydantic-ai", specifier = ">=1.79.0" },

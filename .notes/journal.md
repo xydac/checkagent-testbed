@@ -2429,3 +2429,78 @@ All 32 pass.
 - **Browser playground** (Milestone 15) — test when it ships.
 - **F-113** — still open, monitor.
 - **Explore whether `analyze-prompt` has a `--file` option** for scanning existing system prompt files in a directory.
+
+---
+
+## Session 046 — 2026-04-27
+
+### What I Updated
+
+- Installed latest from git main: still v0.3.0
+- CI: **green**, 7 consecutive successes. Two new commits since session-045:
+  1. "Add behavioral baseline detector for scan false-negative reduction"
+  2. "Fix behavioral detector false positive on scope-limiting refusals"
+- All 1576 pre-existing tests pass (session 046 file was already untracked)
+
+### What I Tried
+
+**Behavioral baseline detector** — the big new feature this session.
+
+The scan CLI now auto-captures a baseline response by sending a benign "Hello, how can you help me?" probe to the agent before running adversarial probes. This baseline is used to detect false negatives: cases where regex patterns miss a compliance but the structural/textual difference from the benign baseline signals the agent actually complied.
+
+The public API:
+```python
+from checkagent.safety import check_behavioral_compliance
+findings = check_behavioral_compliance(output, baseline, probe)
+```
+
+**The fix commit (scope-limiting refusals)**: before the fix, agents that replied with "I can only help with HR questions" were falsely flagged as compliant. After the fix, scope-limiting refusals correctly return 0 findings. Confirmed working.
+
+**What the detector catches:**
+- "No refusal detected" (basic) → LOW severity finding, returned when output has no refusal language and has meaningful text
+- "Potential compliance: no refusal detected, structural divergence (length_anomaly, new_headers, new_code_blocks)" → MEDIUM severity, when output structure diverges from baseline
+
+**What the detector misses:**
+- Short compliant responses (< ~60 chars) — `"PWNED!"` returns 0 findings even with no refusal. Length bias is real.
+- Semantically compliant responses that stay similar in structure to baseline
+
+### New Findings
+
+**F-115**: Behavioral compliance findings always have LOW/MEDIUM severity regardless of probe severity. When a CRITICAL probe succeeds, finding severity is still LOW or MEDIUM. Triage tools that sort by severity will misrank these. The fix is straightforward: the finding severity should inherit `probe.severity` or at minimum be gated by it.
+
+**F-116**: `SafetyFinding.probe` field is always `''` in behavioral compliance findings. Regex-based detectors populate this field correctly. Without probe attribution, findings from `check_behavioral_compliance()` can't be traced back to their triggering probe for deduplication or reporting.
+
+### What Surprised Me
+
+- The **two-tier detection strategy** is clever: regex-based detectors catch specific known-bad patterns (PWNED, "ignore previous instructions"), while behavioral baseline catches generic compliance. They complement each other cleanly.
+- The **scope-limiting false positive fix was necessary** — a large share of real enterprise agents scope-limit their responses ("I only handle billing questions"). Without the fix, they'd all get flagged.
+- **F-115 (severity mismatch) is a triage problem in practice**: the behavioral module is designed to reduce false negatives, so it adds findings conservatively. But LOW severity on a successful CRITICAL injection attack actively misleads users reviewing a finding report.
+
+### Test Coverage (session-046)
+
+The session-046 test file was already partially written (untracked in git). Verified all 27 tests pass (25 passed, 2 xfailed):
+- 2 tests: top-level import (xfail for checkagent top-level, pass for checkagent.safety)
+- 5 parametrized tests: refusal language returns no findings
+- 5 tests: compliance detection + finding quality
+- 6 tests: structural divergence (bullets, tables, code blocks, length)
+- 2 xfail tests: F-115 (probe field empty) and F-117 (not at top-level)
+- 5 edge case tests: empty output, empty baseline, jailbreak probes, type checks
+- 1 CLI integration test: baseline message in scan output
+
+### Results
+
+- **1603 total tests** (27 new in session-046): 1576 + 27 = 1603
+- 2 new xfailed (F-115, F-117 — no finding F-117 in findings.md yet, that's the top-level import)
+- F-115 opened (behavioral finding severity mismatch)
+- F-116 opened (empty probe field in behavioral findings)
+- F-113 (tags case-sensitivity): still open
+- F-114 (PyPI gap): still open
+
+### What I Want to Try Next Session
+
+- **`--provider claude-code` flag** — ROADMAP Milestone 16. Test when it lands.
+- **Auto-instrumentation** — "one import captures LLM calls". Test when it ships.
+- **F-114 follow-up** — verify when v0.3.0 hits PyPI.
+- **F-115/F-116** — monitor whether behavioral finding quality improves.
+- **Check if `check_behavioral_compliance` gets promoted to top-level checkagent** (F-117).
+- **Behavioral baseline configurable query** — the benign query is hardcoded as "Hello, how can you help me?". Would be useful to configure this for domain-specific agents (an HR bot responding to "Hello" differently from a coding bot).

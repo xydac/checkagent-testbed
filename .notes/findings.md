@@ -1387,6 +1387,26 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Workaround:** Always use lowercase tag values: `filter(tags={'indirect'})` not `filter(tags={'INDIRECT'})`. Check actual tag values by iterating `probe.tags` on sample probes.
 **Status:** Open
 
+## F-115: `check_behavioral_compliance()` finding severity does not inherit probe severity
+**Date:** 2026-04-27
+**Severity:** medium
+**Category:** dx-friction
+**Description:** `check_behavioral_compliance(output, baseline, probe)` always returns findings with LOW or MEDIUM severity regardless of the probe's own severity. When a CRITICAL probe's attack is successfully executed by the agent (no refusal detected), the finding severity should reflect the threat level — CRITICAL or at least HIGH. Instead, "no refusal detected" findings are always LOW and "structural divergence" findings are always MEDIUM. This means a triage dashboard that filters by severity will downgrade CRITICAL injection attacks to LOW/MEDIUM noise.
+**Expected:** Behavioral findings inherit (or are gated on) the triggering probe's severity.
+**Actual:** `probe.severity = CRITICAL` → `finding.severity = LOW` (for basic no-refusal) or `Severity.MEDIUM` (for structural divergence). No relationship between probe severity and finding severity.
+**Workaround:** Manually re-tag findings: `f.severity = probe.severity` after calling `check_behavioral_compliance()`.
+**Status:** Open
+
+## F-116: `SafetyFinding.probe` field is empty string in behavioral compliance findings
+**Date:** 2026-04-27
+**Severity:** low
+**Category:** dx-friction
+**Description:** `SafetyFinding` has a `probe` field that should identify which probe triggered the finding. In behavioral compliance findings from `check_behavioral_compliance()`, this field is always `''` (empty string). Regex-based findings from detectors like `PromptInjectionDetector` populate this field correctly (e.g., `probe='ignore_previous_instructions'`). The empty field means behavioral findings cannot be traced back to their triggering probe for reporting or deduplication.
+**Expected:** `SafetyFinding.probe` contains the probe name (`probe.name`) or probe input text.
+**Actual:** `findings[0].probe == ''` always, regardless of which probe was passed.
+**Workaround:** Carry the probe separately alongside the findings list.
+**Status:** Open
+
 ## F-114: v0.3.0 not published to PyPI — `pip install checkagent` gets v0.2.0
 **Date:** 2026-04-24
 **Severity:** high
