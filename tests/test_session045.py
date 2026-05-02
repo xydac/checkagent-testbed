@@ -215,6 +215,7 @@ class TestF113TagsCaseSensitivityStillOpen:
     and will need updating when/if F-113 is fixed.
     """
 
+    @pytest.mark.xfail(strict=False, reason="F-113 FIXED in v0.3.x: tags are now case-insensitive")
     def test_tags_are_case_sensitive(self):
         from checkagent.safety import probes_injection
         ps = probes_injection.all_probes
@@ -233,6 +234,7 @@ class TestF113TagsCaseSensitivityStillOpen:
         assert len(lower) == len(upper)
         assert len(lower) > 0
 
+    @pytest.mark.xfail(strict=False, reason="F-113 FIXED in v0.3.x: tags are now case-insensitive")
     def test_inconsistency_is_surprising(self):
         """Document the asymmetry: severity is case-insensitive but tags is not."""
         from checkagent.safety import probes_injection

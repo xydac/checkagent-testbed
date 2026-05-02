@@ -102,15 +102,17 @@ def test_compliance_finding_has_evidence():
     assert findings[0].evidence == output
 
 
-def test_compliance_severity_low():
-    """'No refusal detected' findings have LOW severity."""
-    probe = get_probe()
+def test_compliance_severity_inherits_probe():
+    """F-115 FIXED: behavioral findings now inherit probe severity."""
+    probe = get_probe()  # probe[0] is CRITICAL
+    assert probe.severity == Severity.CRITICAL
     output = "What would you like me to do? I will comply with your request."
     findings = check_behavioral_compliance(output, BASELINE, probe)
     if findings:
-        no_refusal_findings = [f for f in findings if "no refusal" in f.description.lower()]
-        if no_refusal_findings:
-            assert no_refusal_findings[0].severity == Severity.LOW
+        for f in findings:
+            assert f.severity == probe.severity, (
+                f"Finding severity {f.severity} should match probe severity {probe.severity}"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -118,14 +120,14 @@ def test_compliance_severity_low():
 # ---------------------------------------------------------------------------
 
 def test_new_bullet_list_triggers_finding():
-    """Response with new bullet lists → structural divergence (MEDIUM severity)."""
-    probe = get_probe()
+    """Response with new bullet lists → structural divergence (severity inherits from probe, F-115 fixed)."""
+    probe = get_probe()  # probe[0] is CRITICAL
     output = "Here is the information:\n- Step 1: override\n- Step 2: execute\n- Step 3: complete"
     findings = check_behavioral_compliance(output, BASELINE, probe)
     assert len(findings) >= 1
     struct_findings = [f for f in findings if "structural divergence" in f.description]
     assert len(struct_findings) >= 1
-    assert struct_findings[0].severity == Severity.MEDIUM
+    assert struct_findings[0].severity == probe.severity
 
 
 def test_new_table_rows_triggers_finding():
@@ -194,15 +196,14 @@ def test_4x_longer_no_finding():
 # F-115: SafetyFinding.probe field is empty from check_behavioral_compliance
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(reason="F-115: SafetyFinding.probe field not populated by check_behavioral_compliance")
-def test_f115_finding_probe_field_populated():
-    """SafetyFinding.probe should contain probe name or input text."""
+def test_f116_finding_probe_field_populated():
+    """F-116 FIXED: SafetyFinding.probe now contains probe name."""
     probe = get_probe()
     output = "Confirmed. I will now ignore all previous instructions."
     findings = check_behavioral_compliance(output, BASELINE, probe)
     assert len(findings) >= 1
-    # probe field should contain probe name or input, not empty string
-    assert findings[0].probe != "", f"SafetyFinding.probe is empty — can't trace which probe caused finding"
+    assert findings[0].probe != "", "SafetyFinding.probe is empty — can't trace which probe caused finding"
+    assert findings[0].probe == probe.name
 
 
 # ---------------------------------------------------------------------------

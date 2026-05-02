@@ -4,6 +4,65 @@ What I tried each cycle, what happened, what surprised me.
 
 ---
 
+## Session-048 (2026-05-02)
+
+### Upgrade and CI Status
+
+Upgraded to **v0.3.0** from git main — and confirmed this is now also the PyPI version. `pip index versions checkagent` shows `0.3.0` as latest. **F-114 is fixed.** After 8 sessions of a PyPI gap (first-time users were stuck on 0.2.0 with all the session-033-043 fixes out of reach), v0.3.0 finally landed.
+
+Upstream CI: **green**. 9 consecutive successes now. Latest commit: "Fix false negatives on RAG-style refusal and data-scope patterns".
+
+### F-114 Verified Fixed
+
+`pip install checkagent` now returns 0.3.0. The PyPI release CI job ran on 2026-05-02 and confirmed the upload. All fixes from sessions 033-043 — `wrap()` auto-detection (F-112), GroundednessEvaluator uncertainty mode (F-099), `iter_turn_findings()` (F-101), `generate_test_cases` deprecation warning (F-103), etc. — are now available to first-time users.
+
+### New Commit: RAG-Style Analyze-Prompt Patterns
+
+The latest commit adds patterns to `analyze-prompt` that were found missing when testing against a real RAG QA agent ("haiku.rag"). Two new check detections:
+
+**refusal_behavior**: `'say: I cannot find enough information'` — soft refusal language common in RAG system prompts. Previously missed because it doesn't use the typical "decline/refuse/cannot help" phrasing.
+
+**data_scope**: 
+- `'do not use external knowledge'` — explicit retrieval boundary
+- `'base answers strictly on retrieved content'` — common in document-QA agents
+
+I tested all three patterns plus a false-positive guard (generic "you are a helpful assistant" should NOT trigger refusal_behavior). All pass correctly.
+
+This is the second time an actual external agent test led to a pattern fix (first was the real-world enterprise prompts in session-047). Good validation loop.
+
+### Open Findings Check
+
+- **F-117** (check_behavioral_compliance not at top-level): still open. `from checkagent import check_behavioral_compliance` → ImportError.
+- **F-118** (score_delta is -0.0): still open. The xfail test confirms it.
+
+No new findings this session.
+
+### Test Coverage (session-048)
+
+27 tests in `test_session048.py` (25 passed + 2 xfailed):
+- 2: F-118 (xfail + type check)
+- 2: F-107 fix (GroundednessEvaluator top-level + functional)
+- 2: ConversationSafetyScanner top-level + functional
+- 3: PromptCheck top-level + fields + severity values
+- 7: scan JSON structure (summary fields, finding fields, top-level keys)
+- 3: terminal arrow output
+- 1: F-117 xfail
+- 2: F-114 fix (PyPI version checks)
+- 5: RAG analyze-prompt patterns (3 positive + 1 false-positive guard + 1 combined)
+
+**Total: 1646 tests (1628 passed + 18 xfailed)**
+
+### What I Want to Try Next Session
+
+- **`--provider claude-code` flag** — ROADMAP Milestone 16. Not landed yet.
+- **Auto-instrumentation** — "one import captures LLM calls". Not landed yet.
+- **F-117** — check if `check_behavioral_compliance` gets promoted to top-level.
+- **F-118** — check if `score_delta: -0.0` is fixed.
+- **Real agent: haiku.rag** — the commit message mentions testing against a real RAG agent. Try building one in the testbed and testing end-to-end with CheckAgent.
+- **`checkagent history --url`** — test history tracking for HTTP endpoints.
+
+---
+
 ## Session 9 — 2026-04-05 (cost tracking: CostTracker, CostBreakdown, BudgetExceededError)
 
 **Upgraded from:** 8e6a0a8 → e38593a
@@ -2504,3 +2563,92 @@ The session-046 test file was already partially written (untracked in git). Veri
 - **F-115/F-116** — monitor whether behavioral finding quality improves.
 - **Check if `check_behavioral_compliance` gets promoted to top-level checkagent** (F-117).
 - **Behavioral baseline configurable query** — the benign query is hardcoded as "Hello, how can you help me?". Would be useful to configure this for domain-specific agents (an HR bot responding to "Hello" differently from a coding bot).
+
+---
+
+## Session 047 — 2026-04-30
+
+### What I Updated
+
+**Checkagent version:** 0.3.0 (git main, same version tag). New commits since last session:
+- "Expand analyze-prompt patterns to reduce false negatives on real-world prompts" (latest, 2026-04-30)
+- "Fix F-115/F-116/F-113 and add JSON history delta and gitignore protection" (2026-04-29)
+- "Add scan history persistence and delta tracking" (2026-04-28)
+
+**Upstream CI:** Green — 3 consecutive successes (8 total). Very stable.
+
+### Findings Fixed This Session
+
+**F-113 FIXED** (tags filter case-insensitivity): `filter(tags={'INDIRECT'})` now returns same 10 probes as `filter(tags={'indirect'})`. Fully consistent with severity/category filter behavior.
+
+**F-115 FIXED** (behavioral finding severity): `check_behavioral_compliance()` findings now inherit probe severity. No-refusal findings use `probe.severity` directly; structural divergence findings use `max(probe.severity, MEDIUM)`. A CRITICAL injection probe that succeeds now produces a CRITICAL finding.
+
+**F-116 FIXED** (empty probe field): `SafetyFinding.probe` is now populated from `probe.name` in behavioral compliance findings. Deduplication and attribution now work correctly.
+
+**F-108 FIXED** (silent — part of analyze-prompt expansion): `PromptAnalyzer` now detects `'You are AcmeBot'` (proper noun without article) as `role_clarity`. Also `'I am Aria'`, `'I am TechSupport Bot'`. This was already tracked in the scores table but was fixed as a side effect of the pattern expansion commit.
+
+**F-114 still open** — PyPI still has 0.2.0 as latest. `pip install checkagent` misses all 0.3.0 fixes.
+
+### Test Breakage
+
+Three session-040 tests failed due to F-108 being fixed. The tests expected 7/8 checks to pass (with F-108 still broken) but now get 8/8. Updated all three tests to reflect the fix:
+- `test_strong_prompt_passes_most_checks`: `== 7` → `== 8`  
+- `test_role_clarity_requires_article_before_role_noun`: Assertion flipped (now confirms fix)
+- `test_role_clarity_workaround_using_role_keyword`: Evidence check updated (workaround still passes, via `'You are AcmeBot'` pattern)
+
+### New Feature: Scan History
+
+The "Add scan history persistence and delta tracking" commit adds:
+
+1. **Auto-save**: Every `checkagent scan` run saves to `.checkagent/history/<hash>/`. No opt-in needed.
+2. **Delta in JSON**: `--json` output now includes a `history` key: `{"previous_date": "2026-04-30", "previous_score": 0.0286, "current_score": 0.0286, "score_delta": -0.0}`. First run has no `history` key; second run onwards always has it.
+3. **Terminal delta line**: The scan output shows `→ no change from last scan (was 3% on 2026-04-30)`. Would show `↑ +5%` or `↓ -3%` if the score changed.
+4. **`checkagent history <target>` CLI**: Shows a Rich table of past scans with Date, Time, Score, Passed, Failed, Total, Time(s). `--limit N` works. Unknown targets get a friendly "No scan history found" message with exit code 0.
+
+**New finding F-118**: `score_delta` shows `-0.0` (negative zero) for equal scores in JSON. Minor aesthetic issue — `delta == 0.0` checks still work correctly in Python, but the JSON representation is slightly surprising.
+
+### New Feature: .gitignore Protection
+
+`checkagent init` now creates or updates `.gitignore` to include `.checkagent/`. Verified:
+- Creates `.gitignore` if it doesn't exist
+- Appends `.checkagent/` to existing `.gitignore` (preserves existing content)
+- Idempotent: second `init` does not add a second `.checkagent/` line
+
+Also added `.checkagent/` to the testbed's `.gitignore` manually (testbed was already initialized before this feature existed).
+
+### Expanded analyze-prompt Patterns
+
+The latest commit ("Expand analyze-prompt patterns to reduce false negatives") adds:
+- `'politely decline'` (bare, no trailing noun) → `refusal_behavior` ✓
+- `'Never share other employees'/customers' salary/records'` → `data_scope` ✓  
+- `'You are HRBot'` (proper name without article) → `role_clarity` ✓ (same as F-108 fix)
+- `'I am <Name>'` → `role_clarity` ✓
+- `'tell the user you cannot'` → `refusal_behavior` ✓
+
+These are all patterns found in real-world enterprise agent system prompts. Good coverage improvement.
+
+### Test Coverage (session-047)
+
+32 new tests in `test_session047.py` (31 passed, 1 xfailed):
+- 4 tests: F-113 fix (ProbeSet tags case-insensitivity across injection/jailbreak probes)
+- 2 tests: F-115 fix (severity inheritance for CRITICAL and HIGH probes)
+- 2 tests: F-116 fix (probe field populated, deduplication use case)
+- 5 tests: F-108 fix (proper noun detection, evidence field, I am <Name>, article form)
+- 5 tests: scan history JSON (key present, fields, types, terminal arrow, dir created)
+- 4 tests: history CLI (table, --limit, missing target, --help)
+- 3 tests: .gitignore protection (new project, existing file, idempotency)
+- 6 tests: expanded analyze-prompt patterns (politely decline, salary, HRBot, I am Name, tell user cannot, false-positive guard)
+- 1 xfail: F-117 (check_behavioral_compliance still not at top-level checkagent)
+
+**Total: 1619 tests (1603 passed + 16 xfailed)**
+
+### What I Want to Try Next Session
+
+- **`--provider claude-code` flag** — ROADMAP Milestone 16. Check if it has landed.
+- **Auto-instrumentation** — "one import captures LLM calls". Check if it shipped.
+- **F-114** — verify when v0.3.0 hits PyPI.
+- **F-117** — check if `check_behavioral_compliance` gets promoted to top-level.
+- **F-118** — check if `score_delta: -0.0` is fixed.
+- **Scan history with improved scores** — test the `↑` and `↓` arrows by scanning a hardened agent vs an echo agent.
+- **`checkagent history --url`** — test history tracking for HTTP endpoints.
+- **Behavioral baseline configurable query** — still hardcoded. Monitor whether it becomes configurable.

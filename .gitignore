@@ -14,5 +14,5 @@ venv/
 # QA agent private notes
 .notes/
 
-# QA agent private notes
-.notes/
+# checkagent scan history (local, not for commit)
+.checkagent/

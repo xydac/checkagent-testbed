@@ -165,6 +165,7 @@ class TestProbeSetSeverityFilterCaseInsensitive:
         lower = all_probes.filter(severity="high")
         assert len(title) == len(lower)
 
+    @pytest.mark.xfail(strict=False, reason="F-113 FIXED in v0.3.x: tags are now case-insensitive")
     def test_tags_filter_still_case_sensitive_dx_trap(self):
         """Tags filter is still case-sensitive — INDIRECT returns 0, indirect returns 10.
         This is a DX trap because severity filter is now case-insensitive but tags aren't.

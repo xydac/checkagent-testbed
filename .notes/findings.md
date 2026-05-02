@@ -1385,7 +1385,7 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** Either: (a) `filter(tags=...)` normalizes to lowercase for comparison (consistent with severity), or (b) documentation explicitly states that tags are case-sensitive and severity is not.
 **Actual:** `filter(tags={'indirect'})` → 10 probes. `filter(tags={'INDIRECT'})` → 0 probes. `filter(tags={'Indirect'})` → 0 probes. No error or warning.
 **Workaround:** Always use lowercase tag values: `filter(tags={'indirect'})` not `filter(tags={'INDIRECT'})`. Check actual tag values by iterating `probe.tags` on sample probes.
-**Status:** Open
+**Status:** Fixed in "Fix F-115/F-116/F-113 and add JSON history delta and gitignore protection" (2026-04-29). `filter(tags=...)` now normalizes tags to lowercase before matching, consistent with severity/category filters.
 
 ## F-115: `check_behavioral_compliance()` finding severity does not inherit probe severity
 **Date:** 2026-04-27
@@ -1395,7 +1395,7 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** Behavioral findings inherit (or are gated on) the triggering probe's severity.
 **Actual:** `probe.severity = CRITICAL` → `finding.severity = LOW` (for basic no-refusal) or `Severity.MEDIUM` (for structural divergence). No relationship between probe severity and finding severity.
 **Workaround:** Manually re-tag findings: `f.severity = probe.severity` after calling `check_behavioral_compliance()`.
-**Status:** Open
+**Status:** Fixed in "Fix F-115/F-116/F-113 and add JSON history delta and gitignore protection" (2026-04-29). No-refusal findings now use `probe.severity` directly; structural divergence findings use `max(probe.severity, MEDIUM)` as a floor.
 
 ## F-116: `SafetyFinding.probe` field is empty string in behavioral compliance findings
 **Date:** 2026-04-27
@@ -1405,7 +1405,7 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** `SafetyFinding.probe` contains the probe name (`probe.name`) or probe input text.
 **Actual:** `findings[0].probe == ''` always, regardless of which probe was passed.
 **Workaround:** Carry the probe separately alongside the findings list.
-**Status:** Open
+**Status:** Fixed in "Fix F-115/F-116/F-113 and add JSON history delta and gitignore protection" (2026-04-29). `SafetyFinding.probe` is now populated from `probe.name` instead of being left empty.
 
 ## F-114: v0.3.0 not published to PyPI — `pip install checkagent` gets v0.2.0
 **Date:** 2026-04-24
@@ -1415,4 +1415,24 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** Phase 5 ROADMAP explicitly lists "PyPI v0.3.0 published with all current fixes" as a milestone item. A first-time user following the README's `pip install checkagent` would miss all 0.3.0 fixes.
 **Actual:** `pip install checkagent` → 0.2.0. `pip install checkagent @ git+...` → 0.3.0. The gap includes: wrap() auto-detection (F-112), ToolBoundary top-level export, GroundednessEvaluator uncertainty mode fix (F-099), iter_turn_findings() helper (F-101), generate_test_cases deprecation warning (F-103), PromptAnalysisResult new properties.
 **Workaround:** Install from git: `pip install "checkagent @ git+https://github.com/xydac/checkagent.git@main"`. Not discoverable from the README.
+**Status:** Fixed in v0.3.0 (2026-05-02). PyPI CI run "v0.3.0" confirmed — `pip install checkagent` and `pip index versions checkagent` both show 0.3.0 as latest. All fixes from sessions 033-043 now available to first-time users.
+
+## F-117: `check_behavioral_compliance` not at top-level `checkagent`
+**Date:** 2026-05-01
+**Severity:** low
+**Category:** dx-friction
+**Description:** `check_behavioral_compliance()` is the primary function for testing whether an agent complied with an adversarial probe. It lives in `checkagent.safety` but is not exported from the top-level `checkagent` namespace. This is the 14th instance of the missing-top-level-export pattern — all other behavioral safety components (`PromptInjectionDetector`, `SafetyFinding`, `SafetyEvaluator`, `GroundednessEvaluator`, etc.) are at top-level.
+**Expected:** `from checkagent import check_behavioral_compliance` works.
+**Actual:** `ImportError: cannot import name 'check_behavioral_compliance' from 'checkagent'`. Must use `from checkagent.safety import check_behavioral_compliance`.
+**Workaround:** `from checkagent.safety import check_behavioral_compliance`.
+**Status:** Open
+
+## F-118: `score_delta` shows `-0.0` (negative zero) for equal scores in JSON history
+**Date:** 2026-04-30
+**Severity:** low
+**Category:** dx-friction
+**Description:** When `current_score == previous_score`, the `history.score_delta` field in the `--json` output is `-0.0` instead of `0.0`. In Python, `-0.0 == 0.0` is `True`, but the JSON representation `{"score_delta": -0.0}` displays as `-0.0` which is surprising to users parsing the output. Downstream code that checks `delta > 0` or `delta < 0` will work correctly, but code that checks `delta == 0` or uses string formatting will see the minus sign.
+**Expected:** `score_delta` is `0.0` (positive zero) when scores are equal.
+**Actual:** `score_delta` is `-0.0` — e.g. `{"previous_score": 0.0286, "current_score": 0.0286, "score_delta": -0.0}`.
+**Workaround:** Use `abs(delta) < 0.0001` to test for "no change" rather than `delta == 0`.
 **Status:** Open

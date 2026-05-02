@@ -291,7 +291,7 @@ class TestPromptFile:
         assert strong_score > basic_score
 
     def test_strong_prompt_passes_most_checks(self, strong_prompt_file):
-        """A well-crafted prompt passes 7/8 checks — role_clarity false negative (F-108)."""
+        """A well-crafted prompt passes all 8 checks — F-108 fixed in session-047."""
         result = run_cli(
             "scan", "agents.echo_agent:echo_agent",
             "--category", "injection",
@@ -299,33 +299,27 @@ class TestPromptFile:
             "--json",
         )
         pa = json.loads(result.stdout)["prompt_analysis"]
-        # 7/8: role_clarity check requires 'you are a/an/the <word>' pattern —
-        # 'You are AcmeBot' (proper noun, no article) does NOT match (F-108)
-        assert pa["passed_count"] == 7
+        # F-108 FIXED: 'You are AcmeBot' now matches role_clarity via proper-noun pattern
+        assert pa["passed_count"] == 8
 
-    def test_role_clarity_requires_article_before_role_noun(self):
-        """F-108: role_clarity check misses 'You are AcmeBot' — proper noun needs article."""
+    def test_role_clarity_detects_proper_noun_agent_name(self):
+        """F-108 FIXED: role_clarity now matches 'You are AcmeBot' (proper noun, no article)."""
         from checkagent import PromptAnalyzer
         pa = PromptAnalyzer()
-        # With article: passes — 'you are a/an/the <word>' pattern matches
         result_with_article = pa.analyze("You are a helpful assistant.")
-        # Without article (proper noun alone): FAILS — must add 'your role is...' to pass
-        result_proper_noun_only = pa.analyze("You are AcmeBot.")
+        result_proper_noun = pa.analyze("You are AcmeBot.")
         rc_with = next(cr for cr in result_with_article.check_results if cr.check.id == "role_clarity")
-        rc_without = next(cr for cr in result_proper_noun_only.check_results if cr.check.id == "role_clarity")
-        assert rc_with.passed is True, "Should detect 'You are a helpful assistant'"
-        # BUG (F-108): 'You are AcmeBot' (proper noun, no article) does not match
-        assert rc_without.passed is False, "F-108 may be fixed — update this test"
+        rc_proper = next(cr for cr in result_proper_noun.check_results if cr.check.id == "role_clarity")
+        assert rc_with.passed is True
+        assert rc_proper.passed is True, "F-108 FIXED: proper noun agent names now detected"
 
-    def test_role_clarity_workaround_using_role_keyword(self):
-        """Workaround for F-108: add 'Your role is...' to pass role_clarity check."""
+    def test_role_clarity_workaround_still_works(self):
+        """'Your role is...' phrasing continues to pass role_clarity after F-108 fix."""
         from checkagent import PromptAnalyzer
         pa = PromptAnalyzer()
-        # Workaround: use 'your role is' which matches a different pattern
         result = pa.analyze("You are AcmeBot. Your role is to help AcmeCorp customers.")
         rc = next(cr for cr in result.check_results if cr.check.id == "role_clarity")
-        assert rc.passed is True  # passes via 'your role is' pattern
-        assert "role is" in rc.evidence
+        assert rc.passed is True
 
     def test_prompt_analysis_api_direct(self, basic_prompt_file):
         """PromptAnalyzer API works directly (not just via CLI)."""

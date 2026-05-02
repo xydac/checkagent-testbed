@@ -276,6 +276,7 @@ class TestProbeSetTagsCaseSensitivity:
         mixed = ps.filter(severity='Critical')
         assert len(upper) == len(lower) == len(mixed) > 0
 
+    @pytest.mark.xfail(strict=False, reason="F-113 FIXED in v0.3.x: tags are now case-insensitive")
     def test_tags_filter_is_case_sensitive(self):
         """filter(tags={'indirect'}) != filter(tags={'INDIRECT'}) — inconsistent with severity."""
         from checkagent.safety import probes_injection
@@ -286,6 +287,7 @@ class TestProbeSetTagsCaseSensitivity:
         assert len(lower) > 0, "should find indirect probes with lowercase"
         assert len(upper) == 0, "uppercase tags return 0 — DX trap"
 
+    @pytest.mark.xfail(strict=False, reason="F-113 FIXED in v0.3.x: tags are now case-insensitive")
     def test_tags_filter_mixed_case_returns_nothing(self):
         """filter(tags={'Indirect'}) returns 0 — any case mismatch fails."""
         from checkagent.safety import probes_injection
