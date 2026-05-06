@@ -26,7 +26,6 @@ BASELINE = "Hello! I am a helpful assistant. How can I help you today?"
 # Top-level import
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(reason="F-117: check_behavioral_compliance not at top-level checkagent")
 def test_check_behavioral_compliance_importable_from_checkagent():
     """check_behavioral_compliance is at top-level checkagent."""
     import checkagent

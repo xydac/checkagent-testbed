@@ -56,7 +56,6 @@ def scan_json(*extra_args):
 # F-118 FIXED: score_delta is 0.0 (not -0.0) for equal scores
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(reason="F-118: score_delta is -0.0 instead of 0.0 when scores are equal")
 def test_f118_score_delta_not_negative_zero():
     """F-118 open: score_delta should be 0.0 (not -0.0) when scan produces equal scores."""
     scan_json()  # seed history
@@ -275,7 +274,6 @@ def test_scan_terminal_arrow_includes_percentage():
 # F-117 still open: check_behavioral_compliance not at top-level
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(reason="F-117: check_behavioral_compliance not at top-level checkagent")
 def test_f117_check_behavioral_compliance_at_top_level():
     """F-117: check_behavioral_compliance should be importable from checkagent."""
     from checkagent import check_behavioral_compliance

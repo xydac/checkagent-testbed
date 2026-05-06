@@ -399,7 +399,6 @@ def test_analyze_prompt_false_positive_guard():
     _ = rc.passed  # just check it doesn't crash
 
 
-@pytest.mark.xfail(reason="F-117: check_behavioral_compliance not at top-level checkagent")
 def test_f117_check_behavioral_compliance_at_top_level():
     """check_behavioral_compliance should be importable from checkagent directly."""
     import checkagent

@@ -63,6 +63,72 @@ No new findings this session.
 
 ---
 
+## Session-049 (2026-05-06)
+
+### Upgrade and CI Status
+
+Upgraded to v0.3.0 from git main. Version unchanged from session-048 — the PyPI and git versions are in sync.
+
+Upstream CI: **green**. 10 consecutive successes now. Latest two commits: "Add one-click test file generation to browser playground" and "Add LLM semantic analysis to browser playground". Both are browser-only features — no new CLI surface.
+
+### F-117 Fixed: check_behavioral_compliance at Top Level
+
+`from checkagent import check_behavioral_compliance` now works. This was finding #117 and the 14th instance of the missing-top-level-export pattern. Fixed in the same commit as F-118. All behavioral safety components now accessible from top-level.
+
+### F-118 Fixed: score_delta No Longer -0.0
+
+The `score_delta` field in `--json` history output is now `0.0` (positive zero) when scores are equal. Confirmed via `math.copysign(1, delta) < 0` check. The commit message explicitly calls this out: "Fix score_delta -0.0 and mark --generate-tests HTTP as complete."
+
+### New Feature: --badge SVG Generation
+
+The `--badge FILE` flag generates a shields.io-style SVG badge. Key behaviors confirmed:
+- **Color-coded by score**: green (`#4c1`) for high-scoring agents, red (`#e05d44`) for low-scoring ones
+- **Label format**: "N/M safe" (e.g. "19/101 safe" for echo agent, different count per category)
+- **Terminal confirmation**: "Badge written → /path/to/file" printed to stdout
+- **Combined flags**: `--badge --json` works — badge written, JSON still on stdout
+- The booking agent (100% on injection category) correctly gets green; echo agent gets red
+
+### Browser Playground (Documentation/Browser Only)
+
+Two new upstream commits added browser-based features:
+1. **LLM semantic analysis** — a JavaScript port of `analyze-prompt` checks for zero-install web-based analysis
+2. **One-click test generation** — downloads a `test_safety.py` file from a browser scan
+
+Neither has CLI surface. `checkagent --help` correctly does not list "playground". These are documentation/DX features, not testable from the CLI.
+
+### Open Findings After This Session
+
+- **F-119** (new): `checkagent history --url` flag doesn't exist — URL must be passed as positional TARGET
+- **F-089** (still open): `--generate-tests` still embeds `_resolve_callable` (private function) in generated test files
+
+### Test Coverage (session-049)
+
+26 tests in `test_session049.py` (25 passed + 1 xfailed):
+- 4: F-117 fix (top-level import, returns list, detects compliance, refusal produces no findings)
+- 2: F-118 fix (not negative zero, is float)
+- 4: --generate-tests (`-g FILE` API, valid Python, pytest markers, target name)
+- 3: F-089 (evaluate_output public, _resolve_callable still private, generated tests reference it)
+- 2: history (help flags, URL as positional target)
+- 1: history xfail (F-119: --url flag rejected)
+- 1: playground not in CLI
+- 1: core modules regression check
+- 8: --badge (file created, valid SVG, CheckAgent label, red for low score, green for high score, terminal message, combined with --json, "safe" in SVG)
+
+**Total: 1664 tests (1649 passed + 15 xfailed)**
+
+One xfail from session-046 became a pass (likely the check_behavioral_compliance top-level xfail resolving), dropping xfail count from 16 to 15.
+
+### What I Want to Try Next Session
+
+- **--provider claude-code** — ROADMAP Milestone 16+ item. Not landed yet.
+- **Auto-instrumentation** — "one import captures LLM calls". Not landed yet.
+- **F-089** — track if `_resolve_callable` gets exposed publicly (making generated tests stable)
+- **F-119** — track if `history --url` flag gets added for consistency with `scan --url`
+- **Real RAG agent** — build a minimal RAG agent in the testbed and run a full scan against it
+- **Badge in CI** — try piping `--badge` output into a Git commit or CI artifact
+
+---
+
 ## Session 9 — 2026-04-05 (cost tracking: CostTracker, CostBreakdown, BudgetExceededError)
 
 **Upgraded from:** 8e6a0a8 → e38593a

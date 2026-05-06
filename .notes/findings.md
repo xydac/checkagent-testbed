@@ -1425,7 +1425,7 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** `from checkagent import check_behavioral_compliance` works.
 **Actual:** `ImportError: cannot import name 'check_behavioral_compliance' from 'checkagent'`. Must use `from checkagent.safety import check_behavioral_compliance`.
 **Workaround:** `from checkagent.safety import check_behavioral_compliance`.
-**Status:** Open
+**Status:** Fixed in "Fix score_delta -0.0 and mark --generate-tests HTTP as complete" (2026-05-06). `from checkagent import check_behavioral_compliance` now works. Confirmed in session-049.
 
 ## F-118: `score_delta` shows `-0.0` (negative zero) for equal scores in JSON history
 **Date:** 2026-04-30
@@ -1435,4 +1435,14 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** `score_delta` is `0.0` (positive zero) when scores are equal.
 **Actual:** `score_delta` is `-0.0` — e.g. `{"previous_score": 0.0286, "current_score": 0.0286, "score_delta": -0.0}`.
 **Workaround:** Use `abs(delta) < 0.0001` to test for "no change" rather than `delta == 0`.
+**Status:** Fixed in "Fix score_delta -0.0 and mark --generate-tests HTTP as complete" (2026-05-06). `score_delta` is now `0.0` (not `-0.0`) for equal scores. Confirmed via `math.copysign` test in session-049.
+
+## F-119: `checkagent history --url` flag does not exist
+**Date:** 2026-05-06
+**Severity:** low
+**Category:** docs-mismatch
+**Description:** The `checkagent history` help text and upstream examples imply that `--url` can be used to filter history for an HTTP endpoint (e.g. `checkagent history --url http://...`). In practice, there is no `--url` flag on the `history` command — using it returns "Error: No such option: --url". The URL must be passed as a positional TARGET argument instead.
+**Expected:** `checkagent history --url http://localhost:8000/chat` works (matches scan's `--url` style).
+**Actual:** "No such option: --url". Use `checkagent history http://localhost:8000/chat` instead.
+**Workaround:** Pass the URL as a positional argument: `checkagent history http://localhost:8000/chat`.
 **Status:** Open
