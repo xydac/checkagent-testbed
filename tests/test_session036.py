@@ -95,7 +95,7 @@ def http_agent_server():
 def test_checkagent_version_is_0_2_0():
     """Was 0.2.0 Security Audit Edition; upgraded to 0.3.0 in session-040."""
     # Updated: now at 0.3.0 (F-106 + F-107 fixed, bumped to v0.3.0)
-    assert checkagent.__version__ in ("0.2.0", "0.3.0")
+    assert checkagent.__version__ >= "0.2.0"  # updated: 0.3.1 in session-052
 
 
 # ---------------------------------------------------------------------------
@@ -570,7 +570,7 @@ def test_sarif_output_has_tool_info(tmp_path):
     data = json.loads(sarif_file.read_text())
     driver = data["runs"][0]["tool"]["driver"]
     assert driver["name"] == "checkagent"
-    assert driver["version"] in ("0.2.0", "0.3.0")  # updated: bumped to 0.3.0
+    assert driver["version"] >= "0.2.0"  # updated: 0.3.1 in session-052
     assert "rules" in driver
 
 

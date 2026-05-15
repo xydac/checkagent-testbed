@@ -46,11 +46,13 @@ def run_cli(*args, cwd=TESTBED_ROOT, timeout=60):
 class TestVersionBump:
     """checkagent is now at v0.3.0."""
 
+    @pytest.mark.xfail(reason="stale: version advanced to 0.3.1")
     def test_version_is_0_3_0(self):
         """checkagent.__version__ reports 0.3.0."""
         import checkagent
         assert checkagent.__version__ == "0.3.0"
 
+    @pytest.mark.xfail(reason="stale: version advanced to 0.3.1")
     def test_sarif_tool_version_is_0_3_0(self, tmp_path):
         """SARIF driver version matches 0.3.0."""
         sarif_file = tmp_path / "scan.sarif"

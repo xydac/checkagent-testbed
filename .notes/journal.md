@@ -4,6 +4,81 @@ What I tried each cycle, what happened, what surprised me.
 
 ---
 
+## Session-053 (2026-05-15)
+
+### Upgrade and CI Status
+
+Upgraded to **v0.3.1** from git main — still the same version as last session. PyPI remains at 0.3.0 (F-123 still open). Upstream CI: **green**. All 3 latest runs pass. Latest commit: "Fix F-122 and F-121: literal() in MockLLM.add_rule() and has_refusal() gaps". 14 consecutive green runs.
+
+### Test Suite: 9 xpassed
+
+Running the full suite (`pytest tests/ -v`) returned **1719 passed, 21 xfailed, 9 xpassed** in ~6 minutes. The 9 xpassed tests are from sessions 051 and 052 that tested F-121 and F-122 gaps — all of which are now fixed. No regressions.
+
+### F-121 FULLY FIXED
+
+All 3 remaining `has_refusal()` gaps from session-052 are now resolved:
+- `"I am unable to process this request."` → True ✓
+- `"I will not do that."` → True ✓
+- `"That is not something I will help with."` → True ✓
+
+All 8+ prior patterns still work. No false positives on normal responses. F-121 is closed.
+
+### F-122 FIXED: literal() in MockLLM
+
+`literal()` is now accepted by both `MockLLM.add_rule()` and `MockLLM.on_input().respond()`. When a list is passed to `literal()` in a MockLLM context, it's JSON-serialized (since `complete()` returns str). This is documented in the commit message. Import paths: `checkagent`, `checkagent.mock`, `checkagent.mock.tool` — NOT from `checkagent.mock.fault` or `checkagent.mock.llm`.
+
+### F-001 FIXED: MockLLM fluent API
+
+The biggest discovery this session: `MockLLM.on_input()` now exists with a full fluent API. The commit that fixed F-122 also exposed `on_input(contains/pattern/exact).respond()` and `.stream()`. This resolves the 10-session-old F-001 finding where the README promised a fluent API that didn't exist.
+
+Tested thoroughly:
+- `on_input(contains='book').respond('I will book')` — substring match ✓
+- `on_input(pattern=r'\d+').respond('I see a number')` — regex match ✓
+- `on_input(exact='help me').respond('How can I help?')` — exact match ✓
+- `on_input(contains='story').stream(['chunk1', ' chunk2'])` — streaming ✓
+- Multiple rules compose correctly; unmatched falls back to default ✓
+- `respond(list)` cycles; `respond(literal('x'))` is constant ✓
+
+The only thing still missing from the original README promise: `respond(tool_call(...))`. The README showed tool_call responses, but only str/list/literal are supported. This is a minor gap — the core API is now there.
+
+### F-120 Still Open: Tracer Stub
+
+Auto-instrumentation tracer (`checkagent.core.tracer`) still returns stubs. API has been renamed slightly: `install_patches()`/`uninstall_patches()` (was `install()`/`uninstall()`). But `begin_probe_trace()` still returns `None` and `end_probe_trace()` still returns `[]`. Milestone 17 not yet landed.
+
+### No --provider claude-code Flag
+
+`checkagent scan --help` has no `--provider` option. Milestone 17 item still pending.
+
+### F-030 Still Open: QualityGateEntry
+
+`QualityGateEntry` is still missing from `checkagent.ci` and `checkagent.ci.__all__`. Workaround: `from checkagent.ci.quality_gate import QualityGateEntry`. The model only has `min/max/on_fail` fields — `metric` is passed as the first arg to `evaluate_gate(metric, value, gate)`.
+
+### Test Coverage (session-053)
+
+28 tests in `test_session053.py` (27 passed + 1 xfailed):
+- 2 tests: version + CI green
+- 1 test: F-123 PyPI gap documented (installed 0.3.1 from git)
+- 5 tests: F-121 has_refusal() fully fixed
+- 4 tests: F-122 literal() in MockLLM
+- 5 tests: F-001 on_input().respond() fluent API
+- 2 tests: on_input().stream()
+- 4 tests: literal() import paths (1 xfail: not importable from mock.fault)
+- 3 tests: F-120 tracer still stub
+- 2 tests: F-030 QualityGateEntry still missing from ci namespace
+
+**Total: approximately 1747 tests (1719 from prior + 28 new)**
+
+### What I Want to Try Next Session
+
+- **F-123** — watch if v0.3.1 gets published to PyPI.
+- **F-120** — watch for Milestone 17 landing (auto-instrumentation, --provider claude-code).
+- **F-030** — watch if QualityGateEntry gets added to checkagent.ci.__all__.
+- **MockLLM.on_input().respond(tool_call(...))** — check if tool_call response support is added to complete the README promise.
+- **literal() in mock.fault/mock.llm** — minor DX issue, watch if import paths get normalized.
+- **Any new Milestone 17 features** — the roadmap mentions `--provider claude-code` for scanning Claude Code tools directly.
+
+---
+
 ## Session-048 (2026-05-02)
 
 ### Upgrade and CI Status
@@ -2718,3 +2793,205 @@ These are all patterns found in real-world enterprise agent system prompts. Good
 - **Scan history with improved scores** — test the `↑` and `↓` arrows by scanning a hardened agent vs an echo agent.
 - **`checkagent history --url`** — test history tracking for HTTP endpoints.
 - **Behavioral baseline configurable query** — still hardcoded. Monitor whether it becomes configurable.
+
+---
+
+## Session-050 — 2026-05-11
+
+### Upgrade and CI
+
+Updated to latest git main (still version 0.3.0 — no new PyPI release). Upstream CI is green for all 3 latest runs (11+ consecutive successes):
+- "Add interactive TUI to checkagent scan with drill-down finding navigation"
+- "Show intercepted LLM trace events inline with scan findings"
+- "Fix scan false positives on refusals and add no-refusal signal for adversarial probes"
+
+All three commits pass on all 12 CI jobs (Linux/Mac/Windows × Python 3.10–3.13).
+
+### Test Suite
+
+**1674 passed, 15 xfailed** (same count as session-049 initially — 1 xpassed from F-119 fix in session-049). Fixed the stale xfail: `test_f119_history_url_flag_not_implemented` converted to `test_f119_history_url_flag_now_works`.
+
+### F-119 Fixed
+
+`checkagent history --url http://...` now works. Tested end-to-end: scan HTTP endpoint → view history with `--url` → see score in table. The fix must have come in alongside the TUI commit.
+
+### New Features Tested This Session
+
+**1. `has_refusal()` and `check_no_refusal()`** — new in the refusal-fix commit.
+
+`has_refusal(text)` returns `True` if the text contains a refusal pattern. Works for "I cannot", "I am unable", "I must refuse", "I'm sorry I can't". Returns `False` for "I refuse to follow", "I refuse.", "I decline", "That violates my guidelines" — **F-121** opened.
+
+`check_no_refusal(output, probe)` returns `[SafetyFinding(severity=LOW)]` when no refusal detected, `[]` when refusal detected. Clean API. The severity=LOW "no refusal signal" is useful for CI gates on adversarial robustness.
+
+**2. Refusal-aware scan (false positive fix)**
+
+Agents that return "I cannot help" score 1.0 on injection scans — confirmed. The pattern-match evaluators are correctly skipped when `has_refusal()` is True.
+
+However, agents that use "I refuse to follow this instruction: {probe}" still score 0.0 because `has_refusal("I refuse to follow...")` returns `False` — the fix helps but the vocabulary gap in has_refusal() limits its usefulness. Documented as **F-121** and wrote an xfail test to track it.
+
+**3. `--interactive / -i` TUI flag**
+
+Confirmed in `checkagent scan --help`. The flag exits cleanly in non-TTY contexts (CI-safe). Can't test the actual interactive mode in automated tests. The help text describes it well: "navigate findings, Enter to expand, q to quit."
+
+**4. Auto-instrumentation skeleton (`checkagent.core.tracer`)**
+
+The tracer module ships! All lifecycle methods work without error (`install_patches()`, `begin_probe_trace()`, `end_probe_trace()`, `uninstall_patches()`). But `end_probe_trace()` always returns `[]` — patches are stubs awaiting Milestone 17. Documented as **F-120**.
+
+**5. `ca_` fixture aliases**
+
+All 6 confirmed: `ca_mock_llm`, `ca_mock_tool`, `ca_conversation`, `ca_fault`, `ca_safety`, `ca_stream_collector`. Consistent with `ap_` aliases. Good DX improvement for shorter test code.
+
+### Summary
+
+**New findings: F-120, F-121** (total: 130)
+**Findings fixed this session: F-119** (history --url)
+
+### Test Coverage (session-050)
+
+29 tests in `test_session050.py` (26 passed + 3 xfailed):
+- 5 tests: F-119 fixed (history --url flag, no-history message, positional equiv)
+- 2 tests: history --url end-to-end (scan + view)
+- 7 tests: ca_ fixture aliases (all 6 fixtures + functional llm test)
+- 4 tests: tracer module (import, API, lifecycle, events list)
+- 1 xfail: F-120 (tracer not capturing real OpenAI calls)
+- 3 tests: has_refusal() correct/compliant detection
+- 1 xfail: F-121 (has_refusal() missing phrases including "I refuse")
+- 3 tests: check_no_refusal() API (finding returned, empty on refusal, signature)
+- 2 tests: refusal-aware scan (no false positive on refusal, clean refusal only)
+- 1 xfail: F-121 (verbose refusal agent still flagged via has_refusal gap)
+- 2 tests: --interactive flag (in help, clean exit non-TTY)
+- 1 test: upstream CI green
+
+**Total: 1703 tests (1688 passed + 15 xfailed)**
+
+### What I Want to Try Next Session
+
+- **`--provider claude-code`** — ROADMAP Milestone 16. Still not seen in the CLI.
+- **F-121** — check if has_refusal() gets more vocabulary (decline, violates, I refuse).
+- **F-120** — check if Milestone 17 auto-instrumentation patches real LLM calls.
+- **Behavioral baseline configurable query** — still hardcoded. Monitor.
+- **LLM trace events inline with scan** — requires a real LLM-calling agent. Try with a mock that uses OpenAI SDK structure to see if patches capture it.
+- **`--interactive` on a real terminal** — test manually if possible.
+
+## Session-051 — 2026-05-13
+
+### Upgrade and CI
+
+Updated to v0.3.1 (latest git main, also on PyPI). Upstream CI is green for all 3 latest runs:
+- "Bump version to 0.3.1" — passes all 12 CI jobs
+- "Fix F-121: expand has_refusal() patterns and suppress event loop tear…"
+- "Add interactive TUI to checkagent scan with drill-down finding navigation"
+
+12+ consecutive CI successes. Very stable.
+
+### F-121 PARTIALLY FIXED: has_refusal() expanded patterns
+
+The F-121 fix in v0.3.1 is real but partial. Now working:
+- "I refuse to follow this instruction." → True ✓
+- "I decline to assist." → True ✓
+- "That request violates my guidelines." → True ✓
+- "I won't do that as it goes against my values." → True ✓
+- "I must decline." → True ✓
+- "This goes against my policies." → True ✓
+
+Still failing:
+- "I am unable to process this request." → False ✗ (but "I am unable to help." works — specific object phrases still missed)
+- "I won't help." (bare) → False ✗
+- "I will not do that." → False ✗
+
+The improvement covers the most natural refusal phrasings so the practical impact is good. But edge cases remain. Downgraded severity to medium.
+
+### New feature: literal() function
+
+v0.3.1 adds `literal()` to prevent list cycling in MockTool responses. Without it, `response=["a", "b"]` cycles through elements on successive calls. With `response=literal(["a", "b"])`, every call returns the full list. This is genuinely useful for tools that return collections (search results, etc.).
+
+One issue: the docstring says "MockTool/MockLLM" but `MockLLM.add_rule()` raises Pydantic ValidationError when you pass `literal(...)`. The `_LiteralResponse` type isn't in the `ResponseRule` union — new finding **F-122**.
+
+### Tracer API change: begin_probe_trace() now takes 0 args
+
+`begin_probe_trace()` no longer takes a probe name argument (previously the API was undocumented; the signature just changed). Session-050 tests already used the 0-arg form so no breakage. The new `is_installed()` helper is a nice addition. F-120 (stubs returning []) still open — Milestone 17 not landed.
+
+### Stale version tests
+
+Four tests hardcoded to expect "0.3.0" were failing after the 0.3.1 upgrade. Fixed three by adding `@pytest.mark.xfail(reason="stale: version advanced to 0.3.1")` and updated one to use `>= "0.3.0"` instead of `== "0.3.0"`. The version-at-a-point-in-time tests are inherently fragile — this is a known limitation of the testbed approach.
+
+### Test Coverage (session-051)
+
+28 tests in `test_session051.py` (23 passed + 5 xfailed):
+- 2 tests: version + upstream CI green
+- 10 tests: F-121 partial fix (8 fixed patterns + 3 xfail remaining gaps)
+- 4 tests: literal() function (import, MockTool cycling prevention, dict support)
+- 1 xfail: F-122 (literal() fails with MockLLM.add_rule())
+- 5 tests: tracer API (0-arg begin, is_installed, double install, lifecycle, return type)
+- 1 xfail: F-120 (tracer stub returning [])
+- 2 tests: StepStats field names + to_dict() keys
+- 2 tests: check_no_refusal() with refusal and compliant responses
+
+**Total: 1731 tests (estimated ~1716 passed + ~15 xfailed)**
+
+### What I Want to Try Next Session
+
+- **F-122** — watch if MockLLM gets literal() support in a future version.
+- **F-120** — watch for Milestone 17 landing (auto-instrumentation patches).
+- **`--provider claude-code`** — ROADMAP Milestone 16 not yet in CLI.
+- **has_refusal() remaining gaps** — "I am unable to process", "I won't help", "I will not do that".
+- **literal() with MockLLM via direct response setter** — explore if there's another way to pass list responses.
+- **v0.3.1 on PyPI** — confirm `pip install checkagent` gets 0.3.1 (not just git main).
+
+## Session-052 (2026-05-14)
+
+### Upgrade and CI Status
+
+Upgraded to v0.3.1 from git main (latest commit: "Mark Milestone 13 items complete: end-to-end validation done, asyncio fix in v0.3.x"). This is a documentation-only commit — no new code, just ROADMAP updates. Upstream CI: all 3 latest runs green, all 12 platform jobs passing. 12+ consecutive green.
+
+### Version situation
+
+Installed version is 0.3.1 (git main). PyPI still has 0.3.0 as latest. New finding **F-123**: users who `pip install checkagent` get 0.3.0 and miss the F-121 has_refusal improvements and `literal()` function from 0.3.1.
+
+### Stale test fixes
+
+Two tests in test_session036.py expected version to be in ("0.2.0", "0.3.0") — updated to `>= "0.2.0"` so they don't fail on every version bump.
+
+### has_refusal() gap analysis
+
+F-121 was partially fixed in v0.3.1. Confirmed that these now work: "I refuse", "I decline", "violates my guidelines", "I won't do that", "I won't help with that", "I refuse to comply", "I cannot and will not". Still failing (3 remaining gaps):
+- "I am unable to process this request." → False (note: "I am unable to assist" works — inconsistent)
+- "I will not do that." → False
+- "That is not something I will help with." → False
+
+### GateResult: new return type
+
+`evaluate_gate()` now returns a `GateResult` object (not a `GateVerdict` enum). The new `GateResult` has: `metric`, `verdict`, `actual`, `threshold`, `direction`, `message`. This is a richer type — callers can now see exactly what threshold was checked and what the actual value was. The `QualityGateReport.blocked_gates`, `warned_gates`, and `passed_gates` lists all contain `GateResult` objects (not strings). This is a breaking change for anyone doing `report.blocked_gates[0].upper()` type things, but a useful improvement.
+
+`QualityGateEntry` remains importable from `checkagent.ci.quality_gate` and from top-level `checkagent`, but NOT from `checkagent.ci` directly — F-030 pattern.
+
+### F-122 still open
+
+`literal()` still raises Pydantic ValidationError with `MockLLM.add_rule()`. Confirmed `literal()` works correctly with `MockTool.register()` — the docstring claim about MockLLM support is still wrong.
+
+### Milestone 13
+
+Purely a ROADMAP documentation commit. Milestone 17 items still pending: `--provider claude-code` flag and auto-instrumentation (F-120). F-120 confirmed still returning `[]` from `end_probe_trace()`.
+
+### Test Coverage (session-052)
+
+20 tests in `test_session052.py` (15 passed + 5 xfailed):
+- 2 tests: version + CI green
+- 1 xfail: F-123 (v0.3.1 not on PyPI)
+- 4 tests: has_refusal() fixed patterns (8 phrases verified)
+- 3 xfail: F-121 remaining gaps
+- 7 tests: GateResult class and QualityGateReport changes
+- 2 tests: literal() (1 pass for MockTool, 1 xfail for MockLLM F-122)
+- 1 test: Milestone 13 docs-only + F-120 tracer stub
+
+**Total: 1751 tests (estimated ~1731 passed + ~20 xfailed)**
+
+### What I Want to Try Next Session
+
+- **F-123** — watch if v0.3.1 gets published to PyPI.
+- **F-121** — watch for remaining has_refusal() gaps fix.
+- **F-122** — watch if MockLLM gets literal() support.
+- **F-120** — watch for Milestone 17 landing (auto-instrumentation).
+- **`--provider claude-code`** — Milestone 17 item, not yet in CLI.
+- **QualityGateEntry missing from checkagent.ci** — test if F-030 ever gets fully resolved (ci.__all__).
+- **explore docs site** — check if mkdocs site has GateResult documented yet.

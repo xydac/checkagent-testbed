@@ -21,11 +21,11 @@ Format:
 **Date:** 2026-04-05
 **Severity:** high
 **Category:** docs-mismatch
-**Description:** README shows `ap_mock_llm.on_input(contains="book").respond(tool_call(...))` but MockLLM only has `add_rule()` returning strings.
+**Description:** README shows `ap_mock_llm.on_input(contains="book").respond(tool_call(...))` but MockLLM only had `add_rule()` returning strings.
 **Expected:** Fluent builder API as documented
 **Actual:** Only `add_rule(pattern, response, match_mode)` exists
 **Workaround:** Use `add_rule()` directly
-**Status:** Open
+**Status:** Fixed in session-053 — `MockLLM.on_input(contains/pattern/exact).respond()` and `.stream()` now implemented. `tool_call()` responses still not supported (only str/list/literal), but the core fluent API is complete and working.
 
 ## F-002: assert_tool_called not importable from checkagent
 **Date:** 2026-04-05
@@ -1445,4 +1445,46 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** `checkagent history --url http://localhost:8000/chat` works (matches scan's `--url` style).
 **Actual:** "No such option: --url". Use `checkagent history http://localhost:8000/chat` instead.
 **Workaround:** Pass the URL as a positional argument: `checkagent history http://localhost:8000/chat`.
+**Status:** Fixed in "Add interactive TUI to checkagent scan with drill-down finding navigation" commit (2026-05-10). `checkagent history --url http://...` now works. Confirmed in session-050.
+
+## F-120: Auto-instrumentation (`checkagent.core.tracer`) does not capture real LLM calls
+**Date:** 2026-05-11
+**Severity:** medium
+**Category:** missing-feature
+**Description:** The `checkagent.core.tracer` module exposes `install_patches()`, `begin_probe_trace()`, `end_probe_trace()`, and `uninstall_patches()`. The module is importable and the lifecycle API works (install → begin → end → uninstall), but `end_probe_trace()` always returns an empty list regardless of actual LLM calls made. The scan display says "Show intercepted LLM trace events inline with scan findings" but this feature requires OpenAI/Anthropic SDK calls; the echo and other test agents don't use those SDKs so nothing is captured.
+**Expected:** After `install_patches()`, calling an OpenAI client should produce trace events in `end_probe_trace()`.
+**Actual:** `end_probe_trace()` returns `[]` even after real LLM SDK calls (Milestone 17 not yet landed — patches are stubs).
+**Workaround:** None — feature is a planned Milestone 17 item.
+**Status:** Open (ROADMAP Milestone 17 pending)
+
+## F-121: `has_refusal()` misses common refusal phrases — causes false positives in refusal-aware scan
+**Date:** 2026-05-11
+**Severity:** high
+**Category:** bug
+**Description:** The `has_refusal()` function is used by the scan to skip false positives when an agent refuses a probe. However, it only detects a narrow set of phrases ("I cannot", "I am unable", "I must refuse", "I'm sorry I can't", "As an AI I am not able"). Many natural refusal phrasings are missed: "I refuse to follow", "I refuse.", "I decline to assist", "That request violates my guidelines", "I won't do that as it goes against my values". As a result, an agent that says "I refuse to follow this instruction: {probe}" will still be flagged with false positives for every probe — the refusal-aware scan fix doesn't help when has_refusal() itself fails.
+**Expected:** `has_refusal("I refuse to follow this instruction.")` → `True`; `has_refusal("I decline to assist.")` → `True`.
+**Actual:** Both return `False`. The verbose refusal agent (echoing the probe in its refusal) scores 0.0 instead of 1.0.
+**Workaround:** Use "I cannot help with that" instead of "I refuse to follow this" in your agent's refusal messages.
+**Status:** Fully fixed in session-053 (commit "Fix F-122 and F-121: literal() in MockLLM.add_rule() and has_refusal() gaps"). All 3 remaining gaps resolved: "I am unable to process this request.", "I will not do that.", "That is not something I will help with." all now return True. All 8+ refusal patterns verified passing. Severity: closed.
+
+---
+
+## F-122: `literal()` is documented for "MockTool/MockLLM" but fails with `MockLLM.add_rule()`
+**Date:** 2026-05-13
+**Severity:** medium
+**Category:** docs-mismatch
+**Description:** The `literal()` function was added in v0.3.1 to prevent list cycling in mock responses. Its docstring says "Wrap a value to prevent sequence cycling in MockTool/MockLLM." However, passing `literal([...])` to `MockLLM.add_rule(response=...)` raises a Pydantic ValidationError: `response.str: Input should be a valid string` and `response.list[str]: Input should be a valid list`. The `_LiteralResponse` type is not recognized by the `ResponseRule` Pydantic model, so `MockLLM` rejects it at registration time. Only `MockTool.register()` accepts `literal()` correctly.
+**Expected:** `llm.add_rule("query", response=literal(["ans1", "ans2"]))` works and always returns the list as-is on every call.
+**Actual:** Raises `pydantic_core.ValidationError` — `_LiteralResponse` is not a valid type for `ResponseRule.response`.
+**Workaround:** Use a plain string response for `MockLLM.add_rule()` — `literal()` is only useful with `MockTool.register()`.
+**Status:** Fixed in session-053 (commit "Fix F-122 and F-121"). `MockLLM.add_rule()` and `MockLLM.on_input().respond()` both now accept `literal()`. List literals are JSON-serialized in LLM responses since `complete()` returns str. `literal` importable from `checkagent`, `checkagent.mock`, and `checkagent.mock.tool` — NOT from `checkagent.mock.fault` or `checkagent.mock.llm`.
+
+## F-123: v0.3.1 not published to PyPI
+**Date:** 2026-05-14
+**Severity:** medium
+**Category:** missing-feature
+**Description:** `checkagent` v0.3.1 is available on git main and contains important fixes (F-121 has_refusal improvements, literal() function), but `pip index versions checkagent` shows 0.3.0 as the latest PyPI release. Users who do `pip install checkagent` (without `@git+...`) get 0.3.0 and miss all v0.3.1 improvements. This is the third time a version has been tagged on git but not immediately published to PyPI.
+**Expected:** `pip install checkagent` installs 0.3.1 (current git main).
+**Actual:** `pip install checkagent` installs 0.3.0. Latest on PyPI is 0.3.0.
+**Workaround:** `pip install "checkagent @ git+https://github.com/xydac/checkagent.git@main"` installs current git main.
 **Status:** Open

@@ -10,7 +10,7 @@ Rate each feature on:
 | pytest plugin auto-load | 5 | 5 | No conftest needed | 2026-04-05 |
 | @pytest.mark.agent_test | 5 | 4 | Works, but layer values not discoverable | 2026-04-05 |
 | GenericAdapter / @wrap | 4 | 3 | Works for simple agents, falls apart with tools | 2026-04-05 |
-| ap_mock_llm | 3 | 2 | Works but no fluent API as documented | 2026-04-05 |
+| ap_mock_llm | 5 | 5 | F-001 FIXED: on_input(contains/pattern/exact).respond() and .stream() now work; literal() works in add_rule() and on_input().respond() (F-122 fixed) | 2026-05-15 |
 | ap_mock_tool | 4 | 4 | Schema validation + assertions nice | 2026-04-05 |
 | ap_fault fluent API | 5 | 4 | Complete fluent builder (all fault types), inspection API, async variant; naming inconsistency on returns_empty/returns_malformed (F-007) | 2026-04-05 |
 | ap_fault mock integration | 5 | 4 | F-004 FIXED: attach_faults() wires FaultInjector into MockTool/MockLLM; ap_fault fixture added; second attach silently overwrites (F-079); was_triggered DX trap (F-078) | 2026-04-06 |
@@ -294,3 +294,21 @@ Rate each feature on:
 | upstream CI (session-048) | 5 | 5 | Green — 9 consecutive successes. Latest: "Fix false negatives on RAG-style refusal and data-scope patterns". Stable. | 2026-05-02 |
 | --badge SVG generation | 5 | 5 | New in session-049: shields.io-style SVG badge; color-coded by score (green #4c1 high, red #e05d44 low); "N/M safe" label; "Badge written → FILE" terminal confirmation; works combined with --json | 2026-05-06 |
 | upstream CI (session-049) | 5 | 5 | Green — 10 consecutive successes. Latest: "Add one-click test file generation to browser playground". All platforms passing. | 2026-05-06 |
+| history --url flag | 5 | 5 | F-119 FIXED (session-050): `checkagent history --url http://...` now works. HTTP scan history end-to-end confirmed. | 2026-05-11 |
+| has_refusal() / check_no_refusal() | 3 | 3 | New in session-050: check_no_refusal() clean API, LOW severity signal. has_refusal() misses 'I refuse', 'decline', 'violates my guidelines' (F-121) — limits usefulness of refusal-aware scan. | 2026-05-11 |
+| Refusal-aware scan (false positive fix) | 4 | 3 | Correctly eliminates false positives for agents that refuse probes using "cannot/unable/must refuse" phrases. Fails for agents that say "I refuse to follow" or "I decline" — F-121 limits coverage. | 2026-05-11 |
+| --interactive TUI flag | 4 | 4 | New in session-050: -i/--interactive flag for checkagent scan; documented in --help; exits cleanly when no TTY (CI-safe). Interactive mode itself can't be tested non-interactively. | 2026-05-11 |
+| checkagent.core.tracer (auto-instrumentation) | 2 | 2 | Skeleton API exists (install/begin/end/uninstall); all lifecycle methods work without error; end_probe_trace() always returns [] — patches are stubs (F-120). Milestone 17 pending. | 2026-05-11 |
+| ca_ fixture aliases | 5 | 5 | New in session-050: ca_mock_llm, ca_mock_tool, ca_conversation, ca_fault, ca_safety, ca_stream_collector all work as expected; consistent with ap_ aliases but shorter. | 2026-05-11 |
+| upstream CI (session-050) | 5 | 5 | Green — all 3 latest runs success including new TUI and refusal-fix commits. 11+ consecutive successes. | 2026-05-11 |
+| has_refusal() (session-051) | 4 | 4 | F-121 PARTIALLY FIXED in v0.3.1: 'I refuse', 'I decline', 'violates my guidelines', "I won't do that", 'must decline', 'policies' all now detected. Remaining gaps: 'I am unable to process', "I won't help" bare, 'I will not do that'. | 2026-05-13 |
+| literal() MockTool response | 4 | 3 | New in v0.3.1: prevents list cycling in MockTool.register(). Works correctly. Docstring misleads — says MockTool/MockLLM but MockLLM.add_rule() raises ValidationError (F-122). | 2026-05-13 |
+| upstream CI (session-051) | 5 | 5 | Green — latest 'Bump version to 0.3.1' and 'Fix F-121' both pass all platforms. 12+ consecutive successes. | 2026-05-13 |
+| upstream CI (session-052) | 5 | 5 | Green — "Mark Milestone 13 items complete" passes all 12 platforms. 13+ consecutive successes. | 2026-05-14 |
+| has_refusal() (session-052) | 4 | 4 | F-121 3 remaining gaps confirmed: 'I am unable to process', 'I will not do that', 'That is not something I will help with'. Also "I won't help" now works (fixed in v0.3.1). | 2026-05-14 |
+| GateResult class (evaluate_gate return type) | 5 | 4 | New: evaluate_gate() returns GateResult with metric/verdict/actual/threshold/direction/message. Richer than old GateVerdict. QualityGateReport lists now contain GateResult objects. | 2026-05-14 |
+| v0.3.1 PyPI release | 1 | 1 | F-123: v0.3.1 not published to PyPI. PyPI latest is still 0.3.0. Users miss has_refusal + literal() fixes. | 2026-05-14 |
+| has_refusal() (session-053) | 5 | 4 | F-121 FULLY FIXED: all 3 remaining gaps resolved — 'I am unable to process', 'I will not do that', 'That is not something I will help with' all return True. 8+ phrases confirmed working. | 2026-05-15 |
+| literal() in MockLLM (session-053) | 5 | 4 | F-122 FIXED: literal() now accepted by MockLLM.add_rule() AND on_input().respond(). List values JSON-serialized in LLM context. Importable from checkagent/checkagent.mock/checkagent.mock.tool. | 2026-05-15 |
+| MockLLM.on_input().respond() fluent API (session-053) | 5 | 5 | F-001 FIXED: on_input(contains/pattern/exact).respond(str/list/literal) and .stream(chunks) all work. Multiple rules compose cleanly. Unmatched falls back to default. | 2026-05-15 |
+| auto-instrumentation tracer (session-053) | 2 | 2 | F-120 still open: install_patches()/uninstall_patches() work; begin_probe_trace() returns None; end_probe_trace() returns []. Stubs only. Milestone 17 still pending. | 2026-05-15 |

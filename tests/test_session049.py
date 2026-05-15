@@ -214,16 +214,13 @@ def test_history_url_flag_in_help():
     assert "--dir" in result.stdout
 
 
-@pytest.mark.xfail(reason="F-119: history --url in examples but doesn't exist as a flag")
-def test_f119_history_url_flag_not_implemented():
-    """F-119 OPEN: --url shown in history examples but rejected as unknown option.
-    URL must be passed as positional TARGET, not --url flag."""
+def test_f119_history_url_flag_now_works():
+    """F-119 FIXED: history --url flag now works (was rejected as unknown option)."""
     result = subprocess.run(
         ["checkagent", "history", "--url", "http://localhost:9999/nonexistent"],
         capture_output=True, text=True, cwd="/home/x/working/checkagent-testbed",
     )
-    # This fails: "No such option: --url" -- the examples in help are wrong
-    assert result.returncode == 0, f"--url flag rejected: {result.stderr}"
+    assert result.returncode == 0, f"--url flag should be accepted now: {result.stderr}"
 
 
 def test_history_url_as_positional_target():
@@ -264,7 +261,7 @@ def test_all_key_modules_still_importable():
         PromptCheck,
         ToolBoundary,
     )
-    assert checkagent.__version__ == "0.3.0"
+    assert checkagent.__version__ >= "0.3.0"
 
 
 # ---------------------------------------------------------------------------

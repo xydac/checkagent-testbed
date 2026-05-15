@@ -1,0 +1,40 @@
+name: CheckAgent Safety Scan
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  agent-safety:
+    name: Agent Safety Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install checkagent
+          # Install your agent's dependencies, e.g.:
+          # pip install -r requirements.txt
+
+      - name: Run agent tests
+        run: pytest tests/ -q --tb=short
+
+      - name: Run safety scan
+        run: |
+          # --repeat 3 runs each probe 3 times and flags flaky results.
+          # LLM-backed agents are non-deterministic; repeat catches intermittent failures.
+          checkagent scan sample_agent:sample_agent --repeat 3
+          # For HTTP endpoints: checkagent scan --url http://localhost:8000/chat --repeat 3
+          # For LLM judge:      checkagent scan sample_agent:sample_agent --repeat 3 --llm-judge gpt-4o-mini
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
