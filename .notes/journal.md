@@ -2995,3 +2995,60 @@ Purely a ROADMAP documentation commit. Milestone 17 items still pending: `--prov
 - **`--provider claude-code`** — Milestone 17 item, not yet in CLI.
 - **QualityGateEntry missing from checkagent.ci** — test if F-030 ever gets fully resolved (ci.__all__).
 - **explore docs site** — check if mkdocs site has GateResult documented yet.
+
+---
+
+## Session-054 — 2026-05-17
+
+### Upgrade
+
+Upgraded to git main (0.3.1). PyPI still at 0.3.0 (F-123 still open). Installed via `--break-system-packages`.
+
+### CI State
+
+- Latest run (25997299878): **GREEN** — "Show real findings in README scan example"
+- Previous run (25967978967): **RED** — `test_openai_async_real_client_traced` tried `import openai` with no install guard; fixed in the following commit
+- Pattern: 1-run red streak, quickly resolved. CI remains healthy overall.
+
+### 2 XPASSes from session-050
+
+`test_has_refusal_missing_phrases` and `test_scan_refusal_includes_probe_text` both xpassed in the full test run. These were marked xfail for F-121, which was fully fixed in session-051/053. The xfail markers are stale — `strict=False` so they don't block. Documented in session-054 tests.
+
+### Main Focus: `ca_tracer` fixture and F-120
+
+The upstream commit "Add ca_tracer fixture, fix Anthropic tool_use tracing, close F-120" landed since session-053. Key findings:
+
+**What works (new):**
+- `ca_tracer` pytest fixture: installs patches on entry, removes on exit, auto-cleanup if end() not called
+- `TracerContext` class: clean API with `.begin()`, `.end()`, `.events`, `.llm_calls`, `.tool_calls`
+- `is_installed()` function correctly tracks patch state
+- All 5 tracer functions at top-level `checkagent` except `is_installed()` (F-124)
+- Double `install_patches()` / `uninstall_patches()` both idempotent
+- `begin_probe_trace()` / `end_probe_trace()` safe to call without `install_patches()` first
+
+**What doesn't work (F-120 still open):**
+- `end_probe_trace()` still returns `[]` even when Anthropic SDK is imported and a client is instantiated with the patches active. No events captured without real HTTP API calls making contact. The "close F-120" claim is aspirational — the fixture scaffolding is there but actual event capture requires real LLM SDK calls that succeed.
+
+**Minor DX finding (F-124):**
+- `is_installed()` is not exported from top-level `checkagent` — the only tracer function missing. All 4 others (`install_patches`, `uninstall_patches`, `begin_probe_trace`, `end_probe_trace`) are there plus `TracerContext`. Minor inconsistency.
+
+### Test Coverage (session-054)
+
+18 tests in `test_session054.py` (16 passed + 2 xfailed):
+- 3 tests: version + CI state
+- 2 tests: top-level tracer exports (TracerContext, begin/end, install/uninstall) + is_installed gap
+- 7 tests: ca_tracer fixture lifecycle (begin/end, is_installed guard, cleanup, multi-cycle)
+- 2 tests: install/uninstall idempotency + safe-without-install
+- 1 xfail: F-120 (end_probe_trace returns [] with Anthropic SDK)
+- 2 tests: TracerContext manual usage + filter-by-type
+- 1 test: session-050 xpass documentation
+
+**Total: 1773 tests (1755 + 18 new = 1773, ~1751 passed + ~22 xfailed)**
+
+### What I Want to Try Next Session
+
+- **F-120** — watch for actual event capture (non-empty `end_probe_trace()` return)
+- **F-123** — watch if v0.3.1 gets published to PyPI  
+- **F-124** — watch if `is_installed()` gets added to top-level exports
+- **`--provider claude-code`** — Milestone 17 item, still not in CLI
+- **Real public agent integration** — try integrating a real LangChain or PydanticAI agent from GitHub into the testbed as a permanent test case

@@ -1455,7 +1455,7 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** After `install_patches()`, calling an OpenAI client should produce trace events in `end_probe_trace()`.
 **Actual:** `end_probe_trace()` returns `[]` even after real LLM SDK calls (Milestone 17 not yet landed — patches are stubs).
 **Workaround:** None — feature is a planned Milestone 17 item.
-**Status:** Open (ROADMAP Milestone 17 pending)
+**Status:** Partially addressed in session-054. Upstream commit "Add ca_tracer fixture, fix Anthropic tool_use tracing, close F-120" added: `ca_tracer` pytest fixture with `TracerContext` (begin/end/events/llm_calls/tool_calls), `is_installed()` function, and the full tracer API exported at top-level. However, `end_probe_trace()` still returns `[]` in the testbed even with Anthropic SDK installed — the patches require real API calls to capture events. Keeping open until non-empty events confirmed.
 
 ## F-121: `has_refusal()` misses common refusal phrases — causes false positives in refusal-aware scan
 **Date:** 2026-05-11
@@ -1487,4 +1487,14 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** `pip install checkagent` installs 0.3.1 (current git main).
 **Actual:** `pip install checkagent` installs 0.3.0. Latest on PyPI is 0.3.0.
 **Workaround:** `pip install "checkagent @ git+https://github.com/xydac/checkagent.git@main"` installs current git main.
+**Status:** Open
+
+## F-124: `is_installed()` not exported from top-level `checkagent`
+**Date:** 2026-05-17
+**Severity:** low
+**Category:** dx-friction
+**Description:** The `checkagent.core.tracer` module exports 5 functions: `install_patches`, `uninstall_patches`, `begin_probe_trace`, `end_probe_trace`, and `is_installed`. The first four are exported at the top-level `checkagent` namespace. `is_installed()` is the odd one out — users who want to assert whether patches are active must `from checkagent.core.tracer import is_installed` explicitly. This is inconsistent with the other 4 tracer functions.
+**Expected:** `from checkagent import is_installed` works like the other tracer functions.
+**Actual:** `hasattr(checkagent, 'is_installed')` is False; must use `checkagent.core.tracer.is_installed`.
+**Workaround:** `from checkagent.core.tracer import is_installed`
 **Status:** Open
