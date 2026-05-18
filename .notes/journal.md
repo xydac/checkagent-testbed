@@ -3052,3 +3052,47 @@ The upstream commit "Add ca_tracer fixture, fix Anthropic tool_use tracing, clos
 - **F-124** — watch if `is_installed()` gets added to top-level exports
 - **`--provider claude-code`** — Milestone 17 item, still not in CLI
 - **Real public agent integration** — try integrating a real LangChain or PydanticAI agent from GitHub into the testbed as a permanent test case
+
+---
+
+## Session 055 — 2026-05-18
+
+### Upgrade + CI State
+
+Upgraded to checkagent 0.3.1 from git main. Latest upstream CI run is green: "Add --llm flag to analyze-prompt for semantic verification of failing checks" (2026-05-18). 11+ consecutive green runs. F-123 still open — PyPI shows 0.3.0 as latest, 0.3.1 not published.
+
+### F-124 FIXED
+
+`is_installed()` is now exported from top-level `checkagent`. All 6 tracer symbols are now accessible via `from checkagent import ...`: `install_patches`, `uninstall_patches`, `begin_probe_trace`, `end_probe_trace`, `TracerContext`, `is_installed`. DX score updated to 5.
+
+### F-120 Still Open
+
+`end_probe_trace()` still returns `[]` — no events captured without real API calls. The tracer scaffolding is complete but the actual interception of LLM calls requires hitting real APIs. Milestone 17 remains incomplete in practice.
+
+### New Feature: `analyze-prompt --llm`
+
+The big new feature this session is `--llm MODEL` on `checkagent analyze-prompt`. Concept: pattern matching alone misses non-canonical security phrasing — e.g., "keep this conversation completely private" won't trigger the confidentiality check, but an LLM would recognize it as equivalent. The `--llm` flag adds a second pass using an LLM to verify checks that patterns couldn't confirm.
+
+**What works:**
+- Clear error for unrecognized model names: "Cannot detect provider from model '...'. Use a model like 'gpt-4o-mini' (OpenAI) or 'claude-haiku-4-5-20251001' (Anthropic)."
+- New JSON fields: `llm_verified_count` (int or null), `llm_model` (str or null), `llm_passed` (bool or null) per check
+- Without `--llm`: all three fields are `null`
+- With `--llm` + no API key: `llm_model` is set, `llm_verified_count` is 0, `llm_passed` is False for failing checks (null for passing ones)
+- Footer changes from "static guidelines check" to "static + LLM-assisted (model)" when `--llm` used
+- LLM only runs on checks that failed pattern matching — already-passing checks stay `llm_passed: null`
+
+**F-125 (new finding):** Silent fallback when no API key. Terminal shows "Running LLM verification (gpt-4o-mini) on 7 unconfirmed check(s)…" but then silently falls back to static analysis with no warning. `llm_verified_count: 0` in JSON is the only signal. A user trusting the progress message thinks their prompt was semantically verified. Should either error immediately ("OPENAI_API_KEY not set") or warn ("LLM verification skipped — API key not found").
+
+**Non-canonical gap documented:** Tested a prompt with "keep this conversation completely private" (confidentiality) and "only use the information they give you" (data_scope) — both missed by pattern matching. These are exactly the cases where `--llm` would help IF you have an API key. Good motivation for the feature; just needs F-125 fixed to deliver on the promise.
+
+### Tests (17 new, session-055)
+
+All 17 pass. Coverage: version/PyPI/CI checks, F-124 fixed, F-120 still open, `--llm` JSON field structure, terminal output, silent-failure behavior (F-125), invalid model error handling, non-canonical phrasing gap.
+
+### What to Try Next Session
+
+- **F-123** — watch for v0.3.1 on PyPI
+- **F-125** — watch for API key missing warning in `--llm` fallback
+- **F-120** — watch for actual tracer event capture
+- **`--llm` with real API key** — if ANTHROPIC_API_KEY becomes available, verify LLM actually improves scores on non-canonical prompts
+- **Real public agent integration** — still on backlog; no API key limits testing options

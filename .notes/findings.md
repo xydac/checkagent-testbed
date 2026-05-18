@@ -1497,4 +1497,16 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** `from checkagent import is_installed` works like the other tracer functions.
 **Actual:** `hasattr(checkagent, 'is_installed')` is False; must use `checkagent.core.tracer.is_installed`.
 **Workaround:** `from checkagent.core.tracer import is_installed`
+**Status:** Fixed in session-055. `from checkagent import is_installed` now works. All 6 tracer symbols now at top-level: `install_patches`, `uninstall_patches`, `begin_probe_trace`, `end_probe_trace`, `TracerContext`, `is_installed`.
+
+---
+
+## F-125: `analyze-prompt --llm` silently ignores missing API key — misleading progress message
+**Date:** 2026-05-18
+**Severity:** medium
+**Category:** dx-friction
+**Description:** When running `checkagent analyze-prompt --llm gpt-4o-mini "..."` without the relevant API key set (`OPENAI_API_KEY` / `ANTHROPIC_API_KEY`), the terminal prints "Running LLM verification (gpt-4o-mini) on 7 unconfirmed check(s)…" but then silently falls back to static analysis — `llm_verified_count` is 0 in the JSON output and no checks receive LLM verification. There is no warning, error, or note to the user explaining why LLM verification was skipped. A user trusting the progress message will believe their prompt has been semantically verified when it hasn't.
+**Expected:** Either: (a) error out immediately with "OPENAI_API_KEY is not set", or (b) print a warning "LLM verification skipped — API key not found" after the progress message.
+**Actual:** "Running LLM verification (gpt-4o-mini) on 7 unconfirmed check(s)…" appears, then output shows same result as static-only analysis with no indication that LLM verification was skipped. JSON shows `llm_verified_count: 0`.
+**Workaround:** Check `llm_verified_count` in `--json` output to confirm LLM actually ran.
 **Status:** Open
