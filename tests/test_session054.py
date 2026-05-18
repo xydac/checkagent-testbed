@@ -68,12 +68,13 @@ def test_tracer_context_at_top_level():
 
 def test_tracer_exports_at_top_level():
     """install_patches, uninstall_patches, TracerContext, begin_probe_trace,
-    end_probe_trace all at top-level. is_installed() is the only tracer function
-    NOT exported — minor DX gap (need to import from checkagent.core.tracer)."""
+    end_probe_trace all at top-level. F-124 FIXED in session-055: is_installed()
+    is now also at top-level."""
     from checkagent import install_patches, uninstall_patches, TracerContext
     from checkagent import begin_probe_trace, end_probe_trace
-    assert not hasattr(checkagent, "is_installed"), (
-        "is_installed() still missing from top-level checkagent (minor DX gap)"
+    # F-124 fixed: is_installed() is now at top-level too
+    assert hasattr(checkagent, "is_installed"), (
+        "is_installed() should now be at top-level checkagent (F-124 fixed)"
     )
 
 
