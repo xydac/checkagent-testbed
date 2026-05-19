@@ -3096,3 +3096,53 @@ All 17 pass. Coverage: version/PyPI/CI checks, F-124 fixed, F-120 still open, `-
 - **F-120** — watch for actual tracer event capture
 - **`--llm` with real API key** — if ANTHROPIC_API_KEY becomes available, verify LLM actually improves scores on non-canonical prompts
 - **Real public agent integration** — still on backlog; no API key limits testing options
+
+---
+
+## Session 056 — 2026-05-19
+
+### Upgrade + CI State
+
+Upgraded to checkagent 0.3.1 from git main. Latest upstream CI run is green: "Add --extra-body to scan for Dify and custom API endpoints" (2026-05-19). 12+ consecutive green runs. F-123 still open — PyPI still at 0.3.0.
+
+### Stale Test Fixed
+
+`test_analyze_prompt_llm_per_check_fields` in session-055 was failing because upstream changed the behavior of `llm_passed` when no API key is set: was `False`, now `None`. More semantically correct — LLM was never run, so it has no pass/fail result. Updated the assertion and added regression tests for the new behavior.
+
+### New Feature: `--extra-body` for HTTP Scanning
+
+The big new feature this session is `--extra-body JSON` on `checkagent scan --url`. Motivation: APIs like Dify require additional required fields in the request body (e.g., `inputs`, `user`, `response_mode`) alongside the probe input. Without a way to supply these, all probes fail with connection errors.
+
+**What works:**
+- Extra JSON fields are merged into every HTTP probe request
+- Probe input always takes precedence if there's a key conflict (e.g., `--extra-body '{"query":"override"}'` + `--input-field query` → probe input wins)
+- Invalid JSON → clear error: "Invalid value for --extra-body: Invalid JSON: ..."
+- Non-object JSON (array, null) → clear error: "must be a JSON object"
+- Help text includes Dify example with the exact required fields
+- Without `--extra-body`, Dify-style server returns 400 → scan gets all errors; with it, 0 errors
+
+**Verified by embedding a Dify-style test server** (requires `inputs` + `user` fields) in the test suite. Two modes compared directly:
+1. No `--extra-body`: 35 errors (server rejects all requests with 400)
+2. With `--extra-body '{"inputs":{},"user":"testuser","response_mode":"blocking"}'`: 0 errors, 35 findings (echo agent fails all probes — correct)
+
+**DX gap found — F-126:** When `--extra-body` is passed to a callable (non-HTTP) target, it's silently ignored — no warning, no error, no JSON `warning` field. Low severity but a DX trap for users who add `--extra-body` and switch from HTTP to callable scanning without cleaning up their flags.
+
+### F-125 FIXED
+
+The same commit that added `--extra-body` also fixed F-125 (silent LLM fallback). Now shows:
+- `Warning: LLM verification skipped — ANTHROPIC_API_KEY is not set.` (for Anthropic models)
+- `Warning: LLM verification skipped — OPENAI_API_KEY is not set.` (for OpenAI models)
+
+Both providers handled correctly. The behavior change: `llm_passed` is now `None` for failing checks when no API key is set (was `False`). Updated session-055 test + added 2 new F-125-fixed tests.
+
+### Tests (17 new, session-056)
+
+All 17 pass. Coverage: version/PyPI/CI checks, `--extra-body` valid usage (4 tests), error handling (3 tests), F-126 DX gap documentation, `--llm` behavior change (2 tests), F-125 fixed (2 tests), help text discoverability (2 tests).
+
+### What to Try Next Session
+
+- **F-123** — watch for v0.3.1 on PyPI
+- **F-120** — watch for actual tracer event capture
+- **F-126** — watch for --extra-body warning on callable targets
+- **`--llm` with real API key** — if ANTHROPIC_API_KEY becomes available, verify LLM actually improves scores on non-canonical prompts
+- **Real public agent integration** — still on backlog; no API key limits testing options

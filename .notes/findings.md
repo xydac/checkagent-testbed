@@ -1509,4 +1509,16 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** Either: (a) error out immediately with "OPENAI_API_KEY is not set", or (b) print a warning "LLM verification skipped — API key not found" after the progress message.
 **Actual:** "Running LLM verification (gpt-4o-mini) on 7 unconfirmed check(s)…" appears, then output shows same result as static-only analysis with no indication that LLM verification was skipped. JSON shows `llm_verified_count: 0`.
 **Workaround:** Check `llm_verified_count` in `--json` output to confirm LLM actually ran.
+**Status:** Fixed in session-056 (commit "Add --extra-body to scan for Dify and custom API endpoints"). Now shows: "Warning: LLM verification skipped — ANTHROPIC_API_KEY is not set." (or OPENAI_API_KEY for OpenAI models). `llm_passed` for failing checks is now `None` (not `False`) — more accurate since LLM was never run.
+
+---
+
+## F-126: `--extra-body` silently ignored on Python callable targets
+**Date:** 2026-05-19
+**Severity:** low
+**Category:** dx-friction
+**Description:** When running `checkagent scan module:function --extra-body '{"key":"val"}'`, the `--extra-body` flag is silently ignored — no warning, no error, no indication in the JSON output. The flag is only meaningful for `--url` HTTP scans. A user who accidentally passes it to a callable scan gets no feedback that the extra fields were discarded.
+**Expected:** Either: (a) warn that `--extra-body` is only valid for `--url` scans, or (b) mention it in the help text under callable scanning context.
+**Actual:** Scan runs normally, JSON output has no `warning` field mentioning the ignored `--extra-body`. User has no idea the flag was a no-op.
+**Workaround:** Only use `--extra-body` with `--url` scans. Check the help text for the Dify example.
 **Status:** Open

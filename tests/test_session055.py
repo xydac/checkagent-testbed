@@ -178,24 +178,30 @@ def test_analyze_prompt_llm_per_check_fields():
                 f"Check {check['id']} already passed pattern — llm_passed should stay null"
             )
         else:
-            # Failed pattern — LLM attempted but no key → llm_passed is false (not null)
-            assert check["llm_passed"] is False, (
-                f"Check {check['id']} failed pattern + no API key → llm_passed should be False"
+            # Failed pattern — LLM attempted but no key → llm_passed is None (not attempted)
+            # Behavior changed in session-056: was False, now None (more accurate: LLM never ran)
+            assert check["llm_passed"] is None, (
+                f"Check {check['id']} failed pattern + no API key → llm_passed should be None"
             )
 
 
 def test_analyze_prompt_llm_terminal_says_running():
-    """--llm shows 'Running LLM verification' message in terminal output."""
+    """--llm shows model-related message in terminal output.
+    Session-056 update: F-125 fixed — 'Running LLM verification' replaced by
+    'Warning: LLM verification skipped — OPENAI_API_KEY is not set.' when no key set.
+    The model name still appears in the output."""
     result = subprocess.run(
         ["checkagent", "analyze-prompt", "--llm", "gpt-4o-mini",
          "You are a helpful assistant."],
         capture_output=True, text=True
     )
     combined = result.stdout + result.stderr
-    assert "Running LLM verification" in combined, (
-        "--llm should show a progress message"
-    )
+    # Model name still appears (either in warning or footer)
     assert "gpt-4o-mini" in combined, "Model name should appear in output"
+    # Either the running message OR the skip warning should appear
+    assert ("Running LLM verification" in combined or "OPENAI_API_KEY" in combined), (
+        "--llm should show either a progress message or an API key warning"
+    )
 
 
 def test_analyze_prompt_footer_mentions_llm_model():
@@ -216,7 +222,7 @@ def test_analyze_prompt_footer_mentions_llm_model():
 # ---------------------------------------------------------------------------
 
 def test_f125_llm_silently_falls_back_no_api_key_warning():
-    """F-125: --llm silently verifies 0 checks when API key missing — no user warning."""
+    """F-125 FIXED (session-056): --llm now warns when API key missing."""
     import os
     env = os.environ.copy()
     env.pop("OPENAI_API_KEY", None)
@@ -230,17 +236,17 @@ def test_f125_llm_silently_falls_back_no_api_key_warning():
     raw = result.stdout or result.stderr
     data = json.loads(raw)
 
-    # F-125: verifies 0 checks silently — user has no idea LLM didn't run
+    # Still verifies 0 checks (no key → no LLM call)
     assert data["llm_verified_count"] == 0, "No API key → 0 LLM verifications"
 
     combined = result.stdout + result.stderr
-    # Bug: no warning about missing key — just "Running..." then falls back
+    # F-125 FIXED: warning now shown
     has_warning = any(
         phrase in combined
-        for phrase in ["API key", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "not set", "missing"]
+        for phrase in ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "not set", "skipped"]
     )
-    assert not has_warning, (
-        "F-125: currently no warning about missing API key (DX gap — expected behavior)"
+    assert has_warning, (
+        "F-125 fix: expected warning about missing API key, got none. Regression?"
     )
 
 
