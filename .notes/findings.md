@@ -1179,7 +1179,7 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** `from checkagent import evaluate_output` or `from checkagent.safety import evaluate_output`
 **Actual:** `from checkagent.cli.scan import evaluate_output` — CLI-internal private module.
 **Workaround:** Import from `checkagent.cli.scan` but accept the fragility.
-**Status:** Open
+**Status:** Fixed in session-058 (commit "Fix F-128: add evaluate_output_with_baseline"). Both `evaluate_output` and `evaluate_output_with_baseline` are now importable from top-level `checkagent`.
 
 ---
 
@@ -1521,4 +1521,40 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** Either: (a) warn that `--extra-body` is only valid for `--url` scans, or (b) mention it in the help text under callable scanning context.
 **Actual:** Scan runs normally, JSON output has no `warning` field mentioning the ignored `--extra-body`. User has no idea the flag was a no-op.
 **Workaround:** Only use `--extra-body` with `--url` scans. Check the help text for the Dify example.
+**Status:** Fixed in ae6bbef — prints "Warning: --extra-body has no effect for Python callable targets (only applies to --url scans)."
+
+---
+
+## F-127: `--extra-body` warning goes to stdout, polluting `--json` output
+**Date:** 2026-05-20
+**Severity:** low
+**Category:** dx-friction
+**Description:** The F-126 fix emits a warning when `--extra-body` is used on a callable target. However, the warning is printed to stdout (not stderr), which means `--json` output is broken for any script that does `json.loads(result.stdout)`. The JSON object starts after the warning text, so a naive parse fails with `JSONDecodeError`.
+**Expected:** Warnings and diagnostics go to stderr; JSON (when `--json` is specified) is the only content on stdout.
+**Actual:** `stdout` contains `"Warning: --extra-body has no effect for Python callable targets (only applies to --url scans).\n{...json...}"`. Any script calling `json.loads(result.stdout)` gets a JSONDecodeError. (The existing `--repeat` diagnostic had the same issue as F-098.)
+**Workaround:** Find the first `{` in stdout and parse from there: `json.loads(stdout[stdout.find('{'):])`
+**Status:** Fixed in session-058. The warning now goes to stderr; stdout is clean JSON when `--json` is active. Verified: `json.loads(result.stdout)` succeeds with `--extra-body` + `--json`.
+
+---
+
+## F-128: `--generate-tests` uses static `evaluate_output()` — misses behavioral/baseline findings
+**Date:** 2026-05-20
+**Severity:** medium
+**Category:** dx-friction
+**Description:** `checkagent scan --generate-tests` generates pytest files that call `from checkagent.cli.scan import evaluate_output`. This is a static-only check (no baseline comparison). But the scan itself uses behavioral analysis: it captures a baseline response first and detects structural divergence (`length_anomaly`, `new_code_blocks`, `new_headers`, etc.) relative to that baseline. Findings detected only via behavioral comparison are NOT caught in the generated tests. For an echo agent, the scan found ~34 failing probes but generated tests only caught ~14 — ~21 tests "pass" (false confidence) because the behavioral findings are absent.
+**Expected:** Generated regression tests reproduce the same findings the scan detected, including baseline-comparison findings.
+**Actual:** Generated tests reproduce ~40% of scan findings. ~60% of behavioral detections are silently absent. A developer running the generated tests sees "21 passed" and trusts their agent is safe, when the scan would have flagged those same probes.
+**Workaround:** Treat generated tests as a partial safety net. Run `checkagent scan` directly for authoritative results.
+**Status:** Fixed in session-058 ("Fix F-128: add evaluate_output_with_baseline"). Generated tests now: (1) use `evaluate_output_with_baseline(text, baseline_response, category=...)` for assertions, (2) capture a session-scoped `baseline_response` fixture by calling the agent once with a benign query. Behavioral findings (length_anomaly, new_code_blocks, new_table_rows) are now detected. For the echo agent: scan finds 34 failing probes, generated tests fail 35/35 — full parity achieved.
+
+---
+
+## F-129: Upstream CI failing on Windows 3.13 due to GitHub Actions Node.js 20 deprecation
+**Date:** 2026-05-23
+**Severity:** medium
+**Category:** dx-friction
+**Description:** The latest CI run ("Document scan_gates config and --comment-file flag in docs") fails on Windows 3.13 at the `actions/checkout@v4` step. The failure is a GitHub Actions infrastructure issue: `actions/checkout@v4` and `actions/setup-python@v5` use Node.js 20 which GitHub is deprecating. As of June 2nd 2026, GitHub will force Node.js 24 for all actions, which will break these workflows. All 11 other platform/Python version combinations pass (macOS, Ubuntu, Windows 3.10/3.11/3.12 all green). This is NOT a checkagent code bug — it's an actions version pin issue.
+**Expected:** All 12 CI jobs pass.
+**Actual:** Windows Python 3.13 fails at checkout before any code runs. Error: "Process completed with exit code 1" on `Run actions/checkout@v4`.
+**Workaround:** Upgrade `actions/checkout` to v5 and `actions/setup-python` to v6 in the CI workflow before June 2nd 2026.
 **Status:** Open

@@ -3146,3 +3146,171 @@ All 17 pass. Coverage: version/PyPI/CI checks, `--extra-body` valid usage (4 tes
 - **F-126** — watch for --extra-body warning on callable targets
 - **`--llm` with real API key** — if ANTHROPIC_API_KEY becomes available, verify LLM actually improves scores on non-canonical prompts
 - **Real public agent integration** — still on backlog; no API key limits testing options
+
+---
+
+## Session-057 — 2026-05-20
+
+### Upstream
+
+- Updated to checkagent git main, still 0.3.1 (no version bump)
+- New commit since session-056: "Fix --generate-tests HTTP passthrough: use scan-time input_field, extra_body, headers; warn on --extra-body without --url (F-126)"
+- CI green: all 12 platforms passing, 13+ consecutive successes
+
+### F-126 Fixed — --extra-body warning on callable targets
+
+The new commit fixed F-126. Running `checkagent scan module:func --extra-body '...'` now prints:
+```
+Warning: --extra-body has no effect for Python callable targets (only applies to --url scans).
+```
+This is good. However, discovered F-127: the warning goes to stdout (not stderr), which means when using `--json`, the warning text prefix before the JSON breaks `json.loads(result.stdout)`. Workaround: strip to first `{` before parsing. Same pattern as the old F-098 repeat diagnostic issue — warnings should go to stderr when `--json` is active.
+
+### --generate-tests HTTP Passthrough Fix
+
+The same commit fixed `--generate-tests` for HTTP scans. Previously, generated test files had no way to reproduce the scan's HTTP configuration (extra-body fields, custom input field name, custom headers). Now the generated file correctly includes:
+- `EXTRA_BODY: dict = {'inputs': {}, 'user': 'testuser'}` (from `--extra-body`)
+- `INPUT_FIELD = "query"` (from `--input-field`)
+- `OUTPUT_FIELD = 'answer'` (from `--output-field`)
+- `AUTH_HEADERS: dict = {'X-Api-Key': 'secret123'}` (from `-H`)
+
+The agent_fn fixture merges all of these: `payload = json.dumps({**EXTRA_BODY, INPUT_FIELD: probe_input})`. This is exactly what you need for a Dify-style endpoint.
+
+Verified with a live embedded Dify-style server (requires `inputs` + `user` fields). Generated tests run cleanly against it.
+
+### F-128 New — Generate-tests misses behavioral findings
+
+Discovered a fidelity gap. The `checkagent scan` command uses baseline comparison: it captures a "normal" response first, then compares each probe response for structural divergence (`length_anomaly`, `new_code_blocks`, `new_headers`). Many findings are detected this way.
+
+The generated tests use `from checkagent.cli.scan import evaluate_output` — a static check with no baseline context. For the same echo agent:
+- Scan: 34 failed probes (1 passed)
+- Generated tests: 14 failing tests, 21 passing (false confidence)
+
+~60% of scan findings are behavioral and missing from the generated tests. A developer who runs only the generated tests gets a misleadingly optimistic safety signal.
+
+### F-123/F-120 Still Open
+
+- F-123: PyPI still shows 0.3.0 as latest. `pip install checkagent` installs 0.3.0.
+- F-120: Tracer still stubs. `begin_probe_trace()` returns None, `end_probe_trace()` returns [].
+
+### Tests Added
+
+- Updated `test_session056.py::test_extra_body_silently_ignored_on_callable` to assert F-126 IS fixed (warning shown)
+- 12 new tests in `test_session057.py`: version/PyPI checks, F-126 fixed assertions (2), F-127 DX gap (2), --generate-tests passthrough (4), F-128 behavioral gap (1), F-120 open (1)
+- Total: 1842 tests passing
+
+### What to Try Next Session
+
+- **F-127** — watch for warning moved to stderr when `--json` is active
+- **F-128** — watch for baseline context in generated tests (would require saving baseline per probe)
+- **F-123** — watch for v0.3.1 PyPI release
+- **F-120** — watch for actual tracer event capture
+- **Real public agent integration** — still on backlog; high priority
+
+---
+
+## Session-058 (2026-05-22)
+
+### Upgrade and CI Status
+
+checkagent 0.3.1 was already installed. Upstream CI shows 3 consecutive successes, latest commit: "Fix F-128: add evaluate_output_with_baseline; generated tests now include baseline comparison". All 12 platform/version combinations green. 14+ consecutive successes.
+
+### F-128 FIXED — Generated tests now use baseline-aware evaluation
+
+The big fix this session. `evaluate_output_with_baseline(output, baseline, category=...)` is a new function that combines static pattern detection with behavioral baseline comparison. It correctly detects:
+
+- `new_code_blocks` — code block appeared in response but not in baseline
+- `length_anomaly` — response is much longer than baseline
+- `new_table_rows` — markdown table appeared in response but not baseline
+
+The function is at top-level `checkagent` (also part of F-096 fix).
+
+Generated tests now have a session-scoped `baseline_response` fixture that captures one benign response, then passes it to `evaluate_output_with_baseline` in each test. For the echo agent: old static-only tests caught 14/35 failures; new baseline-aware tests catch 35/35. Full parity with the scan.
+
+### F-127 FIXED — Warning to stderr with --json
+
+The `--extra-body` warning on callable targets now goes to stderr (not stdout). With `--json` active, stdout is clean JSON. Verified: `json.loads(result.stdout)` succeeds without any parsing tricks.
+
+### F-096 FIXED — evaluate_output at top-level
+
+Both `evaluate_output` and `evaluate_output_with_baseline` are now importable from top-level `checkagent`. No need to use the private `checkagent.cli.scan` path.
+
+### Stale Test Updated
+
+`test_session035.py::test_evaluate_output_not_at_top_level` was asserting F-096 was open (evaluate_output NOT at top-level). Updated to `test_evaluate_output_at_top_level` which verifies both `evaluate_output` and `evaluate_output_with_baseline` are now at top-level.
+
+### F-120 Still Open
+
+`begin_probe_trace()` takes 0 positional arguments (API changed from session-054 when it took a probe name string). `end_probe_trace()` still returns `[]`. Tracer is still stubs.
+
+### F-123 Still Open
+
+PyPI still shows 0.3.0. `pip install checkagent` without `@git` gives 0.3.0. All the 0.3.1 fixes (has_refusal improvements, literal(), F-128) are unreachable to PyPI users.
+
+### Tests Added
+
+- Updated `test_session035.py::test_evaluate_output_not_at_top_level` → `test_evaluate_output_at_top_level` (F-096 fix)
+- 15 new tests in `test_session058.py`: upstream CI, F-096 fix (2), F-128 fix (8), F-127 fix (2), F-120 open (1), F-123 open (1)
+- Total: ~1857 tests
+
+### What to Try Next Session
+
+- **F-123** — watch for v0.3.1 PyPI release (keep checking)
+- **F-120** — watch for actual tracer event capture (Milestone 17)
+- **Real public agent integration** — still high priority; LangChain/OpenAI Agents SDK real examples
+- **begin_probe_trace() API** — arg was removed; check if probe name tracking is now implicit
+
+## Session-059 (2026-05-23)
+
+### Upgrade and CI Status
+
+Upgraded checkagent to latest git main (0.3.1 already installed). Upstream CI shows the latest commit ("Document scan_gates config and --comment-file flag in docs") has a **red** run — but it's a GitHub Actions infrastructure issue, not a checkagent code bug. Only Windows 3.13 fails, and only at `actions/checkout@v4` (Node.js 20 deprecation, GitHub forces Node.js 24 starting June 2nd 2026). All 11 other jobs pass. New finding: F-129.
+
+### scan_gates Config — New Feature
+
+New `scan_gates` section in `checkagent.yml` (and `ScanGatesConfig` at top-level) lets you define CI quality gates for `checkagent scan`:
+
+```yaml
+scan_gates:
+  max_critical: 0
+  max_high: 3
+  max_findings: 10
+  min_score: 0.8
+  on_fail: block  # or: warn
+```
+
+All four threshold types work correctly. The `--json` output includes a `quality_gates` array with gate results. Exit code behavior:
+- `on_fail: block` → exit code 2 when a gate is violated (CI-friendly: can use `if: $? != 0` to block PRs)
+- `on_fail: warn` → exit code 0 even when violated; status field in JSON says "warn" not "block"
+- No gates configured → `quality_gates` is empty list in JSON, exit code reflects only findings
+
+`ScanGatesConfig` validates `on_fail` — invalid values raise Pydantic ValidationError with clear message.
+
+### --comment-file Flag — New Feature
+
+`checkagent scan agent:run --comment-file pr.md` generates a GitHub-formatted PR comment. Features:
+- ✅ emoji for clean scans, ❌ for scans with findings
+- Summary table (Safety Score %, Probes Passed N/M, Findings count)
+- Findings table with Severity/Category/Finding columns, truncated with "N more findings"
+- `_Generated by [CheckAgent]_` footer
+- "PR comment written → FILE" confirmation in terminal output
+- Fully compatible with `--json`: stdout is clean JSON, comment goes to file
+
+Note: The PR comment does NOT include the scan_gates results. If you have gates configured, the terminal shows "Quality Gates FAILED/PASSED" but the markdown comment has no gate section. This may be by design (comment focuses on findings, not CI gate policy) but could be a DX gap for teams who want PR comments to reflect whether CI would block.
+
+### F-123 Still Open
+
+PyPI still shows 0.3.0. git main is 0.3.1. All 0.3.1 features (has_refusal improvements, literal(), evaluate_output_with_baseline, scan_gates, --comment-file) unreachable to users who do `pip install checkagent` without `@git`.
+
+### Test Results
+
+Existing tests: 1 failed (test_upstream_ci_green — correctly failing due to F-129 CI failure), 1680 passed, 18 xfailed, 2 xpassed.
+
+Session-059 new tests: 21 passed, 1 xfailed (F-123). Total: ~1878 tests.
+
+### What to Try Next Session
+
+- **F-129** — watch for CI fix (update actions/checkout to v5, setup-python to v6)
+- **F-123** — watch for v0.3.1 PyPI release
+- **F-120** — watch for tracer Milestone 17 (actual event capture)
+- **PR comment + scan_gates integration** — does the comment include gate status? (currently no)
+- **Real public agent integration** — still high priority

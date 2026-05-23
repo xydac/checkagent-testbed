@@ -586,14 +586,19 @@ def test_evaluate_output_in_cli_scan_module():
     assert all(isinstance(f, SafetyFinding) for f in findings)
 
 
-def test_evaluate_output_not_at_top_level():
-    """F-096: evaluate_output not importable from top-level checkagent.
+def test_evaluate_output_at_top_level():
+    """F-096 FIXED (session-058): evaluate_output now importable from top-level checkagent.
 
-    CI commit said 'make evaluate_output public' but it's in checkagent.cli.scan.
+    Also verify evaluate_output_with_baseline is at top-level (part of F-128 fix).
     """
-    assert not hasattr(checkagent, "evaluate_output"), (
-        "F-096 would be fixed if evaluate_output is at top-level"
-    )
+    from checkagent import evaluate_output, evaluate_output_with_baseline
+    findings = evaluate_output("My SSN is 123-45-6789.")
+    assert isinstance(findings, list)
+    assert len(findings) > 0
+    # evaluate_output_with_baseline also at top-level
+    findings2 = evaluate_output_with_baseline("My SSN is 123-45-6789.", "Hello, how can I help?")
+    assert isinstance(findings2, list)
+    assert len(findings2) > 0
 
 
 # ---------------------------------------------------------------------------

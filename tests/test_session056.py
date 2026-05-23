@@ -262,7 +262,7 @@ def test_extra_body_null_gives_clear_error():
 # ---------------------------------------------------------------------------
 
 def test_extra_body_silently_ignored_on_callable():
-    """F-126: --extra-body on a Python callable is silently ignored (no warning, no error)."""
+    """F-126 + F-127 FIXED: --extra-body on callable emits warning (to stderr); stdout is clean JSON."""
     result = subprocess.run(
         [
             "checkagent", "scan", "agents.echo_agent_simple:run",
@@ -272,14 +272,14 @@ def test_extra_body_silently_ignored_on_callable():
         ],
         capture_output=True, text=True, timeout=30
     )
-    data = json.loads(result.stdout or result.stderr)
-    # No error from the scan itself (callable still works)
-    assert "target" in data
-    # No warning about --extra-body being ignored
-    assert "warning" not in data or "extra" not in str(data.get("warning", "")).lower(), (
-        "F-126: Expected no warning about --extra-body being ignored on callable, "
-        "but one appeared (would be an improvement)"
+    # F-127 FIXED (session-058): warning goes to stderr, not stdout
+    assert "extra-body" in result.stderr.lower() or "no effect" in result.stderr.lower(), (
+        f"F-126 FIXED: Warning about --extra-body on callable should be in stderr. "
+        f"stderr: {result.stderr[:200]!r}"
     )
+    # stdout must be clean JSON (F-127 fix)
+    data = json.loads(result.stdout)
+    assert "target" in data
 
 
 # ---------------------------------------------------------------------------
