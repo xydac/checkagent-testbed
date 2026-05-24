@@ -332,3 +332,8 @@ Rate each feature on:
 | scan_gates config (ScanGatesConfig) | 5 | 4 | max_critical/max_high/max_findings/min_score all work; on_fail block→exit 2, warn→exit 0; quality_gates in JSON; ScanGatesConfig at top-level; no docs on quality_gates JSON structure | 2026-05-23 |
 | --comment-file flag | 5 | 5 | Generates GitHub-formatted PR comment markdown; ✅/❌ emoji; summary table + findings table + truncation; works with --json; terminal confirmation; CheckAgent footer | 2026-05-23 |
 | upstream CI (session-059) | 2 | 2 | F-129: Windows 3.13 failing at actions/checkout@v4 — GitHub Actions Node.js 20 deprecation. Code is fine, actions pins need updating before June 2 2026 deadline | 2026-05-23 |
+| upstream CI (session-060) | 4 | 4 | Latest run GREEN all 12 platforms incl. Windows 3.13; F-129 FIXED. Previous run (docs commit) was red. | 2026-05-24 |
+| salary/currency PII patterns | 2 | 2 | F-130: matches ANY dollar amount — $9.99 product price flagged as salary_amount. Massive false positive rate for any agent discussing prices or finance | 2026-05-24 |
+| --verbose flag (scan) | 1 | 2 | F-131: crashes with MarkupError when echo agents return [bracket] text; DX gap: warning says "Use --verbose" even when already using --verbose; still doesn't show per-probe error details | 2026-05-24 |
+| 40%+ probe error warning | 4 | 3 | Warning shown in terminal when 40%+ probes error (useful safety net); JSON output has no error_warning field (programmatic users can't detect this); warning says "Use --verbose" even in verbose mode | 2026-05-24 |
+| HTML compliance report (agent+version) | 5 | 3 | Report now includes agent target and checkagent version; DX gap: version labeled "Model" (implies LLM model, not framework version) | 2026-05-24 |

@@ -1558,3 +1558,33 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Actual:** Windows Python 3.13 fails at checkout before any code runs. Error: "Process completed with exit code 1" on `Run actions/checkout@v4`.
 **Workaround:** Upgrade `actions/checkout` to v5 and `actions/setup-python` to v6 in the CI workflow before June 2nd 2026.
 **Status:** Open
+
+---
+
+## F-129: Upstream CI failing on Windows 3.13 due to GitHub Actions Node.js 20 deprecation
+**Status update (session-060, 2026-05-24):** FIXED. Latest CI run ("Include agent target and version in HTML compliance report") passes all 12 platforms including Windows 3.13. The actions pins were updated upstream.
+
+---
+
+## F-130: `salary_amount` PII pattern matches any dollar amount — massive false positive rate
+**Date:** 2026-05-24
+**Severity:** high
+**Category:** bug
+**Description:** The `salary_amount` pattern added to `PIILeakageScanner` in the "Add salary and currency PII patterns" commit matches ANY dollar-sign amount (`$N` or `$N,NNN.NN`), not just salary/compensation context. This causes false positives on product prices, stock prices, transaction totals, donation amounts, and any financial data an agent legitimately discusses.
+**Expected:** The `salary_amount` pattern should detect salary/compensation leakage — e.g., "salary: $85,000" or "your compensation is $120,000". Generic dollar amounts should not be flagged.
+**Actual:** `scanner.evaluate("Price: $9.99")` → `passed=False, findings=[salary_amount]`. `scanner.evaluate("Your total is $23.50")` → same. Any dollar-formatted amount triggers the pattern regardless of context. Only euro amounts (`€`) and bare numbers without `$` are safe.
+**Workaround:** Disable the `salary_amount` pattern if your agent discusses any financial data: `scanner.disabled = {"salary_amount"}`. Or filter out `salary_amount` findings when reviewing results.
+**Status:** Open
+
+---
+
+## F-131: `--verbose` flag crashes with `MarkupError` when probe output contains Rich markup brackets
+**Date:** 2026-05-24
+**Severity:** high
+**Category:** bug
+**Description:** `checkagent scan --verbose` crashes with `rich.errors.MarkupError: closing tag '[/INST]' at position 91 doesn't match any open tag` when the scanned agent echoes probe input that contains bracket sequences (e.g., `[/INST]`, common in Llama-format injection probes). The verbose detail table passes probe output directly to Rich's `console.print()` without escaping, so any `[...]` sequence is interpreted as Rich markup.
+**Expected:** `--verbose` should escape agent output before rendering it in the detail table, so `[/INST]` is displayed as literal text, not parsed as markup.
+**Actual:** `checkagent scan agents.echo_agent_simple:run --verbose` crashes with exit code 1 and a full traceback ending in `rich.errors.MarkupError`. The summary table is printed but the detail table (which is the only thing `--verbose` adds over non-verbose) is never rendered. Same class of bug as F-093.
+**Workaround:** Do not use `--verbose` on echo agents or agents that return input verbatim. The non-verbose output is unaffected.
+**Status:** Open
+

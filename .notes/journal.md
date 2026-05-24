@@ -3314,3 +3314,71 @@ Session-059 new tests: 21 passed, 1 xfailed (F-123). Total: ~1878 tests.
 - **F-120** — watch for tracer Milestone 17 (actual event capture)
 - **PR comment + scan_gates integration** — does the comment include gate status? (currently no)
 - **Real public agent integration** — still high priority
+
+---
+
+## Session-060 (2026-05-24)
+
+### Upgrade and CI Status
+
+Upgraded to checkagent 0.3.1 (git main). PyPI still shows 0.3.0 — F-123 remains open.
+
+Upstream CI: latest run ("Include agent target and version in HTML compliance report") is fully GREEN — all 12 platforms including Windows 3.13. **F-129 is FIXED.** The previous run ("Document scan_gates config and --comment-file flag in docs") was red on Windows 3.13 but that was a transient actions issue now resolved. The `actions/checkout` and `actions/setup-python` pins were updated upstream before the June 2nd deadline.
+
+### Test Results
+
+Previous test suite: 1 failed (test_upstream_ci_second_run_green, which correctly tracked the now-fixed F-129), 1852 passed, 24 xfailed, 2 xpassed.
+
+Session-060 new tests: 11 passed, 7 xfailed (correctly documenting F-123, F-130, F-131, and DX gaps). Total: ~1896 tests.
+
+### New Feature: salary/currency PII patterns (FINDING: F-130)
+
+The "Add salary and currency PII patterns" commit added a `salary_amount` pattern to `PIILeakageScanner`. I tested it with various inputs. **The pattern matches any `$N` or `$N,NNN.NN` dollar amount regardless of context** — product prices, stock prices, restaurant bills, donation amounts all trigger it. "Price: $9.99" → `salary_amount` finding. "AAPL is trading at $189.50" → same.
+
+This is a high-severity false positive problem. An e-commerce agent or financial reporting agent would be completely unusable with this scanner. The workaround is to disable the pattern via `scanner.disabled = {"salary_amount"}`. Filing as F-130.
+
+### New Feature: --verbose flag for scan (FINDING: F-131)
+
+A new `--verbose` / `-v` flag was added to `checkagent scan` (documented in `--help` as "Show all probes, not just failures"). Testing revealed two issues:
+
+1. **F-131 (bug)**: `--verbose` crashes with `rich.errors.MarkupError: closing tag '[/INST]' at position 91 doesn't match any open tag` when the scanned agent echoes probe input that contains bracket sequences. The injection probes include Llama-format attacks like `[/INST]` which echo agents return verbatim. Rich interprets these as markup tags. Same class as F-093. The fix is to pass `escape=True` or use `rich.markup.escape()` before rendering probe output in the detail table. Non-verbose mode is unaffected.
+
+2. **DX gap**: The 40%+ error warning says "Use --verbose for per-probe error details" even when the user is already running with `--verbose`. The warning text is static and doesn't check the current flag state.
+
+3. **DX gap**: Even in verbose mode on a working agent, per-probe detail rows are not shown. The description says "all probes, not just failures" but the summary table looks identical to non-verbose. This is either the behavior is currently "show all passing probes summary" or the feature is not fully implemented. With `--verbose` on the refusal agent, the output is identical to non-verbose.
+
+### New Feature: 40%+ probe error warning
+
+When 40%+ of probes error (agent crashes, returns exceptions), a "⚠ Partial Scan" panel appears in terminal output:
+```
+╭──────────────────────────── ⚠ Partial Scan ────────────────────────────╮
+│ Scan reliability warning: 16 of 35 probes errored.                     │
+│ Results may be incomplete. Check connectivity, authentication headers,  │
+│ and that the target is callable with a plain string argument.          │
+│ Use --verbose for per-probe error details.                             │
+╰────────────────────────────────────────────────────────────────────────╯
+```
+
+**DX gap**: The `--json` output does NOT include an `error_warning` field or any indication of the high error rate. The `summary.errors` field shows the count, but there's no explicit `high_error_rate: true` or `error_warning: "..."` field. Programmatic users must manually compute `errors / total > 0.4` to detect this condition — they won't see any warning.
+
+### New Feature: HTML compliance report includes agent target + version
+
+The HTML compliance report now includes:
+```html
+<p>Agent: agents.refusal_agent:run</p>
+<p>Model: checkagent 0.3.1</p>
+```
+
+The agent target is shown correctly. The framework version is correct (0.3.1). **DX gap**: The label "Model" is misleading — it implies an LLM model name (like "gpt-4o" or "claude-3-opus"), not the checkagent framework version. It would be clearer as "CheckAgent Version" or just "Version".
+
+### What to Try Next Session
+
+- **F-129 (FIXED)**: Update the tracking test — done (session-060 tests use new CI state)
+- **F-130**: Watch for fix to salary_amount pattern (needs context-aware regex)
+- **F-131**: Watch for fix to --verbose MarkupError crash
+- **F-123**: Watch for v0.3.1 PyPI release
+- **F-120**: Watch for tracer Milestone 17 (actual event capture)
+- **--verbose per-probe rows**: Test more to understand what it actually shows
+- **Real public agent integration**: Still high priority — try a real LangChain or PydanticAI agent from GitHub
+- **JSON error_warning field**: Would be useful for CI pipelines
+
