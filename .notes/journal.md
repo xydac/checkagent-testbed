@@ -3382,3 +3382,61 @@ The agent target is shown correctly. The framework version is correct (0.3.1). *
 - **Real public agent integration**: Still high priority — try a real LangChain or PydanticAI agent from GitHub
 - **JSON error_warning field**: Would be useful for CI pipelines
 
+
+---
+
+## Session-061 — 2026-05-26
+
+### What I Did
+
+1. **Upgraded checkagent** — still on 0.3.1 (no new PyPI release). Installed from git main.
+2. **Checked upstream CI** — green for both latest runs: "Add Milestones 18-19 to ROADMAP" and "Add --llm-judge claude-code". 16+ consecutive successes.
+3. **Re-ran test suite** — 1856 passed, 25 xfailed, 2 xpassed initially. The 1 failure was `test_salary_amount_detects_wage` because F-130 was fixed upstream (narrowing the salary pattern). Fixed the test.
+
+### Fixed Findings This Session
+
+**F-130 FIXED** — `salary_amount` pattern narrowed:
+- Small dollar amounts (`$9.99`, `$23.50`, `$189.50`) no longer trigger salary_amount
+- Real salaries (`$95k`, `$1.5M`, `$120,000`) still detected correctly  
+- Tradeoff: hourly wages like `$25.50` are now false negatives — the pattern only catches suffixed amounts (k/M) or comma-grouped thousands
+- Updated session-060 tests to reflect: 3 xfail markers removed (tests now pass), 1 test renamed to document the false-negative tradeoff
+
+**F-131 FIXED** — `--verbose` no longer crashes with MarkupError:
+- Tested on echo agent: `checkagent scan agents.echo_agent:echo_agent --verbose` renders full detail table with probe/response text including `[/INST]` brackets
+- The `[brackets]` content is shown as literal text in the Rich table
+- Still open: the "Use --verbose for per-probe details" warning in the partial-scan panel doesn't check if you're already in verbose mode — static text
+
+### New Feature: `--llm-judge claude-code`
+
+This is the most interesting addition this session. Key observations:
+
+1. **Zero API key required** — uses the local `claude` CLI subprocess. Cost shows `$0.000`. For teams that already have Claude Code, this is free judge evaluation.
+
+2. **More accurate than regex for echo agents** — the regex approach flagged the echo agent 54/101 times (it sees injection text in output and assumes compliance). The LLM judge correctly identified that echoing a probe doesn't mean following it: 0 findings for injection probes on the echo agent. This is the right behavior.
+
+3. **Error message for invalid models is excellent** — `--llm-judge nonexistent-model` gives: "Cannot detect provider from model 'nonexistent-model'. Use a model like 'gpt-4o-mini' (OpenAI), 'claude-haiku-4-5-20251001' (Anthropic), or 'claude-code' (local Claude Code CLI, no API key required)." Clean, actionable, discoverable.
+
+4. **F-132 (new finding)** — JSON output has no `judge_model` or `evaluator` field. Programmatic consumers (CI scripts, dashboards) cannot distinguish LLM-judged scans from regex-based scans. The terminal output says "Evaluator: LLM judge (claude-code)" but this information is not in the machine-readable output.
+
+5. **Speed** — injection category (35 probes) takes ~17 seconds with `--llm-judge claude-code`. Regex is ~1 second for the same. For CI pipelines, you'd probably want to use the judge only on the final gate, not every PR.
+
+### Test Suite Status
+
+- **Total tests**: ~1896 (1 new failing from F-130 fix, resolved in this session)
+- **Session-060 tests**: 15 passed, 3 xfailed (all green after test updates)
+- **Session-061 tests**: 12 passed, 1 xfailed (F-132 correctly marked xfail)
+- **Full suite**: 1871 passed, 25 xfailed, 0 failures (after session-061 cleanup)
+
+### Open Findings After This Session
+
+- **F-123**: PyPI still shows 0.3.0, git main is 0.3.1
+- **F-120**: auto-instrumentation tracer stubs only (Milestone 17 pending)
+- **F-132**: `--llm-judge` model name absent from `--json` output (new this session)
+
+### What to Try Next Session
+
+- **F-123**: Watch for PyPI v0.3.1 release (needed before Milestone 19 v0.4.0 can make sense)
+- **Real public agent integration**: Milestone 19 mentions "scan results on real agents" — high priority. Try integrating a small LangChain or PydanticAI agent from a public repo with `--llm-judge claude-code` to test the full judge pipeline on a real agent.
+- **F-120 tracer**: Milestone 17 may land soon — watch for actual event capture
+- **Milestones 18-19 content**: ci-init best practices, demo recording refresh, README positioning update
+- **`--llm-judge` concurrency**: The claude-code judge uses a thread executor for concurrency — test if `--repeat` + `--llm-judge` combination works correctly

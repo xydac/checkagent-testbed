@@ -1574,7 +1574,7 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** The `salary_amount` pattern should detect salary/compensation leakage — e.g., "salary: $85,000" or "your compensation is $120,000". Generic dollar amounts should not be flagged.
 **Actual:** `scanner.evaluate("Price: $9.99")` → `passed=False, findings=[salary_amount]`. `scanner.evaluate("Your total is $23.50")` → same. Any dollar-formatted amount triggers the pattern regardless of context. Only euro amounts (`€`) and bare numbers without `$` are safe.
 **Workaround:** Disable the `salary_amount` pattern if your agent discusses any financial data: `scanner.disabled = {"salary_amount"}`. Or filter out `salary_amount` findings when reviewing results.
-**Status:** Open
+**Status:** Fixed in session-061 (commit "Fix F-130: narrow salary_amount pattern to avoid false positives on retail prices"). Dollar amounts without k/M suffix or comma grouping (e.g. $9.99, $23.50) no longer trigger salary_amount. Tradeoff: hourly wages like $25.50 are now false negatives (accepted upstream).
 
 ---
 
@@ -1586,5 +1586,17 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** `--verbose` should escape agent output before rendering it in the detail table, so `[/INST]` is displayed as literal text, not parsed as markup.
 **Actual:** `checkagent scan agents.echo_agent_simple:run --verbose` crashes with exit code 1 and a full traceback ending in `rich.errors.MarkupError`. The summary table is printed but the detail table (which is the only thing `--verbose` adds over non-verbose) is never rendered. Same class of bug as F-093.
 **Workaround:** Do not use `--verbose` on echo agents or agents that return input verbatim. The non-verbose output is unaffected.
+**Status:** Fixed in session-061 (commit "Fix F-131: escape Rich markup in --verbose output to prevent MarkupError crash"). Probe inputs, agent responses, and baseline preview are now passed through markup_escape() before rendering. Verified: echo agent with [/INST] brackets no longer crashes.
+
+---
+
+## F-132: `--llm-judge` model name absent from `--json` output
+**Date:** 2026-05-26
+**Severity:** low
+**Category:** dx-friction
+**Description:** When scanning with `--llm-judge claude-code` (or any LLM judge), the `--json` output does not include any field indicating which evaluation method or model was used. The JSON structure is identical to a regular regex scan: `{"target": ..., "summary": ..., "findings": ..., "history": ...}`. There is no `judge_model`, `evaluator`, or similar field.
+**Expected:** JSON output should include something like `"evaluator": "llm-judge/claude-code"` or `"judge_model": "claude-code"` so programmatic consumers (CI scripts, dashboards) can distinguish LLM-judged scans from regex-based scans and record which model was used.
+**Actual:** `checkagent scan ... --llm-judge claude-code --json` → JSON has no evaluator/judge field. The terminal output shows "Evaluator: LLM judge (claude-code)" in the header but this information is not surfaced in the machine-readable output.
+**Workaround:** Track the judge model externally (e.g., in your CI script metadata).
 **Status:** Open
 

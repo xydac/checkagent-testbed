@@ -65,42 +65,38 @@ def test_salary_amount_detects_actual_salary():
     assert any("salary_amount" in str(f.description) for f in result.findings)
 
 
-def test_salary_amount_detects_wage():
-    """PIILeakageScanner flags explicit wage/hourly rate disclosure."""
+def test_salary_amount_hourly_wage_false_negative():
+    """F-130 tradeoff: hourly wage like '$25.50' is now a false negative.
+
+    Upstream narrowed salary_amount to only match suffixed (e.g. $95k, $1.5M)
+    or comma-grouped ($120,000) amounts. This avoids retail price false positives
+    but means legitimate hourly wages without those markers go undetected.
+    This is an accepted tradeoff per the upstream fix.
+    """
     scanner = PIILeakageScanner()
     result = scanner.evaluate("Hourly wage: $25.50")
-    # This is arguably correct since 'wage' is compensation data
-    assert not result.passed
-
-
-@pytest.mark.xfail(
-    reason="F-130: salary_amount matches any $ amount — 'Price: $9.99' triggers false positive"
-)
-def test_salary_amount_no_false_positive_on_product_price():
-    """F-130: Product price should NOT be flagged as salary_amount."""
-    scanner = PIILeakageScanner()
-    result = scanner.evaluate("This widget costs $9.99")
-    # A product price is not salary/compensation data
+    # F-130 fix: $25.50 no longer triggers — accepted false negative tradeoff
     assert result.passed, (
-        "F-130: '$9.99' product price flagged as salary_amount — false positive"
+        "Hourly wage '$25.50' should pass (not flagged) after F-130 narrowing"
     )
 
 
-@pytest.mark.xfail(
-    reason="F-130: salary_amount matches any $ amount — '$23.50' restaurant total triggers FP"
-)
+def test_salary_amount_no_false_positive_on_product_price():
+    """F-130 FIXED: Product price should NOT be flagged as salary_amount."""
+    scanner = PIILeakageScanner()
+    result = scanner.evaluate("This widget costs $9.99")
+    assert result.passed, "F-130: '$9.99' product price flagged as salary_amount — false positive"
+
+
 def test_salary_amount_no_false_positive_on_transaction():
-    """F-130: Transaction amounts should NOT be flagged as salary_amount."""
+    """F-130 FIXED: Transaction amounts should NOT be flagged as salary_amount."""
     scanner = PIILeakageScanner()
     result = scanner.evaluate("Your total is $23.50")
     assert result.passed, "F-130: '$23.50' transaction amount flagged as salary_amount"
 
 
-@pytest.mark.xfail(
-    reason="F-130: salary_amount matches any $ amount — '$189.50' stock price triggers FP"
-)
 def test_salary_amount_no_false_positive_on_stock_price():
-    """F-130: Stock prices should NOT be flagged as salary_amount."""
+    """F-130 FIXED: Stock prices should NOT be flagged as salary_amount."""
     scanner = PIILeakageScanner()
     result = scanner.evaluate("AAPL is trading at $189.50")
     assert result.passed, "F-130: Stock price flagged as salary_amount"
@@ -127,11 +123,8 @@ def test_salary_amount_no_false_positive_bare_number():
 # F-131: --verbose crashes with MarkupError on bracket-containing probe output
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(
-    reason="F-131: --verbose crashes with rich.errors.MarkupError when probe output contains [brackets]"
-)
 def test_verbose_no_crash_on_echo_agent():
-    """F-131: --verbose should not crash when agent echoes input containing [brackets]."""
+    """F-131 FIXED: --verbose no longer crashes when agent echoes input containing [brackets]."""
     result = subprocess.run(
         ["checkagent", "scan", "agents.echo_agent_simple:run",
          "--category", "injection", "--verbose"],
