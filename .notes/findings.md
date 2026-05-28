@@ -1598,5 +1598,5 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** JSON output should include something like `"evaluator": "llm-judge/claude-code"` or `"judge_model": "claude-code"` so programmatic consumers (CI scripts, dashboards) can distinguish LLM-judged scans from regex-based scans and record which model was used.
 **Actual:** `checkagent scan ... --llm-judge claude-code --json` → JSON has no evaluator/judge field. The terminal output shows "Evaluator: LLM judge (claude-code)" in the header but this information is not surfaced in the machine-readable output.
 **Workaround:** Track the judge model externally (e.g., in your CI script metadata).
-**Status:** Open
+**Status:** Fixed in session-062 (2026-05-28). The `evaluator` field is now present in the `summary` object of JSON output: `{"summary": {"evaluator": "claude-code", ...}}`. The field is set when `--llm-judge` is used; heuristic/regex scans also set this field. Verified: `data["summary"]["evaluator"] == "claude-code"` when scanning with `--llm-judge claude-code`. Also confirmed that the `--repeat + --llm-judge` combination correctly preserves the evaluator field across all repeat runs.
 

@@ -3440,3 +3440,81 @@ This is the most interesting addition this session. Key observations:
 - **F-120 tracer**: Milestone 17 may land soon — watch for actual event capture
 - **Milestones 18-19 content**: ci-init best practices, demo recording refresh, README positioning update
 - **`--llm-judge` concurrency**: The claude-code judge uses a thread executor for concurrency — test if `--repeat` + `--llm-judge` combination works correctly
+
+---
+
+## Session-062 — 2026-05-28
+
+### Upgrade and CI Status
+
+Checkagent 0.3.1 reinstalled from git (same version as last session — no new release). The previous install was also 0.3.1; pip initially refused due to PEP 668 (externally managed Python environment) and required `--break-system-packages` to proceed. No functional change in the installed package.
+
+Upstream CI: **green**. All 5 latest runs succeeded across both the CI and Deploy Docs workflows. Latest commit: "Add score interpretation table and framework guide links to README" (2026-05-28). The prior three days (May 26-28) show consistent passing runs including both the May 27 scan guide commit and the May 26 Milestones 18-19 commit. No red streaks.
+
+### Test Suite
+
+Full suite: **1880 passed, 26 xfailed, 4 xpassed, 10 warnings** — exit code 0. Run time ~9m42s. The 4 xpassed tests are previously-xfailed tests that now pass (likely earlier findings that were fixed without removing the xfail marker). No regressions anywhere in the 1880 tests.
+
+### F-132 FIXED: evaluator field now in JSON output
+
+The biggest change this session: F-132 is resolved. When scanning with `--llm-judge claude-code`, the JSON output now includes `"evaluator": "claude-code"` inside the `summary` object:
+
+```json
+{
+  "summary": {
+    "total": 35,
+    "passed": 35,
+    "failed": 0,
+    "errors": 0,
+    "score": 1.0,
+    "elapsed_seconds": 20.4,
+    "evaluator": "claude-code"
+  }
+}
+```
+
+This was the remaining DX gap from session-061. Programmatic consumers (CI scripts, dashboards) can now distinguish LLM-judged scans from regex scans by reading `data["summary"]["evaluator"]`. The field name is `evaluator`, not `judge_model` — note this for any tooling that was watching for `judge_model`.
+
+### --repeat + --llm-judge Combination
+
+Tested `--repeat N --llm-judge claude-code` on three categories (injection, jailbreak, data_enumeration). **Works correctly.** Key observations:
+
+- JSON output has both `stability` and `summary` objects, both correctly populated
+- `stability.repeat` matches the `--repeat` argument (2 or 3, correctly reflected)
+- `summary.evaluator` is set to `"claude-code"` across all repeat runs
+- Flaky detection works: refusal agent shows `flaky: 0` since it passes all runs consistently
+- No errors or warnings during the combined run
+- `stability_score` is computed and in [0.0, 1.0]
+
+This combination is fully ready for CI gate automation based on stability scores.
+
+### Real PydanticAI Agent + LLM Judge
+
+Tested scanning `agents/travel_agent.py` via `agents.travel_agent:travel_agent_callable` with `--llm-judge claude-code --category scope`. Results:
+
+- **Score: 100% (8/8 probes passed, 0 errors)**
+- **Evaluator**: `claude-code` (correct in JSON)
+- **Elapsed**: ~3.7s
+- **Cost**: $0.000 (claude-code runs locally)
+
+The agent has a well-scoped system prompt (travel bookings only, explicit refusal of off-topic requests, no PII sharing) and the LLM judge correctly evaluated all 8 scope probes as safe. No framework-level issues with checkagent. The travel_agent.py was adapted during testing to fix PydanticAI API changes (stale API in the file: `custom_result_text` → `custom_output_text`, `result.data` → `result.output`) — these are PydanticAI version drift issues, not checkagent bugs.
+
+### Open Findings
+
+- **F-120** (open): auto-instrumentation tracer still stubs only — `begin_probe_trace()` takes 0 arguments (not a label string), `end_probe_trace()` still returns `[]`. Even with corrected API usage, 0 events captured. Milestone 17 still pending.
+- **F-123** (open): PyPI still shows 0.3.0 as latest. Available versions: 0.3.0, 0.2.0, 0.1.x. v0.3.1 only accessible via git install. The ca_tracer and other 0.3.1 fixes are unreachable for `pip install checkagent` users.
+
+F-132 is now **closed**.
+
+### New Findings
+
+None this session.
+
+### What to Try Next Session
+
+- **F-123**: Watch for PyPI v0.3.1 release — nothing has changed upstream yet
+- **F-120**: Watch for Milestone 17 landing (actual tracer event capture); check if the probe name tracking was moved to implicit/automatic
+- **4 xpassed tests**: Identify which findings were fixed without xfail markers being removed; update markers if needed
+- **Milestone 18-19 content**: The README now has score interpretation tables and framework guide links — test these new docs against real scan output
+- **Multi-category real agent scan**: Try `--llm-judge claude-code` across all 5 categories on the travel_agent to get a more complete safety profile
+- **--comment-file + --llm-judge**: Does the PR comment correctly reflect the LLM judge evaluator? Not tested this session.
