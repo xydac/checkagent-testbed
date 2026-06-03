@@ -185,8 +185,8 @@ def test_f089_resolve_callable_still_private():
     # F-089 is still open (generated tests use private API)
 
 
-def test_f089_generated_tests_use_private_resolve_callable():
-    """F-089 still open: generated test files import _resolve_callable (private function)."""
+def test_f089_generated_tests_use_public_resolve_callable():
+    """F-089 FIXED: generated test files now import resolve_callable (public function)."""
     with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as f:
         outfile = f.name
 
@@ -195,8 +195,10 @@ def test_f089_generated_tests_use_private_resolve_callable():
         capture_output=True, text=True, cwd="/home/x/working/checkagent-testbed",
     )
     content = Path(outfile).read_text()
-    assert "_resolve_callable" in content, \
-        "Generated tests still reference private _resolve_callable — F-089 open"
+    assert "resolve_callable" in content, \
+        "Generated tests should import resolve_callable"
+    assert "_resolve_callable" not in content, \
+        "Generated tests should not use private _resolve_callable"
 
 
 # ---------------------------------------------------------------------------

@@ -1098,7 +1098,7 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** Generated tests use stable public API only (e.g., import the agent callable directly, use `PromptInjectionDetector` or other public evaluators).
 **Actual:** `from checkagent.cli.scan import _resolve_callable, _evaluate_output` in every generated file.
 **Workaround:** Manually edit generated tests to avoid private imports. Or don't upgrade checkagent without re-generating the tests.
-**Status:** Open
+**Status:** Fixed in v0.4.0 (session-063). Generated tests now import `resolve_callable` (public) instead of `_resolve_callable`. `_resolve_callable` still exists as an implementation detail but generated tests no longer reference it.
 
 ---
 
@@ -1455,7 +1455,7 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** After `install_patches()`, calling an OpenAI client should produce trace events in `end_probe_trace()`.
 **Actual:** `end_probe_trace()` returns `[]` even after real LLM SDK calls (Milestone 17 not yet landed — patches are stubs).
 **Workaround:** None — feature is a planned Milestone 17 item.
-**Status:** Partially addressed in session-054. Upstream commit "Add ca_tracer fixture, fix Anthropic tool_use tracing, close F-120" added: `ca_tracer` pytest fixture with `TracerContext` (begin/end/events/llm_calls/tool_calls), `is_installed()` function, and the full tracer API exported at top-level. However, `end_probe_trace()` still returns `[]` in the testbed even with Anthropic SDK installed — the patches require real API calls to capture events. Keeping open until non-empty events confirmed.
+**Status:** Fixed in v0.4.0 (session-063, commit "Fix F-120: MockLLM emits tracer events so ca_tracer works without real SDK calls"). `TracerContext.begin()/end()` now captures events from `MockLLM.complete()`. `tc.llm_calls` returns list of dicts with type/provider/model/prompt_preview/response_preview/latency_ms. `MockTool` still does not emit events (MockLLM only). Real OpenAI/Anthropic SDK call tracing still requires actual API calls — only MockLLM was added for test-mode tracing. Feature is now usable in unit tests without real LLM keys.
 
 ## F-121: `has_refusal()` misses common refusal phrases — causes false positives in refusal-aware scan
 **Date:** 2026-05-11
@@ -1487,7 +1487,7 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** `pip install checkagent` installs 0.3.1 (current git main).
 **Actual:** `pip install checkagent` installs 0.3.0. Latest on PyPI is 0.3.0.
 **Workaround:** `pip install "checkagent @ git+https://github.com/xydac/checkagent.git@main"` installs current git main.
-**Status:** Open
+**Status:** Fixed in session-063 (2026-06-02). v0.3.1 was published to PyPI on 2026-05-30; v0.4.0 published on 2026-06-02. `pip install checkagent` now installs 0.4.0.
 
 ## F-124: `is_installed()` not exported from top-level `checkagent`
 **Date:** 2026-05-17
@@ -1600,3 +1600,15 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Workaround:** Track the judge model externally (e.g., in your CI script metadata).
 **Status:** Fixed in session-062 (2026-05-28). The `evaluator` field is now present in the `summary` object of JSON output: `{"summary": {"evaluator": "claude-code", ...}}`. The field is set when `--llm-judge` is used; heuristic/regex scans also set this field. Verified: `data["summary"]["evaluator"] == "claude-code"` when scanning with `--llm-judge claude-code`. Also confirmed that the `--repeat + --llm-judge` combination correctly preserves the evaluator field across all repeat runs.
 
+
+---
+
+## F-133: `--comment-file` PR comment does not mention evaluation method when `--llm-judge` is used
+**Date:** 2026-06-03
+**Severity:** low
+**Category:** dx-friction
+**Description:** When scanning with `--llm-judge claude-code` and `--comment-file report.md`, the generated GitHub PR comment markdown does not include any mention of the evaluation method used. The comment shows the same table format (Safety Score / Probes Passed / Findings) regardless of whether regex or LLM evaluation was used. The terminal shows "Evaluator: LLM judge (claude-code)" but this information is not carried into the PR comment.
+**Expected:** The PR comment should indicate which evaluation method was used — e.g., a row like "Evaluator | LLM judge (claude-code)" in the metrics table. This matters because: (a) the same agent can score 0% with regex and 100% with LLM judge, (b) reviewers need to know why the score changed, (c) teams tracking score history need the evaluation method to interpret deltas.
+**Actual:** `checkagent scan ... --llm-judge claude-code --comment-file report.md` → the generated markdown has no evaluator/judge mention. The `--json` output DOES include `summary.evaluator = "claude-code"`, so the information exists but is not surfaced in the markdown template.
+**Workaround:** Add a manual note to the PR comment or check the JSON output's `summary.evaluator` field.
+**Status:** Open

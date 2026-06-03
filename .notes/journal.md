@@ -3518,3 +3518,130 @@ None this session.
 - **Milestone 18-19 content**: The README now has score interpretation tables and framework guide links — test these new docs against real scan output
 - **Multi-category real agent scan**: Try `--llm-judge claude-code` across all 5 categories on the travel_agent to get a more complete safety profile
 - **--comment-file + --llm-judge**: Does the PR comment correctly reflect the LLM judge evaluator? Not tested this session.
+
+---
+
+## Session-063 (2026-06-02)
+
+### Upgrade and CI Status
+
+Upgraded from v0.3.1 (git) to **v0.4.0** (PyPI). v0.4.0 was released today (2026-06-02); v0.3.1 was published on 2026-05-30. F-123 is now **closed** — `pip install checkagent` installs 0.4.0.
+
+Upstream CI: **green** for all 5 latest runs. Latest: "Add real-world benchmark data to README". 17+ consecutive successes.
+
+### What Changed in v0.4.0
+
+Commits between v0.3.1 and v0.4.0:
+1. **error_warning JSON field** — when 40%+ probes error, `--json` output now includes `error_warning` with `type`, `error_count`, `total_count`, `error_rate`, `message`. Fixes the DX gap noted in session-060 where programmatic users couldn't detect unreliable scans.
+2. **Verbose hint fix** — `--verbose` mode now shows "Per-probe error details are shown above." instead of the self-contradicting "Re-run with --verbose for per-probe error details." Fixes session-061 DX gap.
+3. **F-120 FIXED: MockLLM tracer events** — `TracerContext.begin()/end()` now captures `MockLLM.complete()` calls as trace events. No real API keys needed for tracer testing. `tc.llm_calls` returns list of dicts with `type/provider/model/prompt_preview/response_preview/latency_ms`.
+4. **Performance benchmarks** — `@pytest.mark.slow` tests added for scan wall time (<10s) and per-probe time (<100ms).
+5. **F-089 FIXED: generated tests use public API** — `--generate-tests` now imports `resolve_callable` (public) instead of `_resolve_callable`. Both still exist but generated tests are now stable across upgrades.
+
+### Tests Run
+
+Full test suite: **1 failure → 0 failures** after fix.
+
+The failing test was `test_f089_generated_tests_use_private_resolve_callable` — it was asserting that the private API was still used (documenting the open bug). With F-089 now fixed, the assertion flipped. Updated to `test_f089_generated_tests_use_public_resolve_callable` which asserts the correct behavior.
+
+Added 14 new tests in `test_session063.py`:
+- 2 version/CI checks (v0.4.0, PyPI)
+- 4 TracerContext (F-120 fix) tests
+- 3 error_warning JSON field tests
+- 2 verbose hint fix tests
+- 2 F-089 tests
+- 1 resolve_callable public import test
+
+All 14 pass.
+
+### New Features Tested in Detail
+
+**TracerContext with MockLLM:**
+```python
+install_patches()
+tc = TracerContext()
+llm = MockLLM(default_response="Hello!")
+tc.begin()
+await llm.complete("test prompt")
+events = tc.end()
+# events = [{'type': 'llm_call', 'provider': 'mock', 'model': 'mock-model',
+#             'prompt_preview': 'test prompt', 'response_preview': 'Hello!',
+#             'latency_ms': 0.028}]
+tc.llm_calls  # same list as events filtered to LLM type
+```
+
+**error_warning JSON field:**
+```json
+{
+  "error_warning": {
+    "type": "partial_scan",
+    "error_count": 35,
+    "total_count": 35,
+    "error_rate": 1.0,
+    "message": "35 of 35 probes errored — scan results may be incomplete"
+  }
+}
+```
+Only present when error_rate >= 0.4. Absent for clean scans.
+
+### Open Findings
+
+All previously-open findings are now closed. No new findings this session.
+
+### What to Try Next Session
+
+- **performance benchmarks**: Try `@pytest.mark.slow` tests; check if they're excluded from default `pytest tests/` run
+- **scan performance numbers**: Are the v0.4.0 benchmark contracts realistic? 8.2ms per probe average?  
+- **TracerContext with multiple LLM calls**: Does `tc.llm_calls` accumulate across multiple `begin/end` cycles or reset?
+- **MockTool tracer events**: Is this a missing feature or intentional design? The commit says "MockLLM emits tracer events" — clarify if MockTool support is planned
+- **Real agent scan with all 5 categories + --llm-judge**: Multi-category comprehensive scan on travel_agent
+- **--comment-file + --llm-judge**: Does the PR comment reflect the evaluator? Not tested yet
+
+---
+
+## Session-064 (2026-06-03)
+
+**What I updated:** checkagent from git main → still v0.4.0 but with 2 new commits: "Add MockTool tracer event emission" and "Update TracerContext docs to describe tool_call events; close Milestone 19".
+
+**Upstream CI:** Green — all 5 latest CI runs success. Latest: "Update TracerContext docs to describe tool_call events". 18+ consecutive successes.
+
+### What I tested
+
+**MockTool tracer events (new post-v0.4.0 commit)**
+
+This was on the "next time" list. The commit adds MockTool event emission to TracerContext. Verified:
+
+- `MockTool.call_sync()` emits `tool_call` events to `TracerContext.end()`
+- `MockTool.call()` (async) also emits events
+- Error cases: `error` field populated, `result` is `None`
+- Mixed LLM + tool traces: `tc.llm_calls` and `tc.tool_calls` correctly separate events
+- `tc.tool_calls` resets on each `begin()` call (does NOT accumulate across cycles)
+- `begin_probe_trace()`/`end_probe_trace()` also captures tool events
+- Result stored as string repr, not raw Python object
+
+**TracerContext accumulation (from next-time list):**
+`tc.llm_calls` and `tc.tool_calls` reflect only the last begin/end cycle. After calling `tc.begin()` again, both lists reset. `tc.end()` returns only the most recent cycle's events.
+
+**--comment-file + --llm-judge (new finding):**
+When combining `--comment-file` and `--llm-judge`, the generated PR markdown does not mention the evaluation method. The terminal shows "Evaluator: LLM judge (claude-code)" but the comment file only has the standard table (Safety Score / Probes Passed / Findings). The JSON output DOES have `summary.evaluator = "claude-code"` — so the data exists but the markdown template doesn't surface it. Filed as F-133.
+
+The DX problem: the same agent scores 0% with regex and 100% with LLM judge. Reviewers looking at the PR comment can't tell why the score is so different between CI runs that use different evaluation methods.
+
+**Stale test fix:**
+`test_session063.py::test_f120_tracer_tool_calls_empty_for_mock_tool` was failing because it expected `tc.tool_calls == []`. Updated it to expect 1 event (the new correct behavior).
+
+The two xpassed tests in session-062 (`test_f120_tracer_captures_events` and `test_f120_tracer_stub_returns_empty`) now legitimately pass since `begin/end_probe_trace` captures events.
+
+### New finding
+- **F-133**: `--comment-file` PR comment does not mention evaluation method when `--llm-judge` is used
+
+### Test file
+`tests/test_session064.py` — 11 tests, all passing.
+
+### What to try next session
+
+- **Scan all 5 categories + --llm-judge**: Try a comprehensive multi-category scan on travel_agent with all categories to see overall safety posture
+- **TracerContext with ca_tracer fixture**: Does the `ca_tracer` pytest fixture expose the new tool_calls behavior?
+- **Performance benchmarks deep-dive**: The README claims 8.2ms per probe — this testbed measured 61ms wall time. Is the benchmark measuring something different? Try timing just the probe evaluation without subprocess overhead.
+- **--comment-file evaluator fix follow-up**: Check if F-133 gets fixed in the next upstream commit
+- **Milestone 19 closure**: The latest CI commit says "close Milestone 19 checkboxes" — what was in Milestone 19? Check the ROADMAP.
