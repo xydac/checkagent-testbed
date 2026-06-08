@@ -215,6 +215,7 @@ def test_comment_file_generated_with_llm_judge():
             os.unlink(comment_file)
 
 
+@pytest.mark.xfail(reason="F-133 FIXED in session-065: evaluator now shown in PR comment")
 def test_comment_file_does_not_show_evaluator_method():
     """DX gap: --comment-file does not include evaluator method in PR comment.
 
