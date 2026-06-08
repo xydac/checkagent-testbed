@@ -1611,4 +1611,36 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** The PR comment should indicate which evaluation method was used — e.g., a row like "Evaluator | LLM judge (claude-code)" in the metrics table. This matters because: (a) the same agent can score 0% with regex and 100% with LLM judge, (b) reviewers need to know why the score changed, (c) teams tracking score history need the evaluation method to interpret deltas.
 **Actual:** `checkagent scan ... --llm-judge claude-code --comment-file report.md` → the generated markdown has no evaluator/judge mention. The `--json` output DOES include `summary.evaluator = "claude-code"`, so the information exists but is not surfaced in the markdown template.
 **Workaround:** Add a manual note to the PR comment or check the JSON output's `summary.evaluator` field.
-**Status:** Open
+**Status:** Fixed in session-065. The PR comment markdown now includes an "Evaluator" row in the metrics table when `--llm-judge` is used. Confirmed: echo agent scan with `--llm-judge claude-code --comment-file` → comment file contains "Evaluator" and "LLM judge"/"claude-code". Without `--llm-judge` → no Evaluator row (expected asymmetry).
+
+---
+
+## F-134: `checkagent diff --comment-file` generates UTF-8 with emoji; Windows cp1252 UnicodeDecodeError
+**Date:** 2026-06-05
+**Severity:** high
+**Category:** bug
+**Description:** The `checkagent diff --comment-file` command generates a GitHub PR comment markdown file containing Unicode characters that cannot be decoded by Windows cp1252 (the default Python encoding on Windows). The file contains `🟢` (U+1F7E2, UTF-8: F0 9F 9F A2), `—` (U+2014, em dash, UTF-8: E2 80 94), and `✅` (U+2705, UTF-8: E2 9C 85). On Windows, `Path("diff.md").read_text()` without `encoding='utf-8'` raises `UnicodeDecodeError: 'charmap' codec can't decode byte 0x9C in position N`.
+**Expected:** Either: (a) the `--comment-file` writer should use `encoding='utf-8'` (it likely does), and docs/test should note files are UTF-8; or (b) the markdown template should use ASCII-safe alternatives (`:white_check_mark:` instead of `✅`, `-` instead of `—`).
+**Actual:** Upstream CI `tests\cli\test_diff.py::TestDiffCLI::test_comment_file` fails on Windows 3.12 and 3.13 with `UnicodeDecodeError: 'charmap' codec can't decode byte 0x8f in position 199`. The commit "Document diff command and --diff flag in README and CLI reference" introduced this test without specifying `encoding='utf-8'` in `read_text()`. User-side impact: any user on Windows who reads the generated file with `Path(...).read_text()` will get the same error.
+**Workaround:** Always specify `encoding='utf-8'` when reading checkagent-generated markdown files on Windows: `Path("diff.md").read_text(encoding='utf-8')`.
+**Status:** Fixed in v0.5.0 — "Fix F-134: specify encoding='utf-8' when reading diff comment files on Windows" — confirmed locally: `comment_file.read_text(encoding='utf-8')` works without error.
+
+## F-135: `scan --diff --json` does not embed diff data in JSON output
+**Date:** 2026-06-07
+**Severity:** medium
+**Category:** dx-friction
+**Description:** When running `checkagent scan --diff --json`, the scan JSON output shown on stdout does NOT include the diff data. The diff comparison (new/fixed/unchanged findings, regression flag) is only shown in the Rich terminal output, not in the machine-readable JSON. However, the `history` key (with score delta) is present in the JSON.
+**Expected:** Either `--diff --json` embeds a `diff` object in the JSON output, or docs note that `--diff` output goes to terminal only.
+**Actual:** JSON output contains `history.score_delta` (change from previous), but no `diff` object with `new_findings`/`fixed_findings`/`counts.new`/`regression` fields. Users who parse the JSON cannot programmatically detect regressions from `scan --diff --json` — they must use `checkagent diff` separately for that.
+**Workaround:** Use `checkagent scan --json > current.json` then `checkagent diff baseline.json current.json --json` for machine-readable regression detection.
+**Status:** Fixed in commit 0bc03271 (post-v0.5.0) — `scan --diff --json` now includes a top-level `diff` key with `score.delta`, `counts.new/fixed/unchanged`, `regression`, `new_findings`, `fixed_findings`. Confirmed in session-066.
+
+## F-136: `--min-stability` silently exits 0 (no-op) when scans lack stability data
+**Date:** 2026-06-07
+**Severity:** high
+**Category:** bug
+**Description:** The `checkagent diff --min-stability N` gate should fail when the current agent's stability score drops below threshold N. However, when either scan file lacks stability data (i.e., was run without `--repeat N`), the gate is silently skipped with exit code 0. A warning is emitted to terminal but CI pipelines treat exit 0 as success — the gate becomes a no-op.
+**Expected:** Either (a) `--min-stability` exits 1 when stability data is absent (strict mode: "I asked you to gate on stability but you gave me no stability data"), or (b) the warning is clearly documented as a non-blocking soft warning.
+**Actual:** Terminal shows "Warning: --min-stability requires both scans to be run with --repeat N. No stability data found." but exit code is 0. CI gates defined with `--min-stability` pass silently if users forget `--repeat`.
+**Workaround:** Always pair `--min-stability` with `--repeat N` in the scan step. Add a CI check that the scan JSON contains `stability.stability_score` before invoking `diff --min-stability`.
+**Status:** Fixed in commit 1680ef49 (post-v0.5.0) — now exits 1 with message "Exiting with code 1: --min-stability gate requires both scans to be run with --repeat N. No stability data found." Confirmed in session-066.

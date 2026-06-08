@@ -3645,3 +3645,125 @@ The two xpassed tests in session-062 (`test_f120_tracer_captures_events` and `te
 - **Performance benchmarks deep-dive**: The README claims 8.2ms per probe — this testbed measured 61ms wall time. Is the benchmark measuring something different? Try timing just the probe evaluation without subprocess overhead.
 - **--comment-file evaluator fix follow-up**: Check if F-133 gets fixed in the next upstream commit
 - **Milestone 19 closure**: The latest CI commit says "close Milestone 19 checkboxes" — what was in Milestone 19? Check the ROADMAP.
+
+---
+
+## Session-065 — 2026-06-05
+
+### What I tested
+
+**Upgrade:** `pip install --upgrade checkagent @ git+https://github.com/xydac/checkagent.git@main`. Still v0.4.0.
+
+**Upstream CI:** Red. The latest commit "Document diff command and --diff flag in README and CLI reference" breaks CI on Windows 3.12 and 3.13. The test `test_diff.py::TestDiffCLI::test_comment_file` calls `comment.read_text()` without `encoding='utf-8'`, and the diff comment file contains Unicode characters (🟢, —, ✅) that can't be decoded by Windows cp1252. The previous commit "Enhance history command with sparkline trend chart and score summary" was green.
+
+**F-133 FIXED (from session-064 next-time list):**
+`--comment-file` PR comment now includes an "Evaluator" row when `--llm-judge` is used. The fix was confirmed:
+- `checkagent scan echo_agent --llm-judge claude-code --comment-file out.md` → "Evaluator" in markdown, "LLM judge" or "claude-code" present
+- `checkagent scan echo_agent --comment-file out.md` (no judge) → no "Evaluator" row (correct asymmetry)
+
+**checkagent history sparkline (from next-time list):**
+The "Enhance history command with sparkline trend chart and score summary" commit added:
+- "Trend:" line below the history table with a sparkline chart
+- Trend summary: "stable", "improved", or "declined" + percentage
+- All confirmed working: `checkagent history agents.echo_agent_simple:run --limit 5` shows both sparkline and direction/percentage
+
+**Multi-category LLM judge scan:**
+Ran travel_agent against injection + jailbreak + pii + scope simultaneously with `--llm-judge claude-code`. Result: 100% score across all categories, `evaluator: "claude-code"` in JSON. The combination works cleanly.
+
+**checkagent diff command (new):**
+Full exploration of the new `diff` subcommand added in this session's commit. API: `checkagent diff BASELINE CURRENT [--json] [--fail-on-new] [--comment-file FILE]`
+
+What I confirmed:
+- Improvement case (echo→travel): `score.delta = 1.0`, `counts.fixed = 36`, `regression = False`
+- Regression case (travel→echo): `counts.new = 36`, `regression = True`
+- `--fail-on-new`: exit 1 when regressions, exit 0 when improved or stable
+- `--json` output: keys: `baseline_target`, `current_target`, `score`, `probes`, `new_findings`, `fixed_findings`, `unchanged_findings`, `counts`, `regression`
+- `--comment-file`: generates GitHub PR markdown with score table and fixed/new findings lists
+- Identical scans: `counts.new=0, counts.fixed=0, regression=False`
+- Targets are recorded in JSON output from each scan's `target` field
+
+**DX observations on diff:**
+- The command is very clean — `diff baseline.json current.json` is a natural Git CI workflow
+- `--fail-on-new` integrates naturally with GitHub Actions: run scan on main, scan on PR, diff → non-zero exit fails the check
+- The `--comment-file` output is visually rich (🟢 emoji, — dashes, ✅ checkmarks) but this causes Windows encoding issues (F-134)
+- The Rich terminal output and markdown comment are both nicely formatted
+
+### New finding
+- **F-134**: `diff --comment-file` generates UTF-8 with emoji (🟢, ✅, —); Windows cp1252 reads fail. Upstream CI red. Same root cause pattern as F-043.
+
+### Test file
+`tests/test_session065.py` — 21 tests, all passing. 9 new diff tests added this session.
+
+### What to try next session
+- **F-134 fix follow-up**: Check if Windows encoding fix lands quickly (same class as F-043 which was fixed same-session)
+- **diff + scan_gates integration**: Does `diff --fail-on-new` compose with `scan_gates` in `checkagent.yml`? Does the diff command read gates config?
+- **diff with --repeat**: Does diff handle scan files generated with `--repeat N`? The JSON structure includes a `stability` object — does diff surface stability regressions?
+- **diff --json regression field vs exit code**: When `regression=True` in JSON but `--fail-on-new` is not set, exit is 0. Is there a way to get exit 1 for any regression without `--fail-on-new`?
+- **History + sparkline on stable agent**: The travel_agent (100% every run) should show flat sparkline — test that case
+- **Milestone 20+ ROADMAP**: What's in the next milestone? Check ROADMAP for upcoming features to test
+
+## Session-066 (2026-06-08)
+
+### Upgrade and CI Status
+
+Upgraded to **v0.5.0** from git main. PyPI is now at 0.5.0 (F-123 fully resolved). Upstream CI: **green** for 2 consecutive runs. Latest commit: "Update docs: F-136 behavior change, --diff --json, category/severity breakdown" (2026-06-08). 
+
+New commits since session-065:
+- `5c7ec23f` — Update docs: F-136 behavior change, --diff --json, category/severity breakdown
+- `0bc03271` — Add category_breakdown and severity_breakdown to scan JSON summary
+- `f5ef26a2` — Update ci-init templates with quality gates and complete PR diff workflow
+- `1680ef49` — Fix F-136: --min-stability exits 1 when stability data absent
+- `20c456e2` — Document diff gates and stability tracking
+- `974ff60f` — Add --min-score and --min-stability gates to checkagent diff
+- `7955f72a` — Add stability tracking to diff command for --repeat scans
+
+### Test Suite
+
+Full suite: **1707 passed, 1 failed** (test_session052.py::test_version_is_0_3_1 — expected stale version test). No new regressions.
+
+Session-066 file was pre-populated with 30 tests but 2 were testing stale behavior (bugs that were fixed upstream). After updating, all **36 tests pass**.
+
+### F-135 FIXED
+
+`scan --diff --json` now embeds a `diff` key in the JSON output with the full diff object:
+```json
+{
+  "score": {"delta": 0.0, ...},
+  "counts": {"new": 0, "fixed": 0, "unchanged": 36},
+  "regression": false,
+  "new_findings": [...],
+  "fixed_findings": [...]
+}
+```
+This means users can detect regressions from a single `scan --diff --json` command — no need to run `checkagent diff` separately for machine-readable output. Big DX win for CI pipelines.
+
+### F-136 FIXED
+
+`--min-stability` now exits 1 (not 0) when no stability data is present. The error message is clear:
+> "Exiting with code 1: --min-stability gate requires both scans to be run with --repeat N. No stability data found."
+
+Previously this was a silent no-op — a CI trap where users would configure stability gating and get false confidence. Now the gate fails loudly if it can't be evaluated.
+
+### New features: category_breakdown and severity_breakdown
+
+The scan JSON `summary` now includes:
+- `category_breakdown`: dict mapping category names to finding counts (e.g. `{"prompt_injection": 35, "pii_leakage": 1}`)
+- `severity_breakdown`: dict mapping severity levels to counts (e.g. `{"high": 22, "critical": 9, "medium": 5}`)
+
+Both are empty dicts `{}` for safe agents (no findings). This is useful for CI reporting and understanding what types of issues were detected.
+
+### Stability in diff --json
+
+The `diff --json` output now includes a `stability` key:
+- `null` when neither (or only one) scan used `--repeat`
+- Object with `baseline`/`current`/`delta`/`baseline_repeat`/`current_repeat` when both scans used `--repeat`
+- `delta = current - baseline` stability score (0.0 for same agent)
+
+### What to try next session
+
+- **History + sparkline on stable agent**: travel_agent (always 100%) — test flat sparkline behavior
+- **ci-init quality gates**: The ci-init template now includes quality gates section (`f5ef26a2`) — test what gates are configured by default
+- **scan JSON category_breakdown multi-category**: Run scan with multiple categories and check category_breakdown is correct per category
+- **diff --fail-on-new + --min-score combined**: Do both gates apply when specified together? What's the exit code when both fail?
+- **ROADMAP**: Check what Milestone 20+ contains — what's next?
+
