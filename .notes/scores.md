@@ -127,7 +127,7 @@ Rate each feature on:
 | ReplayEngine (SEQUENCE) | 4 | 3 | Core playback works; remaining/all_used/reset all correct; but silently ignores kind — tool request matches llm interaction (F-044) | 2026-04-05 |
 | ReplayEngine (EXACT) | 5 | 4 | Body matching correct; raises CassetteMismatchError with strategy name in message; default strategy | 2026-04-05 |
 | ReplayEngine (SUBSET) | 5 | 4 | Recorded body must be subset of request body — semantics are correct if you read docs carefully; error on subset mismatch | 2026-04-05 |
-| ReplayEngine block_unmatched | 1 | 1 | block_unmatched=False has no effect — always raises CassetteMismatchError (F-042). Passthrough mode not implemented | 2026-04-05 |
+| ReplayEngine block_unmatched | 5 | 4 | F-042 FIXED (session-069): block_unmatched=False now returns None on mismatch; True (default) still raises CassetteMismatchError | 2026-06-27 |
 | CassetteMismatchError | 5 | 5 | Clean exception hierarchy; message includes kind and strategy; raised on exhausted cassette | 2026-04-05 |
 | MatchStrategy enum | 5 | 4 | 3 values (EXACT/SEQUENCE/SUBSET); string values; default is EXACT (sensible) | 2026-04-05 |
 | TimedCall | 5 | 4 | Context manager; accurate ms timing; reusable; only one field (duration_ms); minimal but functional | 2026-04-05 |
@@ -135,7 +135,7 @@ Rate each feature on:
 | @pytest.mark.cassette (session-017) | 2 | 2 | CassetteRecorder+ReplayEngine exist now but still no pytest fixture — marker still no-op; no ap_cassette, no auto record/replay | 2026-04-05 |
 | checkagent migrate-cassettes CLI | 2 | 2 | Command now exists (F-039 partially resolved) but v0→v1 migration not implemented (F-045); always returns exit code 0 even on failure | 2026-04-06 |
 | migrate-cassettes v0 support | 1 | 1 | "No migration registered from v0" — the only migration needed is unimplemented (F-045) | 2026-04-06 |
-| Cassette.save()/load() path handling | 3 | 2 | Both require pathlib.Path; str raises AttributeError with confusing 'parent'/'read_text' message; no Path coercion (F-046) | 2026-04-06 |
+| Cassette.save()/load() path handling | 5 | 5 | F-046 FIXED (session-069): both save() and load() now accept str or pathlib.Path | 2026-06-27 |
 | upstream CI (session-018) | 1 | 1 | Still red — new failure: TimedCall.duration_ms == 0.0 on Windows for short sleep (F-047). Third consecutive CI failure, third different root cause | 2026-04-06 |
 | upstream CI (session-019) | 4 | 4 | FIXED — latest run passing. F-047 and F-043 both resolved upstream. Stable for the first time in 3 sessions | 2026-04-06 |
 | checkagent.judge module (overall) | 4 | 3 | Core judge logic solid: RubricJudge, compute_verdict, 3 scale types, weighted criteria, statistical verdicts; not at top-level (F-048); no ap_judge fixture (F-049) | 2026-04-06 |
@@ -364,3 +364,27 @@ Rate each feature on:
 | scan --diff flag | 5 | 5 | F-135 FIXED (session-066): `--diff --json` now embeds full `diff` key (score.delta, counts, regression, new/fixed_findings) in JSON output; complete machine-readable regression detection from a single scan command | 2026-06-08 |
 | ci-init --diff integration | 5 | 4 | Generated workflow includes --repeat 3 --diff; PR diff comment section is commented out without showing how to store/fetch baseline artifact in GitHub Actions — gap for the most useful CI pattern | 2026-06-07 |
 | scan JSON category_breakdown | 5 | 5 | New (session-066): summary.category_breakdown shows finding counts by category (e.g. prompt_injection: 35); summary.severity_breakdown shows counts by severity level; both are dicts, empty for safe agents | 2026-06-08 |
+| v1.0.0 PyPI release | 5 | 5 | v1.0.0 published 2026-06-13. `pip install checkagent` now returns 1.0.0. First stable/major release. | 2026-06-13 |
+| upstream CI (session-067) | 1 | 1 | RED — F-142: latest commit "Add --fix flag to analyze-prompt" breaks Windows 3.11/3.12/3.13. Drive letter C: treated as module name. Linux/macOS all green. | 2026-06-13 |
+| analyze-prompt --fix | 5 | 4 | New in v1.0.0: generates hardened prompt with boilerplate security controls for all failing checks. Text output clean; F-141: --fix --json outputs two JSON objects (invalid json.load()); DX gap: replace markers like [DEFINE SCOPE] need docs | 2026-06-13 |
+| dashboard command | 5 | 3 | New in v0.6.0: reads .checkagent/history/, shows per-agent score table with trend/count/scans. Text output good; F-139: JSON missing trend + average_score; 262 agents tracked (port-per-session accumulation is a cosmetic noise issue) | 2026-06-13 |
+| ci-init template (v1.0.0) | 5 | 5 | Significantly improved: two-job structure (scan + pr-diff), quality gates active by default, auto-post PR comment via GitHub script, artifact upload/download for cross-job baseline comparison. Production-ready. | 2026-06-13 |
+| --category multi-flag (F-137) | 1 | 1 | F-137 still open in v1.0.0: only last --category runs; all others silently dropped | 2026-06-13 |
+| diff --min-score scale (F-138) | 2 | 2 | F-138 still open in v1.0.0: --min-score 80 means 8000%, fails 100% agent. No validation or hint. | 2026-06-13 |
+| v1.1.0 PyPI release | 5 | 5 | v1.1.0 published 2026-06-25. `pip install checkagent` returns 1.1.0. | 2026-06-25 |
+| upstream CI (session-068) | 5 | 5 | GREEN — latest 2 runs green ("Enhance --list-targets: show constructor args and scan hints"). The "Bump version to 1.1.0" commit was briefly red (ruff lint) but fixed quickly. | 2026-06-25 |
+| wrap --list-targets | 5 | 5 | New in v1.1.0: lists callable targets in a .py file without importing; shows function type (async fn/function/class); scan command hint for each; shows "Requires: api_key, ..." for classes with required constructor args + adapter/extract-prompt hint | 2026-06-25 |
+| wrap --extract-prompt | 5 | 4 | New in v1.1.0: AST-based extraction of system_prompt/prompt/instruction variables; saves to <varname>.txt in CWD; shows preview + scan suggestion; DX gap: writes to CWD not to agent file's directory; --force needed to overwrite | 2026-06-25 |
+| checkagent watch command | 5 | 5 | New in v1.1.0: file watcher for system prompts; updates analyze-prompt score on save; --interval controls poll rate; --llm for semantic verification; nonexistent file gives clear error immediately | 2026-06-25 |
+| --system-prompt scan mode | 4 | 4 | New: scan a system prompt string/file directly via LLM without Python code; static analyze-prompt section runs immediately; LLM-based probe section requires API key; error message now mentions LLM config (F-144 FIXED); 35/35 errors with no API key but graceful | 2026-06-25 |
+| --exit-zero flag | 5 | 4 | New: forces scan exit 0 even with findings; JSON still valid; tip shown in terminal; DX gap: help text references --min-score/--fail-on-new (diff-only flags) incorrectly (F-143 open) | 2026-06-25 |
+| analyze-prompt --fix (v1.1.0) | 5 | 5 | F-141 FIXED: --fix --json now outputs single valid JSON with hardened_prompt key; F-145 NEW: [your domain] in table Note column stripped by Rich again | 2026-06-25 |
+| analyze-prompt example hints (post-v1.1.0) | 5 | 5 | MISSING checks now show Try: "..." hint in table Note column with a 52-char excerpt from the recommendation; helps users know exactly what to add; F-145 FIXED: [your domain] bracket content now preserved via rich_escape() | 2026-06-27 |
+| scan JSON probe_description + remediation | 5 | 5 | Each finding now includes probe_description (short sentence about the attack) and remediation (list of concrete steps); structured, actionable output for CI and downstream tooling | 2026-06-27 |
+| wrap --list-targets (constructor args) | 5 | 5 | Enhanced: classes with required __init__ args show "Requires: api_key, model" + adapter/extract-prompt hint; directs users to next step without confusion; no change needed for function targets | 2026-06-27 |
+| --exit-zero flag (F-143 status) | 5 | 5 | F-143 FIXED: help text now says "Use checkagent diff --min-score to enforce score thresholds after scanning" — directs to correct command; no longer references nonexistent --min-score on scan | 2026-06-27 |
+| --category multi-flag (session-068) | 5 | 5 | F-137 FIXED in v1.1.0: all specified --category flags now run; tested injection+jailbreak+pii → all 3 appear in category_breakdown | 2026-06-25 |
+| diff --min-score (session-068) | 5 | 4 | F-138 FIXED in v1.1.0: --min-score 80 now rejected with range error; --min-score 0.8 accepted | 2026-06-25 |
+| dashboard --json (session-068) | 5 | 5 | F-139 FIXED in v1.1.0: JSON now includes trend and average_score per agent entry | 2026-06-25 |
+| CassetteRecorder end-to-end (session-069) | 5 | 4 | Full record→finalize→save→load→replay cycle works. API: test_id= (not source=), finalize() no args, record_llm_call(method=,request_body=,response_body=). Still no pytest fixture (ap_cassette), still no v0→v1 migration (F-045), F-044 still open (SEQUENCE ignores kind) | 2026-06-27 |
+| analyze-prompt table Note F-145 (session-069) | 5 | 4 | F-145 FIXED: 'Try:' hint text in table Note now preserves [brackets]. F-146 NEW: Prompt: header preview still strips brackets (different code path) | 2026-06-27 |

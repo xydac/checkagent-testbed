@@ -20,8 +20,11 @@ import checkagent
 # ---------------------------------------------------------------------------
 
 
-def test_version_is_0_3_1():
-    assert checkagent.__version__ == "0.3.1"
+def test_version_is_at_least_1_1_0():
+    from packaging.version import Version
+    assert Version(checkagent.__version__) >= Version("1.1.0"), (
+        f"Expected >= 1.1.0, got {checkagent.__version__}"
+    )
 
 
 def test_upstream_ci_green():
@@ -254,7 +257,9 @@ def test_milestone_13_is_docs_only():
     No new API, no new CLI commands, no new fixtures.
     This test verifies the version is still 0.3.1 (no bump).
     """
-    assert checkagent.__version__ == "0.3.1"
+    # Version has moved well past 0.3.1 — now 1.1.0+
+    from packaging.version import Version
+    assert Version(checkagent.__version__) >= Version("1.1.0")
     # Milestone 17 items still pending:
     # - --provider claude-code flag
     # - Auto-instrumentation capturing real LLM calls (F-120)

@@ -492,7 +492,7 @@ Format:
 **Expected:** `ReplayEngine(..., block_unmatched=False).match(unmatched_req)` → returns `None` (passthrough). `block_unmatched=True` → raises `CassetteMismatchError` (strict mode).
 **Actual:** `block_unmatched=False` always raises `CassetteMismatchError` identically to `block_unmatched=True`. The parameter is accepted but has no effect.
 **Workaround:** Wrap `engine.match()` in a try/except and catch `CassetteMismatchError` yourself to simulate passthrough behavior.
-**Status:** Open
+**Status:** FIXED in post-v1.1.0 commit "Add end-to-end replay tests" (2026-06-27). `block_unmatched=False` now returns `None` instead of raising `CassetteMismatchError`. Confirmed in session-069.
 
 ---
 
@@ -541,7 +541,7 @@ Format:
 **Expected:** Either accept both `str` and `Path` via `os.fspath()` or `Path(path)` coercion (standard Python practice), or raise a `TypeError` with a message like "path must be a pathlib.Path, got str".
 **Actual:** `Cassette.save("/tmp/test.json")` → `AttributeError: 'str' object has no attribute 'parent'`. The error message reveals the implementation detail but doesn't help the user fix it.
 **Workaround:** Always use `pathlib.Path`: `cassette.save(Path("/tmp/test.json"))`, `Cassette.load(Path("/tmp/test.json"))`.
-**Status:** Open
+**Status:** FIXED in post-v1.1.0 commit (2026-06-27). `Cassette.save()` now accepts both `str` and `pathlib.Path`. Confirmed in session-069.
 
 ---
 
@@ -1644,3 +1644,118 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Actual:** Terminal shows "Warning: --min-stability requires both scans to be run with --repeat N. No stability data found." but exit code is 0. CI gates defined with `--min-stability` pass silently if users forget `--repeat`.
 **Workaround:** Always pair `--min-stability` with `--repeat N` in the scan step. Add a CI check that the scan JSON contains `stability.stability_score` before invoking `diff --min-stability`.
 **Status:** Fixed in commit 1680ef49 (post-v0.5.0) — now exits 1 with message "Exiting with code 1: --min-stability gate requires both scans to be run with --repeat N. No stability data found." Confirmed in session-066.
+
+---
+
+## F-137: `--category` flag silently overrides on multiple uses — only last value runs
+**Date:** 2026-06-10
+**Severity:** medium
+**Category:** bug
+**Description:** When passing `--category` multiple times to `checkagent scan`, only the last specified category runs. The first category is silently discarded. For example: `--category injection --category jailbreak` runs only jailbreak probes (15), not both injection+jailbreak (50). Reversing the order gives the opposite drop.
+**Expected:** Multiple `--category` flags should accumulate, running probes for all specified categories.
+**Actual:** `checkagent scan agent --category injection --category jailbreak --json` → `category_breakdown` shows jailbreak findings only; prompt_injection absent. `checkagent scan agent --category jailbreak --category injection --json` → shows injection findings only; jailbreak absent.
+**Workaround:** Run two separate scans and merge results, or use a single `--category` with a combined probe set at the Python API level.
+**Status:** Open as of v1.0.0 (session-067).
+
+---
+
+## F-138: `diff --min-score` accepts float 0-1 but no validation for integer inputs
+**Date:** 2026-06-10
+**Severity:** medium
+**Category:** dx-friction
+**Description:** The `checkagent diff --min-score` flag expects a float in [0, 1] representing a fraction (e.g., `0.8` for 80%). However, there is no validation for integer inputs. A user who writes `--min-score 80` (thinking 80%) passes `80` as the threshold. Internally `score (1.0) < 80` is True, so even a 100% agent fails the gate. The error message reads "safety score 100% is below --min-score 8000%", revealing the mismatch only after failure.
+**Expected:** Either (a) validate that the value is in [0, 1] and raise an error with a suggestion ("did you mean --min-score 0.8?"), or (b) accept integers 1-100 as percentages.
+**Actual:** `checkagent diff baseline.json current.json --min-score 80` → exit 1, message "safety score 100% is below --min-score 8000%". Misleading but detectable.
+**Workaround:** Always use decimal fractions: `--min-score 0.8` not `--min-score 80`.
+**Status:** Open as of v1.0.0 (session-067).
+
+---
+
+## F-139: `dashboard --json` missing `trend` and `average_score` fields shown in table
+**Date:** 2026-06-10
+**Severity:** low
+**Category:** dx-friction
+**Description:** The `checkagent dashboard` table output shows a "Trend" column (→ for stable, ↑ for improving, ↓ for declining) and a footer line "Average score across N agent(s): X%". Neither of these appear in the `--json` output. The JSON agent objects have `target`, `score`, `failed`, `total`, `date`, `scans` — no `trend` field. The top-level JSON has `agents`, `total`, `showing` — no `average_score`.
+**Expected:** `--json` output should mirror what the table shows. Missing fields make the JSON incomplete for dashboard/CI consumers.
+**Workaround:** Calculate trend and average from the `score` values in the `agents` list.
+**Status:** Open as of v1.0.0 (session-067).
+
+---
+
+## F-140: Upstream "CheckAgent Safety Scan" CI workflow fails on v1.0.0 — self-referential issue
+**Date:** 2026-06-10
+**Severity:** info
+**Category:** upstream-ci
+**Description:** The checkagent repo has a "CheckAgent Safety Scan" CI workflow that scans checkagent's own example agents after every push. This workflow uses `pip install checkagent` (PyPI) rather than `pip install -e .` (local), so it tests the previous released version against the new code. This self-referential inconsistency causes this workflow to fail periodically. Not user-facing.
+**Status:** Open (info only — affects checkagent's own CI, not user-side behavior).
+
+---
+
+## F-141: `analyze-prompt --fix --json` outputs two separate JSON objects — invalid for `json.load()`
+**Date:** 2026-06-13
+**Severity:** medium
+**Category:** bug
+**Description:** When running `checkagent analyze-prompt "..." --fix --json`, stdout contains two JSON objects printed sequentially without a separator. The first is the standard analysis result (score, checks, recommendations). The second is `{"hardened_prompt": "..."}`. Standard `json.load()` or `json.loads()` raises `JSONDecodeError: Extra data` after parsing the first object.
+**Expected:** Either (a) the `--fix` key should be added to the existing JSON object (`{"score": ..., "hardened_prompt": ...}`), or (b) output should be properly delimited NDJSON (one object per line), or (c) `--fix` and `--json` should be mutually exclusive with a clear error.
+**Actual:** `checkagent analyze-prompt "You are a bot." --fix --json 2>&1 | python3 -c "import json,sys; json.load(sys.stdin)"` → `JSONDecodeError: Extra data: line 92 column 1`. The hardened prompt is only reachable via `JSONDecoder().raw_decode()` loop.
+**Workaround:** Use `JSONDecoder().raw_decode()` in a loop to extract both objects from stdout, or use `--fix` without `--json` and parse the terminal output.
+**Status:** FIXED in post-v1.0.0 commit (2026-06-14). `hardened_prompt` is now a field inside the single JSON object. Verified in session-068.
+
+---
+
+## F-142: CI red on Windows — bare `.py` file path with drive letter fails `resolve_callable`
+**Date:** 2026-06-13
+**Severity:** high
+**Category:** upstream-ci
+**Description:** The commit "Add --fix flag to analyze-prompt" broke Windows CI (Python 3.11, 3.12, 3.13). The test `test_bare_py_file_suggests_functions` passes a bare `.py` file path (without a function specifier) to `resolve_callable`. On Windows, the path starts with a drive letter (`C:\...`), which `resolve_callable` interprets as a module name `C`, giving "Cannot import module 'C': No module named 'C'" instead of the expected "Missing function name" message.
+**Expected:** A bare `.py` path should always return "Missing function name" regardless of whether it starts with a drive letter.
+**Actual:** Linux/macOS: correct "Missing function name" message. Windows: "Cannot import module 'C': No module named 'C'" — the drive letter is treated as a module name because the path separator check doesn't account for Windows `C:\` prefix.
+**Status:** FIXED in post-v1.0.0 commit "Fix bare .py detection on Windows: handle drive-letter colon in path" (2026-06-14). CI green as of session-068.
+
+---
+
+## F-143: `--exit-zero` help text references `--min-score` and `--fail-on-new` as scan flags, but they don't exist on `scan`
+**Date:** 2026-06-17
+**Severity:** low
+**Category:** docs-mismatch
+**Description:** The `--exit-zero` flag's help text on `checkagent scan` reads: "Quality gates (--min-score, --fail-on-new) still exit 2 when triggered." However, `checkagent scan` has no `--min-score` or `--fail-on-new` flags — those exist only on `checkagent diff`. A user reading only `scan --help` would expect to find these flags on scan and be confused when they don't exist.
+**Expected:** Help text should either (a) name the correct location ("Run `checkagent diff --min-score` to enforce score thresholds") or (b) reference scan gates from `checkagent.yml` config instead.
+**Actual:** `checkagent scan echo_agent:agent --min-score 0.9` → "Error: No such option: --min-score". Contradicts the help text for `--exit-zero`.
+**Workaround:** Use `checkagent diff baseline.json current.json --min-score 0.8` for score-threshold gates.
+**Status:** FIXED in post-v1.1.0 commit (2026-06-27). Help text now says "Use `checkagent diff --min-score` to enforce score thresholds after scanning" — references correct command. Confirmed in session-069.
+
+---
+
+## F-144: `--system-prompt` scan error message says "target is importable" — wrong context for LLM failures
+**Date:** 2026-06-17
+**Severity:** low
+**Category:** dx-friction
+**Description:** When `checkagent scan --system-prompt ... --model claude-code` fails (all 101 probes error due to LLM issues), the error box says: "101 probe(s) raised exceptions. Check that the target is importable and callable, and that any required dependencies are installed." This message is copied from the standard scan error and makes no sense for `--system-prompt` mode — there's no Python target to import.
+**Expected:** For `--system-prompt` mode, the error should say something like "Check your LLM model configuration or API key" instead of referencing importability.
+**Actual:** The static `analyze-prompt` section runs correctly, but the dynamic probe section shows agent-import guidance that is irrelevant to LLM-backed scanning.
+**Workaround:** Ignore the error message; the issue is the LLM connection (API key, network) not importability.
+**Status:** FIXED in v1.1.0. Error message now says "Check your LLM configuration" for --system-prompt mode. Confirmed in session-068 (2026-06-25).
+
+---
+
+## F-145: F-093 regression in v1.1.0 — Rich markup strips `[your domain]` from analyze-prompt table Note column
+**Date:** 2026-06-25
+**Severity:** medium
+**Category:** bug
+**Description:** The fix for F-093 (Rich markup stripping template placeholders like `[your domain]` in `analyze-prompt` output) has regressed in v1.1.0. Running `checkagent analyze-prompt "You are a helpful assistant."` shows `"Try: Only help with ."` in the Scope Boundary table Note column — the `[your domain]` placeholder is stripped. The numbered recommendations section below the table still shows it correctly (`"Only help with [your domain]."`), so this is a partial regression affecting only the inline table Note display.
+**Expected:** The table Note column should show `Try: "Only help with [your domain]."` (as it did in v0.2.0 through v1.0.0).
+**Actual:** Table shows `Try: "Only help with ."` — Rich interprets `[your domain]` as markup and strips the content.
+**Workaround:** The recommendations section (numbered list below the table) still shows the full text correctly. For programmatic use, `--json` output is not affected.
+**Status:** FIXED (session-069 2026-06-27) for the table Note "Try:" hints — post-v1.1.0 commit "Fix F-145: escape hint text". The "Prompt:" header preview still strips brackets (see F-146).
+
+---
+
+## F-146: `analyze-prompt` 'Prompt:' header preview strips `[brackets]` from input text
+**Date:** 2026-06-27
+**Severity:** low
+**Category:** bug
+**Description:** The `Prompt:` line at the top of `checkagent analyze-prompt` output strips bracket content from the input prompt. Running `checkagent analyze-prompt "Only help with [your domain] questions."` shows `Prompt: Only help with  questions.` — note the double space where `[your domain]` was stripped. This is the same Rich markup stripping issue as F-093/F-145 but in a different code path (the preview/header line, not the table Note column). The F-145 fix (`rich_escape()` on hint text) did not cover this code path.
+**Expected:** The `Prompt:` preview line should display the input text exactly, including any `[bracket]` content.
+**Actual:** `Prompt: Only help with  questions.` — double space reveals that `[your domain]` was stripped by Rich treating it as markup.
+**Workaround:** Use `--json` output — the input prompt is not echoed in JSON output, so this is display-only. The analysis itself is not affected.
+**Status:** Open (session-069 2026-06-27). F-145 was partially fixed but this code path was missed.

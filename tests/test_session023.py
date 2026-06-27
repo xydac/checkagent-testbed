@@ -657,10 +657,11 @@ class TestCliImportTrace:
             capture_output=True, text=True
         )
 
-    def test_file_not_found_gives_exit_code_2(self, tmp_path):
+    def test_file_not_found_gives_exit_code_1(self, tmp_path):
+        # v0.6.0 changed exit code from 2 → 1 for file-not-found (runtime error, not usage error)
         result = self._run_cli(str(tmp_path / "no.json"))
-        assert result.returncode == 2
-        assert "does not exist" in result.stderr or "does not exist" in result.stdout
+        assert result.returncode == 1
+        assert "not found" in result.stderr.lower() or "not found" in result.stdout.lower()
 
     def test_basic_import_creates_output_file(self, tmp_path):
         data = [{"input": "q1", "output": "a1"}, {"input": "q2", "output": "a2"}]

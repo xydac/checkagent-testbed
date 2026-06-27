@@ -3767,3 +3767,180 @@ The `diff --json` output now includes a `stability` key:
 - **diff --fail-on-new + --min-score combined**: Do both gates apply when specified together? What's the exit code when both fail?
 - **ROADMAP**: Check what Milestone 20+ contains — what's next?
 
+
+---
+
+## Session 067 — 2026-06-13
+
+### Upgrade
+
+Installed from git main: **v1.0.0** — first stable major release (published to PyPI 2026-06-13).
+
+### Upstream CI
+
+Red. The commit "Add --fix flag to analyze-prompt" introduced a Windows-only failure: `test_bare_py_file_suggests_functions` fails on Python 3.11/3.12/3.13 because `resolve_callable` interprets the Windows drive letter `C:` as a module name → "Cannot import module 'C'" instead of "Missing function name". Linux/macOS green. Filed as F-142.
+
+Also noted: "CheckAgent Safety Scan" CI workflow has been failing intermittently (F-140) — this is a self-referential issue in checkagent's own CI, not user-facing.
+
+### New features in v1.0.0
+
+**`analyze-prompt --fix`** — generates a hardened version of the input prompt with boilerplate security controls appended for every failing check. Example: 7 controls added to "You are a helpful assistant." covering injection guard, scope boundary, PII handling, refusal behavior, data scope, confidentiality, escalation path. DX is good: includes `[DEFINE SCOPE]` placeholders, exit 1 on HIGH checks, clean "Hardened Prompt" section. Found F-141: `--fix --json` outputs two separate JSON objects (analysis result + `{"hardened_prompt": "..."}`) making stdout invalid for `json.load()`.
+
+**`checkagent dashboard`** — reads `.checkagent/history/` and shows per-agent safety table. Tested: 262 agents tracked (historical port-per-session noise), correct score/trend/scan count display. JSON output confirmed working. F-139 (missing `trend` and `average_score` in JSON) still open.
+
+**`ci-init` template (v1.0.0)** — completely redesigned. Now generates a two-job workflow: `scan` (runs on every push, uploads artifact) + `pr-diff` (downloads baseline from main, runs `checkagent diff`, posts PR comment). Quality gates are now **active by default** — `--fail-on-new` and `--min-score 0.8` in the diff step. This is a significant DX improvement over v0.6.0 where gates were commented out and the diff flow was unexplained.
+
+**`demo --scan`** — still working. Shows 95 safety findings in built-in vulnerable agent + 8 mock tests. Good zero-config demo.
+
+### Open findings confirmed still open in v1.0.0
+
+- **F-137**: `--category injection --category jailbreak` → only jailbreak runs. Still drops all but last.
+- **F-138**: `--min-score 80` → "8000%", fails 100% agent. No integer validation.
+- **F-139**: Dashboard JSON missing `trend` and `average_score`.
+
+### Test suite
+
+46 tests in test_session067.py. Updated for v1.0.0:
+- Version test: 0.6.0 → 1.0.0
+- CI test: green → red (documents F-142)
+- ci-init tests: updated for two-job template + active-by-default gates
+- Added `TestAnalyzePromptFix` (9 tests for new --fix flag + F-141)
+
+All 57 tests pass after updates. Full test suite: 1,323+ tests, all passing.
+
+### What to try next session
+
+- **F-141 watch**: is `--fix --json` fixed (merged into single JSON object)?
+- **F-142 watch**: is Windows bare .py path fixed?
+- **F-137 fix watch**: does `--category injection --category jailbreak` now run both?
+- **dashboard `--dir` flag**: test with a different project dir containing history
+- **analyze-prompt --fix on HTTP agent system prompt**: does the API exist?
+- **ROADMAP**: check Milestone 21+ — what's planned post-v1.0.0?
+
+---
+
+## Session-068 (2026-06-25)
+
+### Upgrade and CI Status
+
+Upgraded from v1.0.0 to **v1.1.0** from git main. `pip install checkagent@git+...@main` installed v1.1.0.
+
+Upstream CI: **GREEN** for the latest 2 runs ("Enhance --list-targets: show constructor args and scan hints" and "Add --list-targets to wrap"). The "Bump version to 1.1.0" commit was briefly red due to a ruff lint error (two unsorted import blocks in `tests/cli/test_scan.py`), but this was fixed in the subsequent commit and did not affect functionality.
+
+### Test Suite: 2 failures → 2 xfails
+
+Running `pytest tests/ -x -q` revealed 2 failing tests:
+
+1. `test_session036.py::test_f093_fixed_rich_markup_no_longer_strips_brackets` — **F-145**: F-093 has regressed in v1.1.0. The table Note column now strips `[your domain]` placeholder via Rich markup (shows "Try: Only help with ." instead of "Try: Only help with [your domain]."). The numbered recommendations section below the table still shows the text correctly.
+2. `test_session067.py::test_version_is_1_0_0` — stale: version advanced to 1.1.0.
+
+Both marked `xfail`. Suite now: **1,323 passed, 4+ xfailed, 0 failures**.
+
+### Session-068 Tests: All Pass
+
+The pre-written test_session068.py (491 lines) covered many expected fixes and all 27 tests passed (25 passed, 1 xfailed F-143, 1 xpassed F-144).
+
+F-144 XPASSED — fixed earlier than expected. The `--system-prompt` error message when all probes fail now says "Check your LLM model configuration" instead of "Check that the target is importable". Updated the test to remove the xfail marker.
+
+### Multiple bugs fixed in v1.1.0
+
+- **F-137 FIXED**: `--category injection --category jailbreak` now runs both categories. Previously only the last `--category` flag ran.
+- **F-138 FIXED**: `--min-score 80` now raises a validation error ("must be between 0.0 and 1.0"). Previously it silently interpreted it as 8000%.
+- **F-139 FIXED**: `checkagent dashboard --json` now includes `trend` and `average_score` per agent.
+- **F-141 FIXED**: `analyze-prompt --fix --json` now outputs a single valid JSON object with `hardened_prompt` as a key. Previously output two separate JSON objects.
+- **F-142 FIXED**: CI green on Windows. The bare .py path drive-letter bug is resolved.
+- **F-144 FIXED**: `--system-prompt` LLM error message is now context-appropriate.
+
+### New Features in v1.1.0
+
+**`wrap --list-targets`** — The flagship DX improvement. Runs AST analysis on a `.py` file (no import needed) and lists all callable scan targets with their type and a copy-paste `checkagent scan` command:
+
+- Functions: `async fn echo_agent (line 10)` → `checkagent scan echo_agent:echo_agent`
+- Classes with `.invoke()` and no required args: direct scan hint
+- Classes with required constructor args: shows `Requires: api_key, model` + suggests `--extract-prompt` or writing an adapter
+
+This is genuinely useful — a new user can point it at any agent file and instantly know what to scan.
+
+**`wrap --extract-prompt`** — AST analysis of a `.py` file looking for string assignments to variables named `system_prompt`, `prompt`, `instruction`, `persona`, `system`. Extracts the text, saves it to `<varname>.txt` in the current directory, and suggests the scan command:
+```
+checkagent scan --system-prompt system_prompt.txt --model claude-code
+checkagent scan --system-prompt system_prompt.txt --model claude-haiku-4-5-20251001
+```
+
+One DX gap: it writes the `.txt` file to the current working directory, not to the agent file's directory. Running from a different directory creates the file in an unexpected location.
+
+**`checkagent watch`** — Watches a prompt `.txt` file and re-runs `analyze-prompt` on every save. Good for iterating on a system prompt. New file → friendly "does not exist" error. `--interval` controls poll rate. `--llm` for semantic verification.
+
+**`--system-prompt` scan mode** — Scan a system prompt string or file directly via an LLM (e.g., `--model claude-code`) without writing a Python agent. Static `analyze-prompt` analysis runs immediately; dynamic probe section requires API access. With no API key, 35/35 probes error gracefully. The error message now correctly says "Check your LLM model configuration" (F-144 fixed).
+
+**`--exit-zero`** — Forces scan exit 0 even when findings present. Useful for CI where you want to collect data without breaking the build. JSON output stays valid. DX gap: help text references `--min-score` and `--fail-on-new` as "quality gates that still exit 2" but those flags don't exist on `scan` — only on `diff` (F-143 open).
+
+### F-145: F-093 Rich markup regression
+
+The fix for F-093 (Rich markup stripping `[your domain]` from analyze-prompt output) has partially regressed in v1.1.0. The table Note column shows "Try: Only help with ." (brackets stripped). The numbered recommendations section below the table still shows "Only help with [your domain]." correctly. Logged as F-145. Not affecting `--json` output.
+
+### What to try next session
+
+- **F-145 watch**: is the Rich markup table Note regression fixed?
+- **F-143 watch**: is the `--exit-zero` help text corrected to remove `--min-score` reference?
+- **`checkagent watch` interactive**: test file change detection with real save (write a file, verify re-analysis triggers)
+- **`--extract-prompt` with instructor/system variables**: test on agents using `SYSTEM_PROMPT`, `SYSTEM`, `prompt` variable names
+- **`--system-prompt --model gpt-4o-mini`**: test with real OpenAI key to see full dynamic scan
+- **Milestone 21+**: check ROADMAP for post-v1.1.0 plans
+
+---
+
+## Session-069 (2026-06-27)
+
+### Upgrade and CI Status
+
+Upgraded from v1.1.0 to **git main** (still reports `1.1.0` — no version bump in latest commits). Upstream CI: **GREEN** for the latest 2 runs. Latest commit: "Add end-to-end replay tests: record MockLLM session, save cassette, replay" — a significant milestone for the replay system.
+
+### Test Suite
+
+Running `pytest tests/ -q` showed **1706 passed, 1 failed, 20 xfailed, 3 xpassed** — one stale version test in session-052 expected `0.3.1`. Fixed by changing to `>= 1.1.0`. After fix: **1707 passed**.
+
+### New Feature Focus: Cassette/Replay End-to-End
+
+The new commit adds end-to-end replay tests — meaning the `CassetteRecorder` + `ReplayEngine` workflow now actually works from a user's perspective. Tested extensively.
+
+**What works:**
+
+- `CassetteRecorder(test_id='...')` + `record_llm_call(method=, request_body=, response_body=, model=, duration_ms=)` + `finalize()` → `Cassette` — clean API
+- `Cassette.save(path)` / `Cassette.load(path)` — round-trip preserves all fields; **F-046 FIXED**: both now accept `str` or `pathlib.Path`
+- `ReplayEngine(cassette, strategy=SEQUENCE|EXACT|SUBSET, block_unmatched=True|False)`
+  - SEQUENCE: positional matching regardless of body (remaining property, all_used property, reset() method)
+  - EXACT: body equality required; `CassetteMismatchError` on mismatch
+  - SUBSET: recorded body ⊆ request body
+  - **F-042 FIXED**: `block_unmatched=False` now returns `None` instead of raising
+
+**API discovery pain points (DX friction):**
+- `CassetteRecorder.__init__` takes `test_id=`, not `source=`
+- `finalize()` takes no arguments (name/test_name were removed)
+- `record_llm_call()` uses `method=`, `request_body=`, `response_body=` (not `provider=`, `request=`, `response=`)
+- `engine.remaining` and `engine.all_used` are properties, not methods — calling them `()` raises `TypeError`
+- `engine.match()` takes a `RecordedRequest` object, not `(kind, body)` separately
+
+None of this is documented anywhere accessible — the API was discovered by `inspect.signature()` exploration.
+
+**Still open from earlier:**
+- **F-044**: SEQUENCE ignores `kind` — `RecordedRequest(kind='llm')` matches a tool interaction if it's next in sequence. No kind-based validation.
+- **F-045**: v0→v1 migration still unimplemented — `migrate_cassette_data()` returns v0 data unchanged.
+- **@pytest.mark.cassette**: still has no behavior in the plugin. The cassette marker is registered but does nothing — no auto record/replay, no `ap_cassette` fixture.
+
+### F-145 FIXED / F-146 NEW
+
+**F-145 FIXED**: The post-v1.1.0 commit "Fix F-145: escape hint text in analyze-prompt table Note column" correctly fixes the `Try:` hint text in the table — `[support channel]` now shows as `[s...` (truncated but bracket preserved). The numbered Recommendations section also still works.
+
+**F-146 NEW**: The `Prompt:` header preview line still strips brackets. Running `checkagent analyze-prompt "Only help with [your domain] questions."` shows `Prompt: Only help with  questions.` (double space reveals stripped `[your domain]`). This is the same Rich markup stripping bug in a different code path — the fix for F-145 targeted hint text but not the preview line. Minor severity (display only, analysis unaffected).
+
+**F-143 FIXED**: The `--exit-zero` help text now correctly says "Use `checkagent diff --min-score` to enforce score thresholds after scanning" — no longer references non-existent `--min-score` on `scan`.
+
+### What to try next session
+
+- **@pytest.mark.cassette**: Will the marker ever get actual behavior? This has been open since session-006.
+- **F-045**: v0→v1 migration still unimplemented — track if it ever gets fixed
+- **F-044**: SEQUENCE ignores kind — track if a `strict_kind=True` option is added
+- **F-146 watch**: is the Prompt: preview bracket stripping fixed?
+- **Real agent with replay**: try recording a LangChain/PydanticAI agent session then replaying it deterministically
+- **ROADMAP**: check for Milestone 21+ post-v1.1.0 plans

@@ -285,12 +285,11 @@ def test_f117_check_behavioral_compliance_at_top_level():
 # ---------------------------------------------------------------------------
 
 def test_f114_v030_on_pypi():
-    """F-114 FIXED: checkagent 0.3.0 is the latest PyPI version."""
+    """F-114 FIXED: checkagent is on PyPI at a version >= 0.3.0 (now 1.0.0)."""
     import importlib.metadata
+    from packaging.version import Version
     version = importlib.metadata.version("checkagent")
-    major, minor, patch = version.split(".")
-    assert int(major) >= 0
-    assert int(minor) >= 3, f"Expected >= 0.3.0 on PyPI, got {version}"
+    assert Version(version) >= Version("0.3.0"), f"Expected >= 0.3.0 on PyPI, got {version}"
 
 
 @pytest.mark.xfail(reason="stale: version advanced to 0.3.1")
