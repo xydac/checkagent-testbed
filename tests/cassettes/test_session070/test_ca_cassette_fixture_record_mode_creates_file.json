@@ -1,0 +1,44 @@
+{
+  "meta": {
+    "schema_version": 1,
+    "checkagent_version": "",
+    "recorded_at": "2026-07-09T18:17:16.930855+00:00",
+    "content_hash": "7ea8aff82aea5a0fc404152d5ac38c2bdc25b3b32f03451ac7913bf8b92272df",
+    "test_id": "tests/test_session070.py::test_ca_cassette_fixture_record_mode_creates_file"
+  },
+  "interactions": [
+    {
+      "id": "24ce08ca35dc0f83",
+      "sequence": 0,
+      "request": {
+        "kind": "llm",
+        "method": "chat.completions.create",
+        "model": null,
+        "body": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "What is 2+2?"
+            }
+          ]
+        }
+      },
+      "response": {
+        "status": "ok",
+        "body": {
+          "choices": [
+            {
+              "message": {
+                "content": "4"
+              }
+            }
+          ]
+        },
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "duration_ms": null
+      },
+      "metadata": {}
+    }
+  ]
+}

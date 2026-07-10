@@ -529,7 +529,7 @@ Format:
 **Expected:** `checkagent migrate-cassettes` should be able to upgrade v0 cassettes to v1 schema. The command should also return non-zero exit code when any cassette fails to migrate.
 **Actual:** `checkagent migrate-cassettes /dir/with/v0/cassettes` → "FAIL: No migration registered from v0. Cannot upgrade to v1." with exit code 0. v1 cassettes are correctly skipped.
 **Workaround:** Re-record cassettes by running agents again — there's no migration path. The v0 cassette warning from `Cassette.load()` now correctly points to the real CLI, but the CLI can't actually perform the migration.
-**Status:** Open
+**Status:** FIXED in post-v1.1.0 commit "Implement v0-to-v1 cassette migration (F-045)" (2026-06-28). `_migrate_v0_to_v1` is now registered in `_MIGRATIONS`; migration assigns `id`, `sequence`, and `metadata` to each interaction and sets `schema_version=1`. Both CLI (`checkagent migrate-cassettes`) and Python API (`migrate_cassette_data()`) now work. CLI output: `OK <file>: v0 -> v1 (migrated)` + `Target: v1 | Migrated: 1 | Skipped: 0 | Failed: 0`. Testbed: updated `TestMigrateCassettesV0Failure` class in test_session018.py (4 tests rewrote to verify success). Confirmed in session-070.
 
 ---
 
@@ -977,7 +977,7 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** Either raise an error on second attach, merge injectors, or document the overwrite behavior clearly.
 **Actual:** The second `attach_faults()` call replaces the first. The original injector's faults are lost.
 **Workaround:** Create one FaultInjector with all desired faults before calling `attach_faults()` once.
-**Status:** Open
+**Status:** Fixed in session-072 (d85dbb0) — `attach_faults()` with a different injector now raises `ValueError: A FaultInjector is already attached to this MockTool...`. Same injector is still idempotent.
 
 ---
 
@@ -1110,7 +1110,7 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** `to_dict()` includes all profile attributes: `overall_resilience`, `baseline`, `worst_scenario`, `best_scenario`, `weakest_metric`, `scenarios`.
 **Actual:** `"best_scenario"` key is absent from `to_dict()` output.
 **Workaround:** Access `profile.best_scenario` directly on the object; don't rely on `to_dict()` for this field.
-**Status:** Open
+**Status:** Fixed in session-072 (5f26e57) — `to_dict()` now includes `best_scenario` and `most_resilient_metric`. Confirmed: all 7 expected keys present.
 
 ---
 
@@ -1758,4 +1758,40 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** The `Prompt:` preview line should display the input text exactly, including any `[bracket]` content.
 **Actual:** `Prompt: Only help with  questions.` — double space reveals that `[your domain]` was stripped by Rich treating it as markup.
 **Workaround:** Use `--json` output — the input prompt is not echoed in JSON output, so this is display-only. The analysis itself is not affected.
-**Status:** Open (session-069 2026-06-27). F-145 was partially fixed but this code path was missed.
+**Status:** FIXED in post-v1.1.0 commit "Fix F-146: escape Prompt: header preview to preserve brackets in Rich output" (2026-06-28). The `Prompt:` preview line now calls `rich_escape()` before rendering, same fix pattern as F-145. Confirmed in session-070: `checkagent analyze-prompt "Only help with [your domain] questions."` → `Prompt: Only help with [your domain] questions.` (brackets preserved).
+
+---
+
+## F-147: `stress-prompt` reports 100% robustness for prompts with zero security controls
+**Date:** 2026-07-04
+**Severity:** high
+**Category:** bug
+**Description:** Running `checkagent stress-prompt "Be helpful."` returns `robustness_score: 1.0` and displays "Robustness: 100% (0 controls tested × 8 transforms)". A prompt with no detectable security controls scores 100% because no controls can be "broken" if none exist. The math is technically correct (0 broken / 0 controls → undefined → 1.0) but the headline number is dangerously misleading.
+**Expected:** When `baseline_passing=0`, the robustness score should be 0%, N/A, or display a clear warning like "No security controls detected — robustness score is not meaningful."
+**Actual:** Terminal displays "Robustness: 100%" and JSON has `robustness_score: 1.0`. A user interpreting this as security validation would think "Be helpful." is a perfectly robust prompt.
+**Workaround:** Always check `baseline_passing` field in JSON output alongside `robustness_score`. If `baseline_passing=0`, the robustness score is meaningless.
+**Status:** Fixed in session-072 (8697eed) — CLI now shows "N/A — No security controls detected..." instead of "100%". Python API returns `no_controls_detected=True` and `robustness_score=0.0`.
+
+---
+
+## F-148: `stress-prompt` has no Python API — CLI only
+**Date:** 2026-07-04
+**Severity:** medium
+**Category:** missing-feature
+**Description:** `checkagent stress-prompt` is CLI-only. There is no `from checkagent import stress_prompt` or equivalent Python function. All other analysis features (PromptAnalyzer, check_behavioral_compliance, etc.) have both CLI and Python API forms. This breaks programmatic prompt robustness testing workflows where users want to call stress-prompt in Python code rather than shelling out to the CLI.
+**Expected:** A `stress_prompt(prompt: str) -> dict` function (or `StressResult` model) importable from checkagent.
+**Actual:** No Python API exists. `from checkagent import stress_prompt` raises ImportError.
+**Workaround:** Shell out via `subprocess.run(["checkagent", "stress-prompt", prompt, "--json"])` and parse JSON.
+**Status:** Fixed in session-072 (v1.3.0) — `stress_prompt()`, `ablate_prompt()`, `predict_attack_surface()`, `AttackSurface`, `AttackVector` all importable from top-level `checkagent`. `ablate-prompt` is also a new CLI command.
+
+---
+
+## F-149: `get_children_by_agent()` silently returns `[]` when `run_id` defaults to `None`
+**Date:** 2026-07-10
+**Severity:** medium
+**Category:** bug
+**Description:** `MultiAgentTrace.get_children_by_agent(agent_id)` looks up children by matching `parent_run_id` to `run_id` values. When `AgentRun` is constructed without an explicit `run_id`, the field defaults to `None`. Assigning `parent_run_id=r1.run_id` then sets `parent_run_id=None`. Since multiple runs may have `run_id=None`, the lookup correctly finds zero matches (or the wrong matches), silently returning `[]` instead of the expected child.
+**Expected:** Either `run_id` auto-generates a UUID by default (so no two runs share `None`), or `get_children_by_agent()` warns when `run_id=None` values are detected.
+**Actual:** `AgentRun(agent_id="orchestrator")` has `run_id=None`. Any run with `parent_run_id=None` matches every other run with `run_id=None`. `get_children_by_agent("orchestrator")` returns `[]` silently.
+**Workaround:** Always pass explicit `run_id=str(uuid.uuid4())` when constructing `AgentRun` objects in multi-agent traces. Example: `r1 = AgentRun(agent_id="orchestrator", run_id=str(uuid.uuid4()), ...)`.
+**Status:** Open

@@ -143,7 +143,8 @@ class TestScanReportHTML:
                 "--report", report_path,
             )
             html = Path(report_path).read_text()
-            assert "Total safety tests" in html or "Probes" in html
+            # v1.2.0 enriched report: uses "Total tests" cards (not "Total safety tests")
+            assert "Total tests" in html or "Probes" in html
             assert "Resistance" in html or "resistance" in html
         finally:
             Path(report_path).unlink(missing_ok=True)

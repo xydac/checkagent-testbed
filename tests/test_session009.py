@@ -395,39 +395,32 @@ def test_budget_exceeded_error_message_mentions_limit_and_actual():
 
 
 # ---------------------------------------------------------------------------
-# DX finding: ProviderPricing / BudgetConfig / BUILTIN_PRICING not top-level
-# F-018: must import from checkagent.core.cost / checkagent.core.config
+# F-018 FIXED (v1.3.0): ProviderPricing / BudgetConfig / BUILTIN_PRICING now top-level
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.agent_test(layer="mock")
-def test_f018_provider_pricing_not_importable_from_top_level():
-    """F-018: ProviderPricing is not in checkagent.__all__ — requires internal import."""
+def test_f018_provider_pricing_now_at_top_level():
+    """F-018 FIXED: ProviderPricing is now importable from top-level checkagent."""
     import checkagent
 
-    assert not hasattr(checkagent, "ProviderPricing"), (
-        "ProviderPricing is now top-level — update F-018 status"
-    )
+    assert hasattr(checkagent, "ProviderPricing"), "ProviderPricing should be at top-level"
+    from checkagent import ProviderPricing
+    _ = ProviderPricing(input=1.0, output=2.0)
 
 
 @pytest.mark.agent_test(layer="mock")
-def test_f018_budget_config_not_importable_from_top_level():
-    """F-018: BudgetConfig is not in checkagent.__all__ — requires internal import."""
-    import checkagent
-
-    assert not hasattr(checkagent, "BudgetConfig"), (
-        "BudgetConfig is now top-level — update F-018 status"
-    )
+def test_f018_budget_config_now_at_top_level():
+    """F-018 FIXED: BudgetConfig is now importable from top-level checkagent."""
+    from checkagent import BudgetConfig
+    _ = BudgetConfig(per_test=0.01)
 
 
 @pytest.mark.agent_test(layer="mock")
-def test_f018_builtin_pricing_not_importable_from_top_level():
-    """F-018: BUILTIN_PRICING is not in checkagent.__all__ — requires internal import."""
-    import checkagent
-
-    assert not hasattr(checkagent, "BUILTIN_PRICING"), (
-        "BUILTIN_PRICING is now top-level — update F-018 status"
-    )
+def test_f018_builtin_pricing_now_at_top_level():
+    """F-018 FIXED: BUILTIN_PRICING is now importable from top-level checkagent."""
+    from checkagent import BUILTIN_PRICING
+    assert "gpt-4o" in BUILTIN_PRICING
 
 
 # ---------------------------------------------------------------------------
@@ -436,11 +429,15 @@ def test_f018_builtin_pricing_not_importable_from_top_level():
 
 
 @pytest.mark.agent_test(layer="mock")
-def test_f019_no_ap_cost_tracker_fixture(request):
-    """F-019: There is no ap_cost_tracker pytest fixture — must instantiate CostTracker manually."""
+def test_f019_ca_cost_tracker_fixture_exists(request):
+    """F-019 FIXED (session-072): ca_cost_tracker fixture now exists.
+
+    Previously, no cost tracker fixture existed (F-019). Now ca_cost_tracker is available.
+    The fixture was added as ca_cost_tracker (not ap_cost_tracker) following the ca_ prefix convention.
+    """
     fixture_names = list(request.session._fixturemanager._arg2fixturedefs.keys())
-    assert "ap_cost_tracker" not in fixture_names, (
-        "ap_cost_tracker fixture now exists — update F-019 status"
+    assert "ca_cost_tracker" in fixture_names, (
+        "ca_cost_tracker fixture missing — F-019 regression"
     )
 
 

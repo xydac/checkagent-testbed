@@ -160,64 +160,58 @@ class TestMigrateCassettesCLI:
 
 
 # ---------------------------------------------------------------------------
-# F-045 (new): migrate-cassettes fails for v0 cassettes — no migration registered
+# F-045 FIXED: migrate-cassettes v0→v1 migration now works (session-070)
 # ---------------------------------------------------------------------------
 
 
 class TestMigrateCassettesV0Failure:
-    """v0→v1 migration path is not implemented — CLI exists but migration fails."""
+    """F-045 FIXED: v0→v1 migration is now implemented and succeeds."""
 
-    def test_v0_cassette_fails_with_no_migration_registered(self):
-        """v0 cassettes fail migration with 'No migration registered from v0' message."""
+    def test_v0_cassette_migrates_successfully(self):
+        """F-045 FIXED: v0 cassettes migrate to v1 with an OK status line."""
         with tempfile.TemporaryDirectory() as tmpdir:
             make_v0_cassette_file(Path(tmpdir), "legacy.json")
             result = subprocess.run(
                 ["checkagent", "migrate-cassettes", tmpdir],
                 capture_output=True, text=True
             )
-            # Should report a failure
-            assert "fail" in result.stdout.lower()
+            assert result.returncode == 0
+            assert "ok" in result.stdout.lower()
+            assert "migrated" in result.stdout.lower()
 
-    def test_v0_cassette_migration_failure_message(self):
-        """Failure message must mention that no migration path exists from v0."""
+    def test_v0_cassette_migration_success_message(self):
+        """F-045 FIXED: success output mentions 'v0 -> v1 (migrated)'."""
         with tempfile.TemporaryDirectory() as tmpdir:
             make_v0_cassette_file(Path(tmpdir), "legacy.json")
             result = subprocess.run(
                 ["checkagent", "migrate-cassettes", tmpdir],
                 capture_output=True, text=True
             )
-            # Should mention "no migration" or similar
-            assert "migration" in result.stdout.lower() or "no migration" in result.stdout.lower()
+            assert "v0 -> v1" in result.stdout or "migrated" in result.stdout.lower()
 
-    def test_v0_migration_failure_count_in_summary(self):
-        """Summary line must show Failed: 1 when v0 cassette cannot be migrated."""
+    def test_v0_migration_success_count_in_summary(self):
+        """F-045 FIXED: Summary shows Migrated: 1 when v0 cassette migrates successfully."""
         with tempfile.TemporaryDirectory() as tmpdir:
             make_v0_cassette_file(Path(tmpdir), "legacy.json")
             result = subprocess.run(
                 ["checkagent", "migrate-cassettes", tmpdir],
                 capture_output=True, text=True
             )
-            assert "failed: 1" in result.stdout.lower()
+            assert "migrated: 1" in result.stdout.lower()
+            assert "failed: 0" in result.stdout.lower()
 
-    def test_v0_migration_failure_should_return_nonzero_exit_code(self):
-        """migrate-cassettes with unmigratable cassettes should return non-zero exit code.
-
-        This test documents a BUG: the command returns exit code 0 even when
-        migrations fail. A user who runs 'checkagent migrate-cassettes && deploy'
-        will silently proceed despite cassette migration failures.
-        """
+    def test_v0_migration_returns_zero_exit_code(self):
+        """F-045 FIXED: migrate-cassettes returns 0 on successful v0→v1 migration."""
         with tempfile.TemporaryDirectory() as tmpdir:
             make_v0_cassette_file(Path(tmpdir), "legacy.json")
             result = subprocess.run(
                 ["checkagent", "migrate-cassettes", tmpdir],
                 capture_output=True, text=True
             )
-            # BUG: returns 0 instead of non-zero when migrations fail
-            # This assertion documents the current (broken) behavior
-            assert result.returncode == 0  # should be != 0
+            assert result.returncode == 0
 
-    def test_dry_run_on_v0_cassette_shows_failure_without_modifying(self):
-        """--dry-run on v0 cassette shows failure but doesn't modify the file."""
+    def test_dry_run_on_v0_cassette_does_not_modify_file(self):
+        """--dry-run shows what would migrate without actually modifying the file."""
         with tempfile.TemporaryDirectory() as tmpdir:
             path = make_v0_cassette_file(Path(tmpdir), "legacy.json")
             original = path.read_text()
@@ -225,23 +219,23 @@ class TestMigrateCassettesV0Failure:
                 ["checkagent", "migrate-cassettes", tmpdir, "--dry-run"],
                 capture_output=True, text=True
             )
-            # File must be unmodified
+            # File must be unmodified in dry-run mode
             assert path.read_text() == original
 
-    def test_v0_cassette_file_unchanged_after_failed_migration(self):
-        """Failed migration must not corrupt or modify the original cassette file."""
+    def test_v0_cassette_file_upgraded_after_migration(self):
+        """F-045 FIXED: After migration the cassette file is updated to schema_version 1."""
+        import json
         with tempfile.TemporaryDirectory() as tmpdir:
             path = make_v0_cassette_file(Path(tmpdir), "legacy.json")
-            original_content = path.read_text()
             subprocess.run(
                 ["checkagent", "migrate-cassettes", tmpdir],
                 capture_output=True, text=True
             )
-            # File must be unmodified after failed migration
-            assert path.read_text() == original_content
+            data = json.loads(path.read_text())
+            assert data["meta"]["schema_version"] == 1
 
     def test_mixed_v0_and_v1_cassettes_summary(self):
-        """Mixed directory: v1 skipped, v0 failed — both counts in summary."""
+        """Mixed directory: v1 already at target (skipped), v0 migrated — both counts in summary."""
         with tempfile.TemporaryDirectory() as tmpdir:
             make_v0_cassette_file(Path(tmpdir), "old.json")
             make_v1_cassette_file(Path(tmpdir), "new.json")
@@ -249,8 +243,9 @@ class TestMigrateCassettesV0Failure:
                 ["checkagent", "migrate-cassettes", tmpdir],
                 capture_output=True, text=True
             )
-            assert "skipped: 1" in result.stdout.lower() or "1" in result.stdout
-            assert "failed: 1" in result.stdout.lower() or "failed" in result.stdout
+            assert "skipped: 1" in result.stdout.lower()
+            assert "migrated: 1" in result.stdout.lower()
+            assert "failed: 0" in result.stdout.lower()
 
 
 # ---------------------------------------------------------------------------

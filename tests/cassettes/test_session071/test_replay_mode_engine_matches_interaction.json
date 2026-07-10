@@ -1,0 +1,68 @@
+{
+  "meta": {
+    "schema_version": 1,
+    "checkagent_version": "",
+    "recorded_at": "2026-06-29T18:11:53.174518+00:00",
+    "content_hash": "21e3ce063a22a6b5874d214c479413023c045b8e59fe422f4517564317e56443",
+    "test_id": "tests/test_session071.py::TestApCassetteReplayMode"
+  },
+  "interactions": [
+    {
+      "id": "0db64facf957968b",
+      "sequence": 0,
+      "request": {
+        "kind": "llm",
+        "method": "chat.completions.create",
+        "model": "gpt-4o",
+        "body": {
+          "model": "gpt-4o",
+          "messages": [
+            {
+              "role": "user",
+              "content": "What is the capital of France?"
+            }
+          ]
+        }
+      },
+      "response": {
+        "status": "ok",
+        "body": {
+          "choices": [
+            {
+              "message": {
+                "content": "The capital of France is Paris."
+              }
+            }
+          ]
+        },
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "duration_ms": 95.0
+      },
+      "metadata": {}
+    },
+    {
+      "id": "4e3f35c48ab1086f",
+      "sequence": 1,
+      "request": {
+        "kind": "tool",
+        "method": "search_wikipedia",
+        "model": null,
+        "body": {
+          "query": "France capital"
+        }
+      },
+      "response": {
+        "status": "ok",
+        "body": {
+          "title": "Paris",
+          "summary": "Paris is the capital of France."
+        },
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "duration_ms": 42.0
+      },
+      "metadata": {}
+    }
+  ]
+}

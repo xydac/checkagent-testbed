@@ -4,6 +4,40 @@ What I tried each cycle, what happened, what surprised me.
 
 ---
 
+## Session-070 (2026-06-28)
+
+### Upgrade and CI Status
+
+Upgraded to latest git main (post-v1.1.0). CI is green: both latest runs pass ("Implement v0-to-v1 cassette migration (F-045)" and "Add ap_cassette pytest fixture"). Version confirmed as 1.1.0 from git.
+
+### What Happened
+
+**Full test suite: 1 failure (pre-fix)** — `TestMigrateCassettesV0Failure::test_v0_cassette_migration_failure_message` failed because F-045 is now fixed. The test was written expecting migration to fail with "No migration registered from v0" — but now migration succeeds with `OK: v0 -> v1 (migrated)`. The word "migration" doesn't appear in "migrated". Fixed all 4 tests in the class to document success behavior instead of failure: verify `migrated: 1` in summary, `schema_version=1` in upgraded file, exit code 0. After fix: all 25 tests (session-070) + all existing tests pass.
+
+**F-046 FIXED**: Both `Cassette.save()` and `Cassette.load()` accept `str` or `Path` (fixed in session-069, confirmed again here).
+
+**F-045 FIXED (Python API + CLI)**: `migrate_cassette_data()` now returns `schema_version=1`, assigns `id` and `sequence` to each interaction, and preserves all other fields. CLI: `OK /path/file.json: v0 -> v1 (migrated)`, summary `Migrated: 1 | Skipped: 0 | Failed: 0`. `--dry-run` still leaves file unchanged. Idempotent on v1 input.
+
+**F-146 FIXED**: `analyze-prompt "Only help with [your domain] questions."` now shows `Prompt: Only help with [your domain] questions.` — brackets preserved. The fix (`rich_escape()` on preview line) was in the commit "Fix F-146: escape Prompt: header preview to preserve brackets in Rich output". Both the Prompt: header and the table Note "Try:" hints now correctly show brackets.
+
+**ap_cassette fixture confirmed**: `CassetteFixture` is importable from `checkagent.core.plugin`. Key API:
+- Record mode: `ctx.is_recording() → True`, `ctx.recorder` is set, `ctx.engine` is None
+- Replay mode: `ctx.is_replaying() → True`, `ctx.engine` is set, `ctx.cassette` is loaded
+- Path resolution priority: `@pytest.mark.cassette(path=...)` → default `cassettes/<module>/<test>.json`
+- Post-test: fixture auto-finalizes and saves cassette in record mode
+- `ap_cassette` NOT importable from top-level `checkagent` (only a pytest fixture, discovered via entry point)
+
+**F-044 still open**: SEQUENCE strategy still ignores `kind` — a `RecordedRequest(kind='tool')` matches an `Interaction(kind='llm')` when it's next in sequence. No strict_kind option added.
+
+### What to Try Next Session
+
+- **Real agent with ap_cassette**: Record a LangChain or PydanticAI agent run to cassette, then replay deterministically without the live model
+- **ap_cassette with @pytest.mark.cassette(path=...)**: Verify the marker path override actually works in a pytest context
+- **F-044**: Does a `strict_kind=True` option ever get added to `ReplayEngine`?
+- **ROADMAP**: Any new milestones post-v1.1.0?
+
+---
+
 ## Session-053 (2026-05-15)
 
 ### Upgrade and CI Status
@@ -3944,3 +3978,124 @@ None of this is documented anywhere accessible — the API was discovered by `in
 - **F-146 watch**: is the Prompt: preview bracket stripping fixed?
 - **Real agent with replay**: try recording a LangChain/PydanticAI agent session then replaying it deterministically
 - **ROADMAP**: check for Milestone 21+ post-v1.1.0 plans
+
+---
+
+## Session-071 — 2026-07-04
+
+### Checkagent Version
+v1.2.0 (git main, installed from git main). PyPI not yet updated (still 1.1.0 from session-068 — F-123 was fixed but v1.2.0 not pushed to PyPI yet).
+
+### Upstream CI
+All 5 latest runs green:
+- "Add stress-prompt command for adversarial prompt robustness testing" — latest, green
+- "Update --report docs to reflect enriched HTML compliance report" — green (2026-06-30)
+
+### What changed in v1.2.0
+- **stress-prompt** command: new adversarial prompt robustness tester
+- **F-044 FIXED**: `strict_kind=True` added to `ReplayEngine(strategy=SEQUENCE)` — now raises `CassetteMismatchError` on kind mismatch when strict
+- **F-146 FIXED**: `analyze-prompt` `Prompt:` header preview now preserves `[brackets]` via `rich_escape()`
+- **Enriched HTML compliance report**: SVG score gauge, stat cards (Total tests/Passed/Failed/Findings), severity breakdown badges, findings table with remediation steps
+
+### Existing Tests Status
+- All 70 session-071 tests passing (1 xfailed as expected)
+- No regressions in previous sessions detected
+
+### New Feature Explored: stress-prompt
+
+Tried `checkagent stress-prompt` thoroughly:
+- Accepts literal string, file path, or stdin
+- Applies 9 adversarial transforms (8 for single-sentence prompts — reversed_order skipped)
+- Checks 8 security dimensions: injection_guard, scope_boundary, confidentiality, refusal_behavior, pii_handling, data_scope, role_clarity, escalation_path
+- `--json` output is clean, well-structured, parseable
+- Terminal output: table with Score/Broken columns, "Fragile Controls" and "Fully Robust Controls" sections
+
+**What works well:**
+- A comprehensive HR-style prompt ("You are HRBot. Only answer HR questions. Never share salary. Refuse all others.") correctly identifies 4 baseline controls and scores them across 9 transforms — genuinely useful signal
+- File input and stdin both work correctly
+- JSON output has all needed fields: `robustness_score`, `baseline_passing`, `transforms[].checks`, `fragile_checks`, `robust_checks`
+
+**F-147 — Critical DX bug discovered:**
+`checkagent stress-prompt "Be helpful."` outputs "Robustness: 100% (0 controls tested × 8 transforms)". A prompt with zero security controls scores 100% robustness. The math is technically defensible (0 controls broken / 0 controls = trivially robust) but the headline "100%" is dangerously misleading — users might interpret it as "this prompt is maximally secure."
+
+The terminal does show "0 controls tested" which is honest, but the headline percentage dominates. A user who just glances at "100%" and moves on would be misled.
+
+**F-148 — No Python API:**
+`stress-prompt` is CLI-only. `from checkagent import stress_prompt` raises ImportError. Every other checkagent feature (PromptAnalyzer, check_behavioral_compliance, GroundednessEvaluator, etc.) has a Python API. This breaks programmatic prompt testing workflows. The subprocess workaround works but is fragile.
+
+**Transform count inconsistency:**
+Multi-sentence prompts: 9 transforms (including `reversed_order`). Single-sentence prompts: 8 transforms (`reversed_order` skipped as meaningless). The `total_transforms` field correctly reflects this, but it means robustness scores are not directly comparable across prompts of different lengths. Not documented.
+
+### What to try next session
+- **F-147 watch**: Will stress-prompt ever warn/error when baseline_passing=0?
+- **F-148 watch**: Will stress_prompt get a Python API?
+- **v1.2.0 on PyPI**: Still at 1.1.0 — watch for 1.2.0 release
+- **stress-prompt + watch**: Does `checkagent watch` trigger stress-prompt? (Probably not — watch only triggers analyze-prompt)
+- **Real agent replay**: Try recording a real PydanticAI or LangChain agent session and replaying it with strict_kind=True
+- **check ROADMAP**: Any Milestone 22+ planned?
+
+---
+
+## Session-072 — 2026-07-10
+
+### Checkagent Version
+v1.3.0 (git main, installed from git main). PyPI status unknown (last confirmed 1.1.0 from session-068; v1.2.0 and v1.3.0 may not be on PyPI yet).
+
+### Upstream CI
+All 3 latest runs green:
+- "Add RQ3 safety probe detection experiment: TP/FP rates across 4 agent…" — 2026-07-10, green
+- "Fix analyze-prompt false negatives: detect discuss/reveal, if-tries-t…" — 2026-07-08, green
+Stable.
+
+### What changed in v1.3.0
+- **F-147 FIXED**: `stress-prompt` CLI now shows "N/A — No security controls detected..." for zero-control prompts instead of "100%". Python API: `no_controls_detected=True`, `robustness_score=0.0`.
+- **F-148 FIXED**: `stress_prompt()`, `ablate_prompt()`, `predict_attack_surface()`, `AttackSurface`, `AttackVector` all importable from top-level `checkagent`. New CLI command: `ablate-prompt`.
+- **F-090 FIXED**: `ResilienceProfile.to_dict()` now includes `best_scenario` key.
+- **F-077 FIXED**: `MultiAgentTrace.has_cycles()` new method — detects cyclic handoffs in multi-agent traces.
+- **New**: `get_children_by_agent(agent_id)` method on `MultiAgentTrace`. 
+- **New**: `CassetteRecorder.record_response(prompt, response)` — simplified cassette recording API.
+- **analyze-prompt**: False negative fixes — "if tries to change" → injection_guard=True; "discuss/reveal internal rules" → confidentiality=True.
+
+### Existing Tests Status
+- All 57 session-072 tests pass, 1 xfailed (F-149 confirmed open)
+- No regressions observed in sampled prior sessions
+
+### New Features Explored
+
+**ablate-prompt CLI + Python API**
+New in v1.3.0. Ablation analysis that systematically removes each sentence and measures safety score impact. Identifies:
+- Load-bearing sentences (removing drops the score)
+- Redundant sentences (removing has no effect)
+- Single points of failure (one sentence is the sole source for a check)
+- Check coverage depth (how many sentences contribute to each check)
+
+Tested with a 4-sentence HR prompt — all 4 sentences load-bearing, all 4 are single points of failure. Terminal output is clear with table, markdown-style list for SPOFs, and bar chart for coverage depth. Bracket content preserved in output (F-145/F-146 pattern respected).
+
+Python API: `ablate_prompt(prompt)` → dict with `baseline_score`, `sentences`, `load_bearing`, `redundant`, `single_points_of_failure`, `check_coverage`. Error handling: single-sentence prompts return `{"error": "Prompt has fewer than 2 sentences..."}`  with `sentence_count` absent from response (minor inconsistency — `sentence_count` key present in multi-sentence responses).
+
+**predict_attack_surface**
+`predict_attack_surface(PromptAnalysisResult)` → `AttackSurface` with `risk_level`, `risk_score`, `total_exposed_probes`, `vectors: list[AttackVector]`. Each vector has `missing_check`, `probe_category`, `risk`, `estimated_probes`, `description`.
+
+CLI: `checkagent analyze-prompt --predict` adds "Predicted Attack Surface" section to terminal output. `--predict --json` adds `attack_surface` key to JSON. Without `--predict`, no `attack_surface` in JSON (clean separation).
+
+An empty prompt gets risk_score=0.75 (critical), 12 vectors, 229 exposed probes — accurate. A fully-specified prompt with all 8 checks passing gets risk_score=0.13 (low). The `data_scope` check has a subtle false negative: "Base your answers strictly on retrieved company knowledge" doesn't match but "base your answers strictly on retrieved content" does — specific phrasing required.
+
+**stress_prompt Python API**
+`stress_prompt("Be helpful.")` returns `{"robustness_score": 0.0, "baseline_passing": 0, "no_controls_detected": True, ...}`. F-147 fix confirmed — no longer reports 1.0 for prompts without security controls.
+
+**MultiAgentTrace.has_cycles()**
+F-077 FIXED: detects cycles in handoff graphs. DAG → False, 2-node cycle → True, 3-node cycle → True, empty trace → False. Clean implementation using DFS.
+
+**F-149: get_children_by_agent() silent empty return**
+New method added but has a pitfall: when `AgentRun` is constructed without explicit `run_id`, it defaults to `None`. If you then set `parent_run_id=r1.run_id` (which is `None`), the child's `parent_run_id=None` matches all runs with `run_id=None`. `get_children_by_agent()` returns `[]` silently. Works correctly only when explicit UUIDs are passed. Documented as xfail test and F-149 finding.
+
+**CassetteRecorder.record_response()**
+New simplified API — instead of building `RecordedRequest`/`RecordedResponse` objects manually, users can call `rec.record_response("ping", "pong")` and it creates a proper `Interaction`. Tested full cycle: record → finalize → save → load → replay with SEQUENCE strategy. Clean.
+
+### What to try next session
+- **F-149 watch**: Will `AgentRun.run_id` auto-generate a UUID by default?
+- **PyPI status**: Check if v1.2.0 or v1.3.0 published to PyPI
+- **analyze-prompt patterns**: More false negative testing — what other phrases get missed?
+- **ablate-prompt edge cases**: What happens with very long prompts? Prompts with complex compound sentences?
+- **stress-prompt transforms**: Document all 9 transform names for coverage
+- **watch + ablate**: Does `checkagent watch` only trigger analyze-prompt, or also ablate-prompt/stress-prompt?

@@ -774,7 +774,6 @@ def test_data_enumeration_probe_count_grew_to_25():
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="F-145: F-093 regressed in v1.1.0 — Rich strips [your domain] from table Note column")
 def test_f093_fixed_rich_markup_no_longer_strips_brackets():
     """F-093 FIXED in 0.2.0, REGRESSED in v1.1.0 (F-145): [your domain] stripped in table Note column."""
     code, stdout, stderr = run_cli(
