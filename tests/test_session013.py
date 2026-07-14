@@ -371,13 +371,14 @@ class TestRunSummaryCollision:
 
 class TestQualityGateEntryExports:
     def test_qualitygatentry_not_in_ci_all(self):
-        """F-030: QualityGateEntry is required to use CI gates but not in ci.__all__."""
+        """F-030 FIXED: QualityGateEntry is now in ci.__all__ (was absent, now exported)."""
         import checkagent.ci as ci
-        assert "QualityGateEntry" not in ci.__all__
+        assert "QualityGateEntry" in ci.__all__
 
     def test_qualitygatentry_not_accessible_as_ci_attribute(self):
+        """F-030 FIXED: QualityGateEntry is now accessible as a ci attribute."""
         import checkagent.ci as ci
-        assert not hasattr(ci, "QualityGateEntry")
+        assert hasattr(ci, "QualityGateEntry")
 
     def test_qualitygatentry_accessible_from_submodule(self):
         from checkagent.ci.quality_gate import QualityGateEntry as QGE

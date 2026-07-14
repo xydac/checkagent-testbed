@@ -4099,3 +4099,49 @@ New simplified API — instead of building `RecordedRequest`/`RecordedResponse` 
 - **ablate-prompt edge cases**: What happens with very long prompts? Prompts with complex compound sentences?
 - **stress-prompt transforms**: Document all 9 transform names for coverage
 - **watch + ablate**: Does `checkagent watch` only trigger analyze-prompt, or also ablate-prompt/stress-prompt?
+
+---
+
+## Session-073 (2026-07-14)
+
+### Upgrade
+Updated to v1.3.0 from git main (PyPI still on v1.1.0). Installed via `pip install --break-system-packages`.
+
+### Upstream CI
+**RED** — latest commit "Add generate_targeted_probes: bridge static analysis to dynamic testing" breaks all 12 CI jobs. Ruff finds two errors:
+1. I001 — unsorted import block in `src/checkagent/cli/__init__.py` (new `generate_targeted_probes` CLI import alphabetically out of order)
+2. F841 — local variable `result` assigned but never used in `tests/cli/test_scan.py:475`
+
+The prior commit "Fix ruff E501: wrap long GDPR regex pattern line" was green. This is the same pattern seen in session-034 (ruff lint after a quick feature push). Filed as **F-152**.
+
+### Tests
+1,380 tests (previous 1,323 + 57 new from session-072). After fixing the stale F-030 test in `test_session013.py`, all pass. Added 24 new tests in `test_session073.py`.
+
+**Stale test fixed:** `tests/test_session013.py::TestQualityGateEntryExports` — two tests asserted `QualityGateEntry NOT in ci.__all__` and `NOT hasattr(ci, "QualityGateEntry")`. These were testing for bug F-030 which has since been fixed. Updated assertions to confirm the fix (now asserts presence, not absence).
+
+### New Feature: generate_targeted_probes
+
+New function `generate_targeted_probes(PromptAnalysisResult) -> TargetedProbeSet` bridges static analysis to dynamic testing. Both `generate_targeted_probes` and `TargetedProbeSet` are at top-level checkagent.
+
+**What it does:** Maps each failing `analyze-prompt` check to its corresponding probe category, returning only the probes that test the agent's actual weak spots. A weak prompt (no security controls) gets 102 probes across 6 categories. A well-specified HR prompt gets 64 probes across 2 categories.
+
+**TargetedProbeSet fields:** `probes` (list[Probe]), `total_count` (int), `categories_targeted` (list[str]), `source_checks` (list[str]).
+
+**F-150 — DX gap:** `TargetedProbeSet` is not a `ProbeSet` and doesn't implement the probe collection protocol. No `__iter__`, no `__len__`, no `filter()`, no `__add__`. To use it with parametrize or ProbeSet.filter(), users must do `ProbeSet(targeted.probes)`. This is not documented and not discoverable.
+
+**No CLI equivalent:** `checkagent analyze-prompt` has `--predict` (attack surface) but no `--generate-probes` or `--targeted` flag. The feature is Python-API only.
+
+### F-149 FIXED
+
+`AgentRun.run_id` now auto-generates a UUID by default when not specified. Verified: two `AgentRun()` instances have different UUID run_ids. `get_children_by_agent()` now works without manual UUID management — the core pain point of F-149 is gone.
+
+### F-151: PyPI version lag
+
+PyPI still shows v1.1.0 as latest (published 2026-06-25). Git main is v1.3.0. Two releases (v1.2.0, v1.3.0) are unreachable for users on `pip install checkagent`. v1.3.0 alone fixed 6 findings and added 4 new features. This is the fourth session in a row with this finding.
+
+### What to try next session
+- Watch for CI fix on F-152 (ruff lint)
+- Watch for PyPI publish of v1.3.0 (F-151)
+- Test `generate_targeted_probes` with real agents and scan integration
+- Does the `--generate-probes` CLI gap get a fix, or is the Python API the intended interface?
+- Explore any other new commits that land before next session

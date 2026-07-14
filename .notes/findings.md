@@ -1794,4 +1794,40 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** Either `run_id` auto-generates a UUID by default (so no two runs share `None`), or `get_children_by_agent()` warns when `run_id=None` values are detected.
 **Actual:** `AgentRun(agent_id="orchestrator")` has `run_id=None`. Any run with `parent_run_id=None` matches every other run with `run_id=None`. `get_children_by_agent("orchestrator")` returns `[]` silently.
 **Workaround:** Always pass explicit `run_id=str(uuid.uuid4())` when constructing `AgentRun` objects in multi-agent traces. Example: `r1 = AgentRun(agent_id="orchestrator", run_id=str(uuid.uuid4()), ...)`.
+**Status:** FIXED in session-073 (2026-07-14) — `AgentRun.run_id` now auto-generates a UUID when not specified. Each new `AgentRun()` gets a unique UUID, and `get_children_by_agent()` works correctly without manual UUID management.
+
+---
+
+## F-150: `TargetedProbeSet` is not iterable, filterable, or sized
+**Date:** 2026-07-14
+**Severity:** medium
+**Category:** dx-friction
+**Description:** `generate_targeted_probes()` returns a `TargetedProbeSet` dataclass, but it lacks the core `ProbeSet` interface — no `__iter__`, no `__len__`, no `filter()`, and no `__add__`. To use the probes with pytest.mark.parametrize, ProbeSet.filter(), or any standard iteration, users must manually extract `.probes` and wrap it in `ProbeSet(targeted.probes)`. This is a significant DX gap given that ProbeSet is the standard probe container throughout checkagent.
+**Expected:** `TargetedProbeSet` should either be a `ProbeSet` subclass or implement the same protocol (`__iter__`, `__len__`, `filter()`, `__add__`). Alternatively the function should return a `ProbeSet` directly.
+**Actual:** `list(targeted)` → `TypeError: 'TargetedProbeSet' object is not iterable`. Users must do `ProbeSet(targeted.probes)` to use standard probe APIs.
+**Workaround:** `ProbeSet(targeted.probes)` — wrap the probes list in a ProbeSet before filtering or iterating.
 **Status:** Open
+
+---
+
+## F-151: v1.2.0 and v1.3.0 not published to PyPI — users on v1.1.0 for 2+ weeks
+**Date:** 2026-07-14
+**Severity:** medium
+**Category:** missing-feature
+**Description:** PyPI latest is v1.1.0 (published 2026-06-25). Git main is v1.3.0. Two full releases are unreachable for users who do `pip install checkagent`. v1.2.0 added: ReplayEngine strict_kind fix (F-044), stress-prompt CLI, enriched HTML compliance report. v1.3.0 added: ablate-prompt, predict_attack_surface, AttackSurface/AttackVector, has_cycles(), get_children_by_agent() fix, CassetteRecorder.record_response(), stress_prompt/ablate_prompt Python APIs, F-147/F-148/F-090/F-077 fixes. All of these are inaccessible via pip install.
+**Expected:** New releases published to PyPI within a few days of tagging.
+**Actual:** 19 days since last PyPI publish, 2 major versions behind.
+**Workaround:** `pip install "checkagent @ git+https://github.com/xydac/checkagent.git@main"` to get latest.
+**Status:** Open
+
+---
+
+## F-152: Upstream CI red — "Add generate_targeted_probes" breaks ruff lint (I001 + F841)
+**Date:** 2026-07-14
+**Severity:** high
+**Category:** bug
+**Description:** The latest commit "Add generate_targeted_probes: bridge static analysis to dynamic testing" fails ruff lint on all platforms. Two errors: (1) I001 — unsorted import block in `src/checkagent/cli/__init__.py` (new `generate_targeted_probes` CLI subcommand import not alphabetically sorted with existing imports), (2) F841 — local variable `result` assigned but never used in `tests/cli/test_scan.py:475`. All 12 CI jobs fail at "Lint with ruff" step before reaching tests.
+**Expected:** All CI jobs pass on push to main.
+**Actual:** CI red across all Python versions and platforms (macOS, Windows, Ubuntu). The previous commit "Fix ruff E501: wrap long GDPR regex pattern line" was green.
+**Workaround:** Install from git main and use `generate_targeted_probes` directly — the feature itself works correctly despite the CI failure.
+**Status:** Open (as of 2026-07-14, run ID 29353221893)
