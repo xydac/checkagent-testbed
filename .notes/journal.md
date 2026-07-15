@@ -4145,3 +4145,51 @@ PyPI still shows v1.1.0 as latest (published 2026-06-25). Git main is v1.3.0. Tw
 - Test `generate_targeted_probes` with real agents and scan integration
 - Does the `--generate-probes` CLI gap get a fix, or is the Python API the intended interface?
 - Explore any other new commits that land before next session
+
+---
+
+## Session 074 — 2026-07-15
+
+### Upgrade
+Updated to **v1.4.0** (PyPI publish from today). Previous was v1.3.0 (git-only). This is the first session where `pip install checkagent` gets a version that includes the features tested last session.
+
+### Upstream CI
+**GREEN** — all 3 latest runs passing. F-152 (ruff lint on generate_targeted_probes commit) was fixed in "Fix ruff I001 + F841: sort imports and remove unused variable" immediately followed by "Bump version to 1.4.0". 
+
+The v1.4.0 release commit also published to PyPI in the same batch, meaning F-151 (PyPI version lag — was 19+ days behind) is fully resolved.
+
+### Tests
+Started with 1,380 tests (from session-073). Found 1 stale test in `test_session021.py` (F-056 was fixed — LangChain dict final_output now extracts the string value) and 3 stale tests in `test_session073.py` (F-150 was fixed — TargetedProbeSet protocol tests were asserting the bug behavior). All 4 updated.
+
+Added **18 new tests** in `test_session074.py`.
+
+### Previous Findings Status
+- **F-056 FIXED**: LangChainAdapter `final_output` now extracts the string value from dict returns. Dict with 'output' key → extracts that value; dict without 'output' key → extracts first value. Both `final_output` and `output_text` now agree. Had to update stale test in test_session021.py.
+- **F-150 FIXED**: TargetedProbeSet now implements full ProbeSet protocol — `__iter__`, `__len__`, `filter()`, and `__add__` all work. Users no longer need `ProbeSet(targeted.probes)` workaround. Had to update 3 stale tests in test_session073.py.
+- **F-151 FIXED**: v1.4.0 published to PyPI on 2026-07-15. Resolves 19+ day lag where v1.2.0 and v1.3.0 were git-only.
+- **F-152 FIXED**: Ruff lint errors (I001 + F841) fixed. CI green.
+
+### New Feature: `checkagent compare`
+New command added in v1.4.0 (from "Add checkagent compare: side-by-side agent safety comparison" commit). Compares two agents using their latest scan history.
+
+**What it does:** Reads scan history for two targets, produces a side-by-side comparison table and `--json` output with score, passed/failed counts, category breakdown, unique findings per agent, and a winner declaration.
+
+**Works well:**
+- Table format is clean and readable
+- `--json` has score_delta, categories with deltas, winner
+- Same-agent compare correctly returns `winner: "tie"` and empty `only_agent_a/b`
+
+**F-153 — bug in `only_agent_a`/`only_agent_b`:** When agent_a uniquely fails categories (e.g. echo agent failing `pii_leakage` and `prompt_injection` while refusal agent doesn't), `only_agent_a` in JSON is `[""]` — a list with one empty string — instead of `["pii_leakage", "prompt_injection"]`. Terminal shows a bullet point with nothing after it. Workaround: compute unique failures from the `categories` array manually.
+
+### New Feature: enhanced `--generate-tests`
+The "Enhance --generate-tests: regression tests for passed probes + xfail for findings" commit added xfail test generation.
+
+**What it does:** For probes the agent currently *fails*, the generated file now includes `@pytest.mark.xfail(reason="Known safety gap — fix and remove xfail")` tests. For probes that *pass*, it generates regression tests. Terminal output shows both counts: "1 regression test(s) (passed probes) + 35 xfail test(s) (findings)".
+
+**Quality of xfail tests:** High. They run cleanly as XFAIL (not FAILED) against the current agent. The workflow is clear: fix the agent → remove the xfail decorator → the test becomes a regression test. Tested: echo agent gets 1 passed + 35 xfailed; refusal agent gets 35 passed + 0 xfailed.
+
+### What to try next session
+- Watch for F-153 fix (compare only_agent_a empty string)
+- Try `compare --url-a`/`--url-b` for HTTP agents
+- Look for any new commits that land (the 2026-07-14 batch had several unreleased features)
+- Test `checkagent compare` with more than 2 different categories to explore the only_agent_a bug further

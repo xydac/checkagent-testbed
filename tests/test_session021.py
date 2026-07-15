@@ -115,11 +115,10 @@ def test_f055_langchain_adapter_raises_importerror_without_package(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_f056_langchain_adapter_final_output_is_raw_dict():
-    """F-056: LangChainAdapter.run() sets final_output to the raw runnable return value.
+    """F-056 FIXED: LangChainAdapter now extracts the 'output' value from dict returns.
 
     When a LangChain runnable returns {'output': 'hello', 'extra': 'data'},
-    result.final_output is the full dict — not just the 'output' value.
-    This breaks assert_output_matches(result, 'hello') and is surprising to users.
+    result.final_output is now 'hello' (extracted), not the raw dict.
     """
     from checkagent.adapters.langchain import LangChainAdapter
     from langchain_core.runnables import RunnableLambda
@@ -130,12 +129,10 @@ async def test_f056_langchain_adapter_final_output_is_raw_dict():
     adapter = LangChainAdapter(RunnableLambda(chain))
     result = await adapter.run("test query")
 
-    # final_output is the full dict — not just "hello"
-    assert isinstance(result.final_output, dict), (
-        f"Expected dict but got {type(result.final_output)}"
+    # F-056 FIXED: final_output is now the extracted string, not the dict
+    assert result.final_output == "hello", (
+        f"Expected 'hello' but got {type(result.final_output)}: {result.final_output}"
     )
-    assert result.final_output == {"output": "hello", "extra": "metadata"}
-    # Only step.output_text correctly extracts 'output'
     assert result.steps[0].output_text == "hello"
 
 
@@ -162,8 +159,8 @@ async def test_f056_langchain_adapter_dict_output_first_value_heuristic():
     adapter = LangChainAdapter(RunnableLambda(lambda x: {"result": "hello", "other": "world"}))
     result = await adapter.run("test")
 
-    assert result.final_output == {"result": "hello", "other": "world"}
-    # First dict value extracted for step.output_text
+    # F-056 FIXED: final_output also extracts the first value now
+    assert result.final_output == "hello"
     assert result.steps[0].output_text == "hello"
 
 

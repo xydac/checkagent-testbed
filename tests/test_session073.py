@@ -197,28 +197,29 @@ class TestGenerateTargetedProbesIntegration:
 
 class TestTargetedProbeSetDXGap:
     def test_targeted_probeset_not_directly_iterable(self):
-        """F-150 DX gap: TargetedProbeSet is not iterable — users must use .probes."""
-        from checkagent import generate_targeted_probes, PromptAnalyzer
+        """F-150 FIXED: TargetedProbeSet is now iterable — no ProbeSet conversion needed."""
+        from checkagent import PromptAnalyzer, generate_targeted_probes
+
         result = PromptAnalyzer().analyze("You are a helpful assistant.")
         targeted = generate_targeted_probes(result)
-        # Document current behavior: not iterable
-        with pytest.raises(TypeError):
-            list(targeted)
+        probes = list(targeted)
+        assert len(probes) > 0
 
     def test_targeted_probeset_has_no_filter_method(self):
-        """F-150 DX gap: TargetedProbeSet has no filter() method — need ProbeSet conversion."""
-        from checkagent import generate_targeted_probes, PromptAnalyzer
+        """F-150 FIXED: TargetedProbeSet now has filter() method."""
+        from checkagent import PromptAnalyzer, generate_targeted_probes
+
         result = PromptAnalyzer().analyze("You are a helpful assistant.")
         targeted = generate_targeted_probes(result)
-        assert not hasattr(targeted, "filter")
+        assert hasattr(targeted, "filter")
 
     def test_targeted_probeset_has_no_len(self):
-        """F-150 DX gap: TargetedProbeSet has no __len__ — use .total_count instead."""
-        from checkagent import generate_targeted_probes, PromptAnalyzer
+        """F-150 FIXED: TargetedProbeSet now supports len()."""
+        from checkagent import PromptAnalyzer, generate_targeted_probes
+
         result = PromptAnalyzer().analyze("You are a helpful assistant.")
         targeted = generate_targeted_probes(result)
-        with pytest.raises(TypeError):
-            len(targeted)
+        assert len(targeted) == targeted.total_count
 
 
 # ---------------------------------------------------------------------------

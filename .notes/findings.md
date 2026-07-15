@@ -661,7 +661,7 @@ Format:
 **Expected:** Either `final_output` always extracts the `output` key from dict results (consistent with `step.output_text`), or the extraction heuristic is documented prominently.
 **Actual:** `final_output={'output': 'hello', 'meta': {...}}` (full dict); `step.output_text='hello'` (extracted value). First dict value used as fallback when no `output` key.
 **Workaround:** If you need a string final_output, have your runnable return a plain string, not a dict.
-**Status:** Open
+**Status:** FIXED in v1.4.0 (2026-07-15) — `final_output` now extracts the string value from dict returns, same as `step.output_text`. Dict with 'output' key → extracts that value; dict without 'output' key → extracts first value. Both fields now agree.
 
 ---
 
@@ -1806,7 +1806,7 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** `TargetedProbeSet` should either be a `ProbeSet` subclass or implement the same protocol (`__iter__`, `__len__`, `filter()`, `__add__`). Alternatively the function should return a `ProbeSet` directly.
 **Actual:** `list(targeted)` → `TypeError: 'TargetedProbeSet' object is not iterable`. Users must do `ProbeSet(targeted.probes)` to use standard probe APIs.
 **Workaround:** `ProbeSet(targeted.probes)` — wrap the probes list in a ProbeSet before filtering or iterating.
-**Status:** Open
+**Status:** FIXED in v1.4.0 (2026-07-15) — TargetedProbeSet now implements full ProbeSet protocol: `__iter__`, `__len__`, `filter()`, and `__add__`. Users can iterate, filter, and compose TargetedProbeSet instances directly without wrapping in ProbeSet().
 
 ---
 
@@ -1818,7 +1818,7 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** New releases published to PyPI within a few days of tagging.
 **Actual:** 19 days since last PyPI publish, 2 major versions behind.
 **Workaround:** `pip install "checkagent @ git+https://github.com/xydac/checkagent.git@main"` to get latest.
-**Status:** Open
+**Status:** FIXED in v1.4.0 (2026-07-15) — v1.4.0 published to PyPI today. F-151 also resolves v1.2.0/v1.3.0 lag (both now superseded by v1.4.0 which is on PyPI).
 
 ---
 
@@ -1830,4 +1830,16 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** All CI jobs pass on push to main.
 **Actual:** CI red across all Python versions and platforms (macOS, Windows, Ubuntu). The previous commit "Fix ruff E501: wrap long GDPR regex pattern line" was green.
 **Workaround:** Install from git main and use `generate_targeted_probes` directly — the feature itself works correctly despite the CI failure.
-**Status:** Open (as of 2026-07-14, run ID 29353221893)
+**Status:** FIXED in v1.4.0 (2026-07-15) — "Fix ruff I001 + F841: sort imports and remove unused variable" commit fixed both lint errors. CI green on "Bump version to 1.4.0".
+
+---
+
+## F-153: `compare --json` `only_agent_a`/`only_agent_b` returns `[""]` instead of unique category names
+**Date:** 2026-07-15
+**Severity:** low
+**Category:** bug
+**Description:** When running `checkagent compare agent_a agent_b --json`, the `only_agent_a` field should list category names where agent_a has findings but agent_b doesn't (and vice versa for `only_agent_b`). Instead, when agent_a uniquely fails categories, `only_agent_a` is `[""]` — a list containing a single empty string. The terminal output shows a bullet point with no text. When both agents have identical findings (including comparing an agent against itself), both fields correctly return `[]`.
+**Expected:** `only_agent_a: ["pii_leakage", "prompt_injection"]` when echo agent fails those categories and refusal agent doesn't.
+**Actual:** `only_agent_a: [""]` — one empty string. The terminal shows `• ` (bullet with nothing after it).
+**Workaround:** Use the `categories` array to manually compute unique failures: `[c for c in data['categories'] if c['agent_a_findings'] > 0 and c['agent_b_findings'] == 0]`.
+**Status:** Open
