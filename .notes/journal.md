@@ -4193,3 +4193,41 @@ The "Enhance --generate-tests: regression tests for passed probes + xfail for fi
 - Try `compare --url-a`/`--url-b` for HTTP agents
 - Look for any new commits that land (the 2026-07-14 batch had several unreleased features)
 - Test `checkagent compare` with more than 2 different categories to explore the only_agent_a bug further
+
+---
+
+## Session-075 (2026-07-16)
+
+### Upstream CI
+**GREEN** — all 3 latest runs passing. Latest commit: "Add --targeted flag to scan: use generate_targeted_probes with --prompt-file" (2026-07-16). Post-v1.4.0 git main ahead of latest PyPI release (v1.4.0). No version bump yet.
+
+### Tests
+Started with 1,398 tests (from session-074). Fixed 1 stale test in `test_session074.py` (F-153 was fixed — compare `only_agent_a` now returns probe names, not `[""]`). Added **14 new tests** in `test_session075.py`.
+
+All 14 new tests pass. The stale test was the `test_f153_compare_only_agent_a_empty_string_bug` test which was asserting the buggy `[""]` behavior.
+
+### Previous Findings Status
+- **F-153 FIXED** (post-v1.4.0): `compare --json` `only_agent_a`/`only_agent_b` now returns actual probe names. Semantics changed slightly — it returns individual probe IDs (e.g. 34 probe names like `"dan-jailbreak"`, `"disregard-system-prompt"`) rather than category names. The terminal no longer shows empty bullets. The fix is more useful than the original design — probe-level granularity is better than category-level.
+
+### New Feature: `scan --targeted`
+New `--targeted` flag for the scan command (post-v1.4.0 git main commit). Uses `generate_targeted_probes` to only run probes for categories that match gaps found in the `--prompt-file` analysis.
+
+**What works:**
+- `--targeted` without `--prompt-file` gives clean error with example: "Error: --targeted requires --prompt-file. Example: checkagent scan my_agent:fn --prompt-file prompt.txt --targeted"
+- `--targeted --json` includes `prompt_analysis` key with `score`, `passed_count`, `total_count`, and `checks` list
+- Each check has `id`, `name`, `passed` (bool), `severity`
+- Compatible with `--repeat` (stability object still appears in top-level JSON)
+- Refusal agent scores high (≥0.8) even under targeted probing
+
+**Probe reduction by prompt quality:**
+- Well-secured prompt (6/8 controls, 2 gaps): 101 → 27 probes (**73% reduction**)
+- Poorly-secured prompt (1/8 controls, 7 gaps): 101 → 102 probes (no reduction, slight increase from dynamically generated probes)
+
+**F-154 DX issue:** The "dramatically reducing scan time" benefit only applies to agents with good prompts. For developers writing their first prompt (which is when they'd most want feedback), `--targeted` offers essentially no reduction. The docs/help could clarify that the benefit scales with how good the prompt is.
+
+### What to try next session
+- Watch for F-154 fix (docs/help text clarification for --targeted)
+- Try `compare --url-a`/`--url-b` if that flag exists
+- Check if new commits land (project seems actively developed)
+- Try `--targeted` combined with `--llm-judge` to see if they compose
+- Look for any new CLI commands in the next commit batch

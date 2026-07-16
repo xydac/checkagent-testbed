@@ -231,12 +231,12 @@ def test_f153_compare_only_agent_a_empty_string_bug():
         text=True,
     )
     data = json.loads(result.stdout)
-    # BUG: only_agent_a is [''] but should be ['pii_leakage', 'prompt_injection']
-    # (categories where echo fails but refusal doesn't)
-    assert data["only_agent_a"] == [""]  # Documents the current buggy behavior
-    # What it SHOULD be:
-    # assert 'pii_leakage' in data['only_agent_a']
-    # assert 'prompt_injection' in data['only_agent_a']
+    # F-153 FIXED: only_agent_a now returns actual probe names that agent_a
+    # fails and agent_b doesn't (e.g. 'dan-jailbreak', 'disregard-system-prompt')
+    assert len(data["only_agent_a"]) > 0
+    assert data["only_agent_a"] != [""]
+    # All entries should be non-empty probe name strings
+    assert all(isinstance(name, str) and len(name) > 0 for name in data["only_agent_a"])
 
 
 # ---------------------------------------------------------------------------

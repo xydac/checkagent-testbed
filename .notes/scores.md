@@ -410,6 +410,8 @@ Rate each feature on:
 | v1.4.0 PyPI release | 5 | 5 | F-151/F-152 FIXED: v1.4.0 published to PyPI 2026-07-15. F-150 (TargetedProbeSet protocol) also fixed. F-056 (LangChain dict final_output) fixed. CI green. | 2026-07-15 |
 | generate_targeted_probes (session-074) | 5 | 4 | F-150 FIXED: TargetedProbeSet now fully implements ProbeSet protocol — iter/len/filter/__add__ all work. No CLI equivalent still (no --generate-probes flag on analyze-prompt). | 2026-07-15 |
 | LangChainAdapter (session-074) | 5 | 4 | F-056 FIXED: final_output now extracts string from dict returns (same as output_text). Both 'output' key and first-value fallback work consistently. | 2026-07-15 |
-| checkagent compare | 4 | 4 | New in v1.4.0: side-by-side agent safety comparison; table + JSON; score_delta, categories breakdown, winner declared; F-153: only_agent_a/only_agent_b returns [''] instead of category names when unique findings exist. | 2026-07-15 |
+| checkagent compare | 5 | 4 | F-153 FIXED (session-075): only_agent_a/only_agent_b now returns actual probe names (individual failing probe IDs) instead of ['']. More specific than category names. | 2026-07-16 |
 | --generate-tests (session-074) | 5 | 5 | Enhanced in v1.4.0: now generates regression tests for passed probes AND xfail tests for current findings; xfail tests run cleanly; terminal shows counts. | 2026-07-15 |
 | upstream CI (session-074) | 5 | 5 | GREEN — v1.4.0 "Bump version to 1.4.0" and "Fix ruff I001 + F841" pass all 12 platforms. F-152 resolved. Stable. | 2026-07-15 |
+| scan --targeted | 4 | 3 | New (post-v1.4.0): reduces probe count for well-secured prompts (101→27 for 2-gap prompt); no reduction for gap-heavy prompts (102 vs 101); requires --prompt-file; clean error without it. F-154: DX gap — benefit depends on prompt quality, not documented. | 2026-07-16 |
+| upstream CI (session-075) | 5 | 5 | GREEN — "Add --targeted flag to scan" passes all 12 platforms. Stable. | 2026-07-16 |

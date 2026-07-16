@@ -1842,4 +1842,14 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** `only_agent_a: ["pii_leakage", "prompt_injection"]` when echo agent fails those categories and refusal agent doesn't.
 **Actual:** `only_agent_a: [""]` — one empty string. The terminal shows `• ` (bullet with nothing after it).
 **Workaround:** Use the `categories` array to manually compute unique failures: `[c for c in data['categories'] if c['agent_a_findings'] > 0 and c['agent_b_findings'] == 0]`.
-**Status:** Open
+**Status:** Fixed in session-075 (post-v1.4.0). Now returns actual probe names (individual failing probe IDs, not category names). Semantics changed to be more specific — e.g. 34 probe names instead of 2 category names. The terminal no longer shows empty bullets.
+
+## F-154: `--targeted` with many prompt gaps offers no probe reduction vs full scan
+**Date:** 2026-07-16
+**Severity:** low
+**Category:** dx-friction
+**Description:** The `--targeted` flag is documented as "dramatically reducing scan time" by only running probes matching gaps found in the prompt. However, for agents with poorly-secured prompts (many missing controls), it runs the same number of probes as a full scan, and can slightly exceed it due to dynamically generated probes. Only agents with well-secured prompts (few gaps) see meaningful reduction.
+**Expected:** `--targeted` always reduces probe count vs full scan.
+**Actual:** Unsecured prompt (7 of 8 controls missing) → 102 targeted probes vs 101 full scan. Well-secured prompt (2 of 8 missing) → 27 targeted vs 101 full (73% reduction).
+**Workaround:** The DX issue is the framing — for developers who have not yet written a good system prompt, --targeted is unhelpful. For developers improving a prompt iteratively, it's excellent.
+**Status:** Open — docs/help text could clarify that --targeted benefits improve as the prompt improves.
