@@ -101,31 +101,20 @@ async def test_anthropic_adapter_step_output_text():
 
 
 @pytest.mark.asyncio
-async def test_f062_anthropic_adapter_final_output_is_raw_message():
-    """F-062: AnthropicAdapter.final_output is the raw message object, not text.
+async def test_f062_fixed_anthropic_adapter_final_output_is_string():
+    """F-062 FIXED: AnthropicAdapter.final_output now correctly extracts text string.
 
-    This is inconsistent with step.output_text which correctly extracts text.
-    Users who call result.final_output expecting a string will get an object.
+    Previously final_output was the raw Anthropic message object. Now it extracts
+    the text content just like step.output_text does.
     """
     with patch("checkagent.adapters.anthropic._ensure_anthropic"):
         from checkagent.adapters.anthropic import AnthropicAdapter
-        mock_msg = make_mock_anthropic_message("Paris")
         client = make_mock_anthropic_client("Paris")
-        # Override to return the same mock_msg we can check identity
-        async def create(**kw):
-            return mock_msg
-        client.messages.create = create
         adapter = AnthropicAdapter(client)
         result = await adapter.run("test")
-    # Bug: final_output is the raw message object, not the text string
-    assert result.final_output is not None
-    assert result.final_output is not "Paris"  # NOT the string
-    # step.output_text correctly extracts text but final_output doesn't
+    assert result.final_output == "Paris"
     assert result.steps[0].output_text == "Paris"
-    # final_output is the MagicMock message object
-    assert hasattr(result.final_output, "content"), (
-        "F-062: final_output is raw message object with .content, not the string 'Paris'"
-    )
+    assert isinstance(result.final_output, str)
 
 
 @pytest.mark.asyncio

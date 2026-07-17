@@ -4231,3 +4231,53 @@ New `--targeted` flag for the scan command (post-v1.4.0 git main commit). Uses `
 - Check if new commits land (project seems actively developed)
 - Try `--targeted` combined with `--llm-judge` to see if they compose
 - Look for any new CLI commands in the next commit batch
+
+---
+
+## Session-076 (2026-07-17)
+
+### Upstream CI
+**GREEN** — all 3 latest runs passing. Latest commit: "Add scan workflow guide: end-to-end safety hardening loop" (2026-07-17). Docs-only commit documenting the scan → analyze-prompt → targeted scan → compare → generate-tests workflow loop. No new code features this session.
+
+### Installed Version
+Still v1.4.0 (latest PyPI). Git main is at the same version as the last code commit ("Add --targeted flag to scan" from session-075).
+
+### Tests
+Started with 1,398 tests. Found 1 stale test (`test_f062_anthropic_adapter_final_output_is_raw_message` in `test_session022.py`) — updated to reflect F-062 is fixed. Added **14 new tests** in `test_session076.py`. All 14 pass.
+
+### F-062 FIXED (AnthropicAdapter.final_output)
+The test from session-022 that was asserting the bug behavior (`assert result.final_output is not "Paris"`) now fails because checkagent has fixed F-062: `final_output` is now correctly extracted as the text string, not the raw Anthropic message object. Updated the test to verify the fix.
+
+### F-155 NEW: compare --url-a / --url-b not implemented
+**Medium severity, docs-mismatch.** The `checkagent compare --help` output shows an example:
+```
+checkagent compare --url-a http://a/chat --url-b http://b/chat --json
+```
+But `--url-a` doesn't actually exist as an option. Running it gives "Error: No such option: --url-a" (exit code 2). The Options section only lists `--json` and `--base-dir`. This is a straightforward docs-code mismatch that would frustrate users trying to compare HTTP endpoints directly.
+
+**Workaround:** Scan both HTTP endpoints first with `checkagent scan --url`, then use `checkagent compare` which reads from history. But the target string must match exactly, which is tricky for HTTP endpoints.
+
+### F-156 NEW: compare score_delta sign is counter-intuitive
+**Low severity, DX friction.** `score_delta` in compare JSON is computed as `agent_b_score - agent_a_score`. When agent_a wins (higher score), score_delta is negative. Users naturally expect score_delta to be positive for the winner. The `winner` field is correct, but combining it with score_delta for any calculation requires knowing the sign convention, which is undocumented.
+
+### --targeted + --llm-judge compose correctly
+The combination of `--targeted --prompt-file prompt.txt --llm-judge claude-code` works cleanly:
+- Both flags cooperate correctly (no conflicts)
+- JSON output has both `prompt_analysis` key (from --targeted) and `evaluator: claude-code` (from --llm-judge)
+- 27 probes ran (down from 101) for the well-secured secure_hr_agent.txt prompt
+- Refusal agent scored 1.0 as expected
+
+### compare command (callable targets)
+Tested `checkagent compare refusal_agent echo_agent --json` after scanning both:
+- Returns correct JSON with agent_a/agent_b, score_delta, winner, categories, only_agent_a, only_agent_b
+- winner: agent_a (refusal agent, score 1.0 vs echo agent 0.03)
+- only_agent_b: 34 probe names (individual probe IDs, F-153 confirmed still fixed)
+- score_delta: -0.97 (note: b - a, negative when agent_a wins — F-156)
+- No-history error message is friendly and actionable
+
+### What to try next session
+- Watch for F-155 fix (compare --url-a/--url-b implementation)
+- Watch for F-156 fix (score_delta sign documentation or convention change)
+- Test if compare --url-a/--url-b gets implemented in a future commit
+- Try combining more than 2 categories with --targeted to see if interaction is clean
+- Look for any new commits/features landing after the docs commit

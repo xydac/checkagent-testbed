@@ -1853,3 +1853,31 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Actual:** Unsecured prompt (7 of 8 controls missing) → 102 targeted probes vs 101 full scan. Well-secured prompt (2 of 8 missing) → 27 targeted vs 101 full (73% reduction).
 **Workaround:** The DX issue is the framing — for developers who have not yet written a good system prompt, --targeted is unhelpful. For developers improving a prompt iteratively, it's excellent.
 **Status:** Open — docs/help text could clarify that --targeted benefits improve as the prompt improves.
+
+---
+
+## F-155: `compare --url-a` / `--url-b` advertised in help text but not implemented
+**Date:** 2026-07-17
+**Severity:** medium
+**Category:** docs-mismatch
+**Description:** The `checkagent compare --help` output shows an example using `--url-a` and `--url-b` flags to compare two HTTP endpoints:
+  ```
+  checkagent compare --url-a http://a/chat --url-b http://b/chat --json
+  ```
+  But these options do not exist. Running the command with `--url-a` produces "Error: No such option: --url-a" with exit code 2.
+**Expected:** Either `--url-a`/`--url-b` work as documented, or the help text doesn't show them as examples.
+**Actual:** `Error: No such option: --url-a`. The Options section only shows `--json` and `--base-dir`.
+**Workaround:** Compare HTTP endpoints by scanning each first (`checkagent scan --url`), then using `checkagent compare` (which reads history by target string). But the target string for HTTP endpoints must match exactly.
+**Status:** Open
+
+---
+
+## F-156: `compare --json` `score_delta` sign is counter-intuitive and undocumented
+**Date:** 2026-07-17
+**Severity:** low
+**Category:** dx-friction
+**Description:** `score_delta` in `compare --json` output is computed as `agent_b_score - agent_a_score`. This means score_delta is NEGATIVE when agent_a is the winner (has higher score). Users reading the docs or the JSON would naturally expect score_delta to reflect the margin of victory for the winner, or at minimum have clear documentation of the sign convention.
+**Expected:** score_delta > 0 when agent_a wins, or clear documentation that score_delta = b - a.
+**Actual:** agent_a score=1.0, agent_b score=0.03 → score_delta=-0.97. Winner is agent_a but delta is negative.
+**Workaround:** Check `winner` field for direction, then use `abs(score_delta)` for magnitude.
+**Status:** Open

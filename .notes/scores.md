@@ -158,8 +158,8 @@ Rate each feature on:
 | JudgeScore.passed | 1 | 1 | Doesn't exist — must call compute_verdict() for single-trial pass/fail (F-058) | 2026-04-06 |
 | Criterion default scale for BINARY | 2 | 2 | Defaults to [1,2,3,4,5] regardless of scale_type; BINARY should default to 2-item scale (F-060) | 2026-04-06 |
 | upstream CI (session-022) | 5 | 5 | Green again — "mark all framework adapters as complete" passes all platforms including Windows. F-054 fixed (perf_counter). Stable for third consecutive session | 2026-04-06 |
-| AnthropicAdapter (basic run/error) | 4 | 3 | String input coercion works; error captured in AgentRun.error; duration_ms uses perf_counter; final_output is raw message object not string (F-062); anthropic undeclared dep (F-064) | 2026-04-06 |
-| AnthropicAdapter.final_output | 2 | 2 | Raw Anthropic Message object — not string. Use step.output_text for text. Same pattern as F-056 but worse (opaque SDK object) | 2026-04-06 |
+| AnthropicAdapter (basic run/error) | 5 | 4 | F-062 FIXED (session-076): final_output now extracts string correctly. String input coercion, error capture, perf_counter timing all solid. anthropic undeclared dep (F-064) still open | 2026-07-17 |
+| AnthropicAdapter.final_output | 5 | 5 | F-062 FIXED (session-076): final_output is now the extracted text string, consistent with step.output_text. No longer returns raw message object. | 2026-07-17 |
 | CrewAIAdapter (basic run/error) | 4 | 3 | String input coercion works; final_output=result.raw (string — correct!); error captured; crewai undeclared dep (F-064) | 2026-04-06 |
 | PydanticAIAdapter (basic run/error) | 4 | 3 | String input coercion works; final_output=result.data (correct); error captured; pydantic-ai undeclared dep (F-064) | 2026-04-06 |
 | New adapters top-level exports | N/A | 1 | AnthropicAdapter, CrewAIAdapter, PydanticAIAdapter all absent from top-level checkagent (F-063). Ninth+ instance of pattern | 2026-04-06 |
@@ -415,3 +415,7 @@ Rate each feature on:
 | upstream CI (session-074) | 5 | 5 | GREEN — v1.4.0 "Bump version to 1.4.0" and "Fix ruff I001 + F841" pass all 12 platforms. F-152 resolved. Stable. | 2026-07-15 |
 | scan --targeted | 4 | 3 | New (post-v1.4.0): reduces probe count for well-secured prompts (101→27 for 2-gap prompt); no reduction for gap-heavy prompts (102 vs 101); requires --prompt-file; clean error without it. F-154: DX gap — benefit depends on prompt quality, not documented. | 2026-07-16 |
 | upstream CI (session-075) | 5 | 5 | GREEN — "Add --targeted flag to scan" passes all 12 platforms. Stable. | 2026-07-16 |
+| --targeted + --llm-judge (compose) | 5 | 5 | Both flags compose cleanly: 27 probes, evaluator field in JSON, prompt_analysis key present, score 1.0 on refusal agent; no errors | 2026-07-17 |
+| compare --url-a / --url-b | 1 | 1 | F-155: shown in help examples but not implemented — "No such option: --url-a" on use | 2026-07-17 |
+| compare score_delta semantics | 3 | 2 | F-156: score_delta = b - a (negative when agent_a wins); counter-intuitive, undocumented sign convention; use abs() for magnitude | 2026-07-17 |
+| upstream CI (session-076) | 5 | 5 | GREEN — "Add scan workflow guide: end-to-end safety hardening loop" passes all 3 latest runs. Docs-only commit. Stable. | 2026-07-17 |
