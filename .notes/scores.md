@@ -169,12 +169,12 @@ Rate each feature on:
 | JUnit XML from_quality_gate_report | 5 | 5 | Blocked → failure, Warned → pass with property, Skipped → skipped; properties attached (actual/threshold/direction); clean mapping | 2026-04-06 |
 | upstream CI (session-023) | 5 | 5 | Green for last 2 runs ("mark production trace import as complete", "mark all framework adapters"). Stable | 2026-04-06 |
 | checkagent import-trace CLI | 4 | 4 | Solid: auto-detect JSON/JSONL/OTel, --filter-status, --limit, --tag, --no-pii-scrub, --source; friendly missing-file error; crashes with raw traceback on PII ID collision (F-066) | 2026-04-06 |
-| JsonFileImporter | 5 | 4 | Handles flat, native (steps), span, and JSONL formats; filter by status; limit; not at top-level (F-067) | 2026-04-06 |
-| OtelJsonImporter | 5 | 4 | Parses OTLP JSON correctly; groups by traceId; root span detection; tool spans from child names; error from status.code; not at top-level (F-067) | 2026-04-06 |
+| JsonFileImporter | 5 | 5 | Handles flat, native (steps), span, and JSONL formats; filter by status; limit; F-067 FIXED (session-077): now at top-level | 2026-07-18 |
+| OtelJsonImporter | 5 | 5 | Parses OTLP JSON correctly; groups by traceId; root span detection; tool spans from child names; error from status.code; F-067 FIXED (session-077): now at top-level | 2026-07-18 |
 | PiiScrubber | 5 | 5 | Deterministic replacements; 5 built-in patterns (email/phone/SSN/CC/IP); extra_patterns; scrub_value for nested dicts/lists; reset() works correctly | 2026-04-06 |
 | generate_test_cases | 3 | 1 | F-103: Breaking API change — returns tuple not GoldenDataset, `name=` renamed to `dataset_name=`, no deprecation. Existing code breaks silently. Safety screening useful but the migration story is terrible. | 2026-04-15 |
 | TraceScreeningResult | 5 | 4 | New in 0.2.0 (safety screening commit): total/clean/flagged counts, findings_by_trace with SafetyFinding objects. Catches injection in traced outputs. Not at top-level. | 2026-04-15 |
-| trace_import top-level exports | N/A | 1 | Eleventh instance of missing-top-level-export pattern (F-067) | 2026-04-06 |
+| trace_import top-level exports | 5 | 5 | F-067 FIXED (session-077): TraceImporter, JsonFileImporter, OtelJsonImporter, PiiScrubber, generate_test_cases all now at top-level checkagent | 2026-07-18 |
 | checkagent.multiagent (overall) | 3 | 3 | New multi-agent trace + blame attribution module. Core logic works for most strategies; LEAF_ERRORS bug (F-069) makes the most useful strategy unreliable; agent_id silent failure (F-070); not at top-level (F-068) | 2026-04-06 |
 | MultiAgentTrace construction | 5 | 4 | Clean Pydantic model; runs + handoffs + trace_id; defaults to empty lists; no handoff agent_id validation (F-072) | 2026-04-06 |
 | Handoff model | 5 | 4 | All HandoffType values work (delegation/relay/broadcast); optional metadata (latency_ms, input_summary, from/to run_id); HandoffType not in multiagent namespace (F-071) | 2026-04-06 |
@@ -416,6 +416,10 @@ Rate each feature on:
 | scan --targeted | 4 | 3 | New (post-v1.4.0): reduces probe count for well-secured prompts (101→27 for 2-gap prompt); no reduction for gap-heavy prompts (102 vs 101); requires --prompt-file; clean error without it. F-154: DX gap — benefit depends on prompt quality, not documented. | 2026-07-16 |
 | upstream CI (session-075) | 5 | 5 | GREEN — "Add --targeted flag to scan" passes all 12 platforms. Stable. | 2026-07-16 |
 | --targeted + --llm-judge (compose) | 5 | 5 | Both flags compose cleanly: 27 probes, evaluator field in JSON, prompt_analysis key present, score 1.0 on refusal agent; no errors | 2026-07-17 |
-| compare --url-a / --url-b | 1 | 1 | F-155: shown in help examples but not implemented — "No such option: --url-a" on use | 2026-07-17 |
-| compare score_delta semantics | 3 | 2 | F-156: score_delta = b - a (negative when agent_a wins); counter-intuitive, undocumented sign convention; use abs() for magnitude | 2026-07-17 |
+| compare --url-a / --url-b | 5 | 4 | F-155 FIXED in v1.5.0: --url-a/--url-b now implemented; "No scan history" error is clear; no traceback; error goes to stdout not stderr (minor DX gap) | 2026-07-19 |
+| compare score_delta semantics | 3 | 4 | F-156 IMPROVED: winner + margin fields added in v1.5.0; sign still undocumented (b-a, negative when a wins) but winner field + text "Winner:" line reduce confusion significantly | 2026-07-19 |
 | upstream CI (session-076) | 5 | 5 | GREEN — "Add scan workflow guide: end-to-end safety hardening loop" passes all 3 latest runs. Docs-only commit. Stable. | 2026-07-17 |
+| probe-list command | 5 | 5 | F-157 FIXED in v1.5.0: error message now shows "full_name (alias)" e.g. "prompt_injection (injection)". Both formats accepted. Fully consistent with JSON output. | 2026-07-19 |
+| upstream CI (session-077) | 5 | 5 | GREEN — "Add probe-list command: show all safety probe categories with OWASP mapping" passes all 3 latest runs. Stable. | 2026-07-18 |
+| upstream CI (session-078) | 2 | 2 | F-158: v1.5.0 bump commit fails ruff N806 (history.py:217 _DISPLAY uppercase in function). All 12 CI jobs fail. PyPI publish succeeded anyway — package published from red CI commit. | 2026-07-19 |
+| v1.5.0 PyPI release | 4 | 4 | Published 2026-07-19. F-155/F-157 FIXED; winner+margin in compare. F-158: released from a CI-failing commit (ruff N806). Package works correctly despite the lint error. | 2026-07-19 |

@@ -622,28 +622,28 @@ class TestGenerateTestCases:
 # trace_import not at top-level (F-067)
 # ---------------------------------------------------------------------------
 
-class TestF067TraceImportNotAtTopLevel:
-    """F-067: trace_import classes not exported from top-level checkagent namespace."""
+class TestF067TraceImportFixedAtTopLevel:
+    """F-067 FIXED: TraceImporter, JsonFileImporter, OtelJsonImporter, PiiScrubber now at top-level."""
 
-    def test_trace_importer_not_at_top_level(self):
+    def test_trace_importer_at_top_level(self):
         import checkagent
-        assert not hasattr(checkagent, "TraceImporter")
+        assert hasattr(checkagent, "TraceImporter")
 
-    def test_json_file_importer_not_at_top_level(self):
+    def test_json_file_importer_at_top_level(self):
         import checkagent
-        assert not hasattr(checkagent, "JsonFileImporter")
+        assert hasattr(checkagent, "JsonFileImporter")
 
-    def test_otel_importer_not_at_top_level(self):
+    def test_otel_importer_at_top_level(self):
         import checkagent
-        assert not hasattr(checkagent, "OtelJsonImporter")
+        assert hasattr(checkagent, "OtelJsonImporter")
 
-    def test_pii_scrubber_not_at_top_level(self):
+    def test_pii_scrubber_at_top_level(self):
         import checkagent
-        assert not hasattr(checkagent, "PiiScrubber")
+        assert hasattr(checkagent, "PiiScrubber")
 
-    def test_generate_test_cases_not_at_top_level(self):
+    def test_generate_test_cases_at_top_level(self):
         import checkagent
-        assert not hasattr(checkagent, "generate_test_cases")
+        assert hasattr(checkagent, "generate_test_cases")
 
 
 # ---------------------------------------------------------------------------

@@ -4281,3 +4281,73 @@ Tested `checkagent compare refusal_agent echo_agent --json` after scanning both:
 - Test if compare --url-a/--url-b gets implemented in a future commit
 - Try combining more than 2 categories with --targeted to see if interaction is clean
 - Look for any new commits/features landing after the docs commit
+
+---
+
+## Session-077 (2026-07-18)
+
+### Upstream CI
+**GREEN** — all 3 latest runs passing. Latest commit: "Add probe-list command: show all safety probe categories with OWASP mapping" (2026-07-18). New `probe-list` command added this session.
+
+### Installed Version
+v1.4.0 from git main. No new PyPI release since v1.4.0 (2026-07-15). The probe-list command is in git main but not yet released to PyPI.
+
+### Tests
+Started with 1,412 tests (after previous session). Fixed 5 stale tests in `test_session023.py` (F-067 class renamed from "Not" to "Fixed", assertions flipped from `not hasattr` to `hasattr` for all 5 symbols now at top-level). Added **32 new tests** in `test_session077.py`. All 32 pass (1 xfail for F-157 DX finding).
+
+### F-067 FIXED: trace import classes now at top-level
+`TraceImporter`, `JsonFileImporter`, `OtelJsonImporter`, `PiiScrubber`, and `generate_test_cases` are all now importable from top-level `checkagent`. Updated `test_session023.py` stale tests to reflect the fix.
+
+### New Feature: `probe-list` command
+New command in this session's commit. Comprehensive testing:
+
+**What works:**
+- `checkagent probe-list` — table of 6 categories (101 total probes) with OWASP LLM Top 10 mapping
+- `--json` — structured output with `total_probes`, `categories[].name/count/description/owasp/examples`
+- `--examples` — shows 3 example probe inputs per category; populates `examples` field in `--json`
+- `--category <name>` — filter to single category; accepts both short aliases (`injection`, `pii`, `scope`) and full names (`prompt_injection`, `pii_leakage`, `scope_boundary`)
+- `total_probes` in JSON correctly matches sum of all category counts
+- Can combine `--category` + `--examples` + `--json` cleanly
+- Error for invalid category exits non-zero and shows "Valid categories"
+
+**F-157 NEW (low severity):** Error message for invalid category shows short aliases (`injection`, `pii`, `scope`) but `--json` output uses full names (`prompt_injection`, `pii_leakage`, `scope_boundary`). Users looking at JSON output won't find the mapping obvious. Both short aliases and full names are accepted — the inconsistency is only in the error message. DX friction, not a bug.
+
+### What to try next session
+- Watch for F-155 fix (`compare --url-a`/`--url-b` implementation)
+- Watch for F-156 fix (score_delta sign documentation)
+- Watch for F-157 fix (probe-list error message shows full category names)
+- Check if probe-list gets a new PyPI release (v1.5.0?)
+- Try any new commands/features that land in git main
+
+---
+
+## Session-078 (2026-07-19)
+
+### Upstream CI
+**RED on v1.5.0 bump commit** — all 12 CI jobs fail at "Lint with ruff". Error: N806 `_DISPLAY` uppercase variable in function at `src/checkagent/cli/history.py:217`. The fix for F-157 (probe-list error message now shows full category names using a `_DISPLAY` alias mapping dict) was added inside a function body, which violates ruff's N806 rule (function-scope variables must be lowercase). **New finding F-158**: despite CI failure, the v1.5.0 Publish to PyPI workflow ran independently and published the package.
+
+### Installed Version
+**v1.5.0** from git main (also on PyPI as of 2026-07-19, despite CI red).
+
+### Tests
+Updated `test_session077.py`: removed xfail from `test_error_message_shows_full_category_names` (F-157 now fixed). All 33 tests in session-077 pass.
+
+Added **26 new tests** in `test_session078.py` (26 passed, 1 xfailed for F-158 CI health). Two test failures during development revealed real behavior: (1) `compare --url-a` error goes to stdout not stderr — minor DX gap; (2) `winner` field in JSON is `"agent_a"` not the target string — while text output shows the actual target name.
+
+### F-157 FIXED: probe-list error message now shows full category names
+Error message now shows `"prompt_injection (injection)"` format — full name plus short alias in parens. Both short aliases and full names are accepted, and the error is now consistent with JSON output. Confirmed with `checkagent probe-list --category invalid_cat`.
+
+### F-155 FIXED: compare --url-a / --url-b implemented
+`--url-a` and `--url-b` are real options now. Running compare with them correctly says "No scan history for '...'. Run: checkagent scan ..." — clear actionable error on stdout. No crash or "No such option" error.
+
+### F-156 IMPROVED: compare winner/margin fields added
+`compare --json` now includes `"winner": "agent_a"` (or `"agent_b"`) and `"margin": 0.9714` alongside `"score_delta": -0.9714`. Text output shows `"Winner: agents/refusal_agent.py:run (100% vs 3%)"`. Sign convention is still b-a (negative when a wins) and still not documented in --help, but the winner+margin fields make the output self-explanatory. Minor inconsistency: JSON `winner` is `"agent_a"` (not the target string) while text shows the target name.
+
+### F-158 NEW: v1.5.0 published to PyPI despite CI failure
+All 12 CI jobs fail on the v1.5.0 bump commit (ruff N806 in history.py). The "Publish to PyPI" GitHub Actions workflow doesn't depend on CI passing, so v1.5.0 shipped from a red commit. Package works correctly at runtime — the lint error is cosmetic only. But this is a pattern worth tracking: ruff errors don't block releases.
+
+### What to try next session
+- Watch for F-158 fix (ruff N806 in history.py — follow-up commit expected)
+- Watch for F-156 sign convention documentation improvement
+- Test compare --url-a / --url-b with real HTTP scan history once two endpoints are scanned
+- Explore any new commands or features landing in git main after v1.5.0

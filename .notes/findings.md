@@ -1868,7 +1868,7 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** Either `--url-a`/`--url-b` work as documented, or the help text doesn't show them as examples.
 **Actual:** `Error: No such option: --url-a`. The Options section only shows `--json` and `--base-dir`.
 **Workaround:** Compare HTTP endpoints by scanning each first (`checkagent scan --url`), then using `checkagent compare` (which reads history by target string). But the target string for HTTP endpoints must match exactly.
-**Status:** Open
+**Status:** FIXED in v1.5.0 (2026-07-19) — `--url-a` and `--url-b` are now real options; running compare with them no longer gives "No such option". With no scan history, gives a clear "No scan history" error on stdout with a suggestion to run `checkagent scan`.
 
 ---
 
@@ -1881,3 +1881,28 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Actual:** agent_a score=1.0, agent_b score=0.03 → score_delta=-0.97. Winner is agent_a but delta is negative.
 **Workaround:** Check `winner` field for direction, then use `abs(score_delta)` for magnitude.
 **Status:** Open
+
+---
+
+## F-157: FIXED — `probe-list --category` error message shows short aliases, not full category names in JSON
+**Date:** 2026-07-18
+**Severity:** low
+**Category:** dx-friction
+**Description:** When an invalid `--category` is given, the error message says: "Valid categories: data_enumeration, groundedness, injection, jailbreak, pii, scope". These are short aliases. But the `--json` output shows full names: `prompt_injection`, `pii_leakage`, `scope_boundary`. A user seeing `prompt_injection` in JSON output would not know the error message means `injection` is the correct name for that category.
+**Expected:** Error message lists the same category names shown in `--json` output (full names), or notes that both aliases and full names are accepted.
+**Actual:** Error shows short aliases only; full names are undiscoverable from the error.
+**Note:** Both the short alias (`injection`) and full name (`prompt_injection`) are accepted as valid `--category` values — the filter is permissive. The inconsistency is only in the error message.
+**Workaround:** Run `checkagent probe-list --json` to see all full category names and use those.
+**Status:** FIXED in v1.5.0 (2026-07-19) — error message now shows "full_name (short_alias)" format, e.g. "prompt_injection (injection)". Both formats are accepted and the error now shows both together.
+
+---
+
+## F-158: v1.5.0 published to PyPI despite CI failing on ruff N806 lint error
+**Date:** 2026-07-19
+**Severity:** medium
+**Category:** bug
+**Description:** The v1.5.0 release commit ("Bump to v1.5.0: fix probe-list error message to show full category names") fails the main CI workflow with ruff N806: "Variable `_DISPLAY` in function should be lowercase" in `src/checkagent/cli/history.py:217`. All 12 CI jobs fail at "Lint with ruff". However, the "Publish to PyPI" workflow succeeded and v1.5.0 was published despite the red CI. The Publish workflow does not depend on CI passing.
+**Expected:** A PyPI release should only be published from a commit where all CI checks pass. This is standard practice to prevent publishing broken packages.
+**Actual:** v1.5.0 is live on PyPI as of 2026-07-19 but the commit that created it has a known lint error. While this specific error (N806: uppercase const in function) is cosmetic and does not affect runtime behavior, the pattern is concerning — future regressions could ship to users.
+**Workaround:** The package itself works correctly. The lint error is cosmetic.
+**Status:** Open — CI remains red on the v1.5.0 commit. A follow-up commit to fix ruff N806 is needed.
