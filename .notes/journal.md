@@ -4351,3 +4351,64 @@ All 12 CI jobs fail on the v1.5.0 bump commit (ruff N806 in history.py). The "Pu
 - Watch for F-156 sign convention documentation improvement
 - Test compare --url-a / --url-b with real HTTP scan history once two endpoints are scanned
 - Explore any new commands or features landing in git main after v1.5.0
+
+---
+
+### What to try next session
+- Watch for F-159 fix (category delta in JSON diff output)
+- Watch for F-160 fix (--verbose --examples duplication in JSON)
+- Watch for F-156 sign convention documentation
+- Test `watch` category delta interactively when possible
+- Look for any new features that land in git main post-session-079
+
+---
+
+## Session-079 (2026-07-20)
+
+### Upstream CI
+**GREEN** — Latest commit "Add category delta to watch rescan" passes all 12 platforms. F-158 is fixed: the "Fix N806: rename _DISPLAY to _display" commit corrected the ruff error that had broken CI. Two consecutive clean commits now on main.
+
+### Installed Version
+Still **v1.5.0** (git main). Two new feature commits since last session beyond the v1.5.0 release: "Add per-category delta to scan output" and "Add category delta to watch rescan", plus the N806 fix.
+
+### Tests
+Fixed two outdated tests:
+1. `test_session024.py::test_f068_multiagent_partial_fix` → renamed `test_f068_multiagent_fully_fixed` — Handoff (and all other multiagent symbols) are now at top-level `checkagent`, completing F-068.
+2. `test_session027.py::test_attach_faults_second_call_overwrites_first` → renamed `test_attach_faults_second_call_raises_valueerror` — the test was tracking pre-F-079-fix behavior where second `attach_faults()` silently overwrote; now it correctly raises `ValueError`.
+
+Added **16 new tests** in `test_session079.py`. All 16 pass.
+
+### F-068 FULLY FIXED: all multiagent symbols at top-level
+`Handoff`, `assign_blame`, `BlameStrategy`, `BlameResult`, `top_blamed_agent`, and `assign_blame_ensemble` are all now importable directly from `checkagent`. Previously only `MultiAgentTrace` and `HandoffType` were at top-level. This completes the F-068 fix.
+
+### F-158 FIXED: ruff N806 resolved, CI green
+The "Fix N806: rename _DISPLAY to _display in format_category_delta" commit corrected the lint error in `history.py:217`. CI passed immediately on that commit and on the following "Add category delta to watch rescan" commit. Pattern concern remains: the Publish workflow still doesn't depend on CI.
+
+### New feature: probe-list --verbose
+The `--verbose` flag on `probe-list` adds the full probe text list to both terminal and JSON output.
+
+Terminal mode: shows a numbered list of all probe inputs under "All Probe Inputs" heading, grouped by category.
+
+JSON mode: adds a `probes` key to each category with `{input, description}` objects for each probe. Without `--verbose`, only `examples` is present (and it's empty unless `--examples` is also used).
+
+**DX gap (F-160):** When combining `--verbose --examples --json`, both `examples` and `probes` contain all probe texts — the `examples` count jumps from 3 to the full count. This is confusing duplication.
+
+### New feature: per-category delta in scan terminal output
+After each scan, the terminal now shows per-category finding counts and delta vs the previous scan:
+```
+→ no change from last scan (was 3% on 2026-07-19)
+  prompt_injection       34 → 34  = unchanged
+  pii_leakage             1 → 1  = unchanged
+```
+Or with changes:
+```
+↓ -1% from last scan (was 3% on 2026-07-19)
+  jailbreak              0 → 15  ↑15 new
+  pii_leakage            1 → 2  ↑1 new
+  prompt_injection       34 → 34  = unchanged
+```
+
+**Finding (F-159):** This category delta does NOT appear in `--json` or `--diff --json` output. The `diff` key has `new_findings`/`fixed_findings` but no `category_delta`. Terminal-only feature, not machine-readable.
+
+### New feature: watch category delta
+The "Add category delta to watch rescan" commit extends the watch command to show per-category changes when re-scanning on file change. Could not test interactively (non-TTY environment), but the terminal output structure should match the scan delta display.

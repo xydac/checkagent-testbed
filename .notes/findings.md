@@ -1905,4 +1905,38 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** A PyPI release should only be published from a commit where all CI checks pass. This is standard practice to prevent publishing broken packages.
 **Actual:** v1.5.0 is live on PyPI as of 2026-07-19 but the commit that created it has a known lint error. While this specific error (N806: uppercase const in function) is cosmetic and does not affect runtime behavior, the pattern is concerning — future regressions could ship to users.
 **Workaround:** The package itself works correctly. The lint error is cosmetic.
-**Status:** Open — CI remains red on the v1.5.0 commit. A follow-up commit to fix ruff N806 is needed.
+**Status:** FIXED in session-079 (2026-07-20) — "Fix N806: rename _DISPLAY to _display" commit followed immediately. CI is green again on "Add category delta to watch rescan" commit (latest main). The pattern of publishing from red CI remains concerning but this specific instance was resolved quickly.
+
+---
+
+## F-159: Per-category delta in scan output is terminal-only — missing from JSON
+**Date:** 2026-07-20
+**Severity:** low
+**Category:** missing-feature
+**Description:** When scanning an agent for the second time, the terminal output shows per-category finding deltas like:
+  ```
+  → no change from last scan (was 3% on 2026-07-19)
+    prompt_injection       34 → 34  = unchanged
+    pii_leakage             1 → 2  ↑1 new
+  ```
+  This is useful for tracking which categories got better or worse. However, this information does NOT appear in the `--json` output or `--diff --json` output. The `diff` key in JSON contains `score`, `new_findings`, `fixed_findings`, etc. but no `category_delta` field.
+**Expected:** Per-category delta should be available in JSON output for CI pipelines and tooling that need to detect which specific categories regressed.
+**Actual:** `category_delta` is terminal-only; JSON users have to compute it manually from `category_breakdown` across two scans.
+**Workaround:** Compare `category_breakdown` in consecutive `--json` scans manually.
+**Status:** Open
+
+---
+
+## F-160: `probe-list --verbose --examples` combination duplicates all probe data in JSON
+**Date:** 2026-07-20
+**Severity:** low
+**Category:** dx-friction
+**Description:** When both `--verbose` and `--examples` are used with `--json`, the JSON output contains duplicate probe data:
+  - `examples`: normally 3 probe texts (with `--examples` alone), but jumps to ALL probes when `--verbose` is also active
+  - `probes`: all probe texts (added by `--verbose`)
+  
+  This means when both flags are combined, each probe text appears twice in the JSON response.
+**Expected:** `--verbose` and `--examples` should be clearly distinct modes. Combining them should either be an error or produce non-overlapping data.
+**Actual:** `examples` count changes from 3 to 35 when `--verbose` is added, and `probes` also has 35 — so 70 probe entries for a 35-probe category.
+**Workaround:** Use `--verbose` alone for full probe lists in JSON.
+**Status:** Open

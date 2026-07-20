@@ -249,21 +249,19 @@ def test_attach_faults_returns_self(ca_mock_tool, ca_mock_llm):
     assert ca_mock_llm.attach_faults(fi) is ca_mock_llm
 
 
-def test_attach_faults_second_call_overwrites_first(ca_mock_tool):
-    """Second attach_faults() overwrites the first injector — not additive."""
+def test_attach_faults_second_call_raises_valueerror(ca_mock_tool):
+    """F-079 FIXED: second attach_faults() with different injector raises ValueError."""
     fi1 = FaultInjector()
     fi1.on_tool("x").timeout()
 
-    fi2 = FaultInjector()  # no faults
+    fi2 = FaultInjector()  # different injector
 
     ca_mock_tool.register("x", response="ok",
                           schema={"type": "object", "properties": {}})
     ca_mock_tool.attach_faults(fi1)
-    ca_mock_tool.attach_faults(fi2)  # overwrites fi1
 
-    # fi1 is gone — call should succeed
-    result = ca_mock_tool.call_sync("x", {})
-    assert result == "ok", "Second attach_faults() overwrites the first (not additive)"
+    with pytest.raises(ValueError, match="already attached"):
+        ca_mock_tool.attach_faults(fi2)  # raises — not a silent overwrite
 
 
 # ---------------------------------------------------------------------------

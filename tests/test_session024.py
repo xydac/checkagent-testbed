@@ -83,20 +83,16 @@ def _make_three_agent_trace(
 # ---------------------------------------------------------------------------
 
 @pytest.mark.agent_test
-def test_f068_multiagent_partial_fix():
-    """F-068 PARTIALLY FIXED: MultiAgentTrace and HandoffType now at top-level.
-
-    Still missing: Handoff, assign_blame, BlameStrategy, top_blamed_agent.
-    """
+def test_f068_multiagent_fully_fixed():
+    """F-068 FULLY FIXED (session-079): all multiagent symbols now at top-level checkagent."""
     import checkagent
-    # These are now fixed:
-    assert hasattr(checkagent, "MultiAgentTrace"), "MultiAgentTrace should be at top-level"
-    assert hasattr(checkagent, "HandoffType"), "HandoffType should be at top-level"
-    # These still require checkagent.multiagent import:
-    assert not hasattr(checkagent, "Handoff"), "Handoff still not at top-level"
-    assert not hasattr(checkagent, "assign_blame"), "assign_blame still not at top-level"
-    assert not hasattr(checkagent, "BlameStrategy"), "BlameStrategy still not at top-level"
-    assert not hasattr(checkagent, "top_blamed_agent"), "top_blamed_agent still not at top-level"
+    symbols = [
+        "MultiAgentTrace", "HandoffType", "Handoff",
+        "assign_blame", "assign_blame_ensemble", "BlameStrategy",
+        "BlameResult", "top_blamed_agent",
+    ]
+    for sym in symbols:
+        assert hasattr(checkagent, sym), f"{sym} should be at top-level checkagent"
 
 
 @pytest.mark.agent_test
