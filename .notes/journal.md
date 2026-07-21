@@ -4412,3 +4412,52 @@ Or with changes:
 
 ### New feature: watch category delta
 The "Add category delta to watch rescan" commit extends the watch command to show per-category changes when re-scanning on file change. Could not test interactively (non-TTY environment), but the terminal output structure should match the scan delta display.
+
+---
+
+## Session-080 (2026-07-21)
+
+### Upstream CI
+**GREEN** — Latest 3 runs all succeed including the v1.6.0 bump commit. The Publish workflow ran alongside and v1.6.0 hit PyPI on 2026-07-21. The Node.js 20 deprecation warning continues to appear in CI annotations but has no functional impact.
+
+### Installed Version
+**v1.6.0** from git main and PyPI. Commit message: "Bump to v1.6.0: category_delta in diff JSON, probe-list duplication fix" — these are F-159 and F-160 respectively, both reported in session-079 and fixed in a single commit.
+
+### Tests
+
+**Pre-fix failures: 3**
+
+1. `test_session028.py::test_f079_double_attach_overwrites_first` — This test was written in session-028 documenting the broken behavior where second `attach_faults()` silently overwrote the first injector. F-079 was fixed in session-072 (raises `ValueError`), and we updated the related test in session-079, but missed this one. Renamed to `test_f079_double_attach_raises_valueerror` and updated to verify the fix.
+
+2. `test_session079.py::test_probe_list_verbose_examples_combination` — Was testing F-160 bug behavior (examples jumps to full probe count with --verbose). Now fixed in v1.6.0: examples stays ≤3. Updated to document the fixed state.
+
+3. `test_session079.py::test_scan_category_delta_not_in_diff_json` — Was documenting F-159 (category_delta absent from JSON). Now fixed in v1.6.0. Renamed to `test_scan_category_delta_now_in_diff_json` and updated to assert it IS present.
+
+**Post-fix: all tests pass** (plus 10 new session-080 tests).
+
+### F-159 FIXED (category_delta in diff JSON)
+
+`checkagent diff --json` now has a top-level `category_delta` key. `checkagent scan --diff --json` also has it inside the `diff` key. Structure:
+```json
+{
+  "category_delta": {
+    "prompt_injection": {"baseline": 34, "current": 35, "delta": 1},
+    "pii_leakage": {"baseline": 1, "current": 1, "delta": 0}
+  }
+}
+```
+This closes the machine-readability gap that required users to compute deltas manually across consecutive JSON scans. CI pipelines can now detect category-specific regressions directly.
+
+### F-160 FIXED (probe-list --verbose --examples duplication)
+
+Previously: combining `--verbose --examples --json` caused `examples` to jump from 3 to all probe count (35 for injection), creating duplicate data.
+
+Now: `examples` stays at ≤3 items regardless of `--verbose`. The `probes` key (added by `--verbose`) contains the full list. The two flags produce non-overlapping data and can be safely combined.
+
+### v1.6.0 PyPI confirmed
+
+`pip index versions checkagent` shows 1.6.0 as available. This is the tightest gap between upstream commits and PyPI release we've seen — the publish workflow ran on the same push as the CI workflow. Version consistency confirmed: `checkagent.__version__ == '1.6.0'`, CLI `--version` matches, importlib.metadata matches.
+
+### Observation: 3 stale tests found in one session
+
+All three test corrections were for findings that were documented as fixed in previous sessions but whose corresponding test was not updated at the time. Pattern: when a finding is fixed upstream, we update the finding status and scores, but sometimes miss a test that was written to document the broken behavior. Worth being more systematic about this — when marking a finding as fixed, search for all tests referencing that finding ID and update them.

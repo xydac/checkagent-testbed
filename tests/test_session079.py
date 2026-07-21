@@ -158,7 +158,8 @@ def test_probe_list_verbose_terminal_shows_numbered_list():
 
 @pytest.mark.agent_test
 def test_probe_list_verbose_examples_combination():
-    """--verbose --examples: both flags work together; probes has all, examples has all."""
+    """F-160 FIXED in v1.6.0: --verbose --examples no longer duplicates probes into examples.
+    probes has all probes; examples stays at <=3."""
     result = subprocess.run(
         ["checkagent", "probe-list", "--verbose", "--examples", "--json", "--category", "pii"],
         capture_output=True, text=True,
@@ -168,10 +169,10 @@ def test_probe_list_verbose_examples_combination():
     cat = data["categories"][0]
     assert "probes" in cat
     assert "examples" in cat
-    # Both should have all probes when combined
-    assert len(cat["probes"]) == 10
-    assert len(cat["examples"]) == 10, (
-        "when --verbose is set, --examples returns all probes (not just 3)"
+    # F-160 FIXED: examples is no longer inflated to all-probe count
+    assert len(cat["probes"]) == 10, "probes should have all 10 pii probes in --verbose mode"
+    assert len(cat["examples"]) <= 3, (
+        f"F-160 FIXED: examples should be <=3 even with --verbose, got {len(cat['examples'])}"
     )
 
 
@@ -222,10 +223,10 @@ def test_scan_category_delta_shows_category_breakdown():
 
 
 @pytest.mark.agent_test
-def test_scan_category_delta_not_in_diff_json():
-    """Category delta is shown in terminal but NOT yet in --diff JSON output.
+def test_scan_category_delta_now_in_diff_json():
+    """F-159 FIXED in v1.6.0: category_delta is now in --diff JSON output.
 
-    This is a finding: the category delta is terminal-only, not machine-readable.
+    Previously this was terminal-only (F-159). Now machine-readable.
     """
     # Run scan twice to build history
     subprocess.run(
@@ -237,18 +238,16 @@ def test_scan_category_delta_not_in_diff_json():
          "--category", "injection", "--diff", "--json"],
         capture_output=True, text=True,
     )
-    assert result.returncode == 0 or True  # scan may exit 1 for findings
     try:
         data = json.loads(result.stdout)
         diff = data.get("diff", {})
-        # category_delta is NOT in the diff JSON — terminal-only feature
-        has_category_delta = "category_delta" in diff
-        # Document the current behavior: it's not there
-        assert not has_category_delta, (
-            "category_delta IS now in diff JSON — update this test!"
+        # F-159 FIXED: category_delta IS now in the diff JSON
+        assert "category_delta" in diff, (
+            f"F-159 regression: category_delta missing from scan --diff --json. "
+            f"diff keys: {list(diff.keys())}"
         )
     except json.JSONDecodeError:
-        pass  # JSON may be preceded by auto-detect message
+        pytest.skip("Could not parse JSON (auto-detect message on stdout?)")
 
 
 @pytest.mark.agent_test

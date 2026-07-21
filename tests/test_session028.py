@@ -264,15 +264,15 @@ def test_f078_was_triggered_is_method_not_property():
 
 
 # ---------------------------------------------------------------------------
-# F-079: second attach_faults() overwrites first (still open)
+# F-079: second attach_faults() FIXED — now raises ValueError
 # ---------------------------------------------------------------------------
 
 @pytest.mark.agent_test
 @pytest.mark.asyncio
-async def test_f079_double_attach_overwrites_first():
+async def test_f079_double_attach_raises_valueerror():
     """
-    F-079 OPEN: Calling attach_faults() twice silently overwrites the first
-    injector. Faults from fi1 are lost when fi2 is attached. Not additive.
+    F-079 FIXED (session-072): Calling attach_faults() with a different injector
+    now raises ValueError with a helpful message. Previously silently overwrote fi1.
     """
     fi1 = FaultInjector()
     fi1.on_tool("search").timeout()
@@ -293,15 +293,12 @@ async def test_f079_double_attach_overwrites_first():
     )
 
     tool.attach_faults(fi1)
-    tool.attach_faults(fi2)  # overwrites fi1 — search fault is now lost
+    # second attach with a different injector now raises ValueError (F-079 fixed)
+    with pytest.raises(ValueError, match="FaultInjector is already attached"):
+        tool.attach_faults(fi2)
 
-    # search fault was in fi1 — should now be GONE (fi1 overwritten)
-    result = await tool.call("search", {"q": "test"})
-    assert result == {"result": "ok"}  # no fault — fi1 was silently dropped
-
-    # book fault is in fi2 — should still fire
-    with pytest.raises(Exception):
-        await tool.call("book", {"id": "123"})
+    # same injector is idempotent — no error
+    tool.attach_faults(fi1)
 
 
 # ---------------------------------------------------------------------------

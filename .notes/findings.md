@@ -1923,7 +1923,7 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** Per-category delta should be available in JSON output for CI pipelines and tooling that need to detect which specific categories regressed.
 **Actual:** `category_delta` is terminal-only; JSON users have to compute it manually from `category_breakdown` across two scans.
 **Workaround:** Compare `category_breakdown` in consecutive `--json` scans manually.
-**Status:** Open
+**Status:** Fixed in v1.6.0 — `category_delta` now appears in both `checkagent diff --json` (top-level key) and `checkagent scan --diff --json` (inside the `diff` key). Structure: `{category_name: {baseline: N, current: N, delta: N}}`.
 
 ---
 
@@ -1939,4 +1939,4 @@ A user who builds topology via `parent_run_id` (common when wrapping real agents
 **Expected:** `--verbose` and `--examples` should be clearly distinct modes. Combining them should either be an error or produce non-overlapping data.
 **Actual:** `examples` count changes from 3 to 35 when `--verbose` is added, and `probes` also has 35 — so 70 probe entries for a 35-probe category.
 **Workaround:** Use `--verbose` alone for full probe lists in JSON.
-**Status:** Open
+**Status:** Fixed in v1.6.0 — `examples` now stays at ≤3 even when `--verbose` is also active. `probes` has the full list; `examples` is independent.
